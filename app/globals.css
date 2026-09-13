@@ -1380,6 +1380,314 @@ button.row:hover { background: var(--surface-soft); }
   gap: 12px;
 }
 
+/* ==========================================================================
+   Visual Anatomical Tooth Visualizer Component (.visual-tooth-*)
+   ========================================================================== */
+
+.visual-tooth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-card);
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.18s ease;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Size Variants */
+.visual-tooth-card.size-sm {
+  min-width: 52px;
+  max-width: 66px;
+  min-height: 88px;
+  padding: 5px 3px 4px 3px;
+  gap: 2px;
+}
+
+.visual-tooth-card.size-md {
+  min-width: 68px;
+  max-width: 84px;
+  min-height: 112px;
+  padding: 6px 4px 5px 4px;
+  gap: 3px;
+}
+
+.visual-tooth-card.size-lg {
+  min-width: 96px;
+  max-width: 122px;
+  min-height: 142px;
+  padding: 10px 8px 8px 8px;
+  gap: 6px;
+}
+
+/* Hover Effects */
+.visual-tooth-card:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 8px 18px -4px rgba(0, 0, 0, 0.1), 0 2px 6px -1px rgba(0, 0, 0, 0.06);
+  border-color: var(--muted-soft);
+  z-index: 5;
+}
+
+.visual-tooth-card:hover .visual-tooth-svg {
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.12));
+}
+
+.visual-tooth-card:hover .visual-tooth-crown {
+  filter: brightness(1.03);
+}
+
+/* Active Outline Glow */
+.visual-tooth-card.is-selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.35), 0 8px 20px -2px rgba(204, 120, 92, 0.25);
+  transform: translateY(-3px) scale(1.04);
+  background: var(--surface-soft);
+  z-index: 10;
+}
+
+.visual-tooth-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Condition Card Sub-tints */
+.visual-tooth-card.condition-caries {
+  background: linear-gradient(180deg, var(--canvas) 0%, rgba(198, 69, 69, 0.04) 100%);
+}
+
+.visual-tooth-card.condition-restored {
+  background: linear-gradient(180deg, var(--canvas) 0%, rgba(93, 184, 166, 0.04) 100%);
+}
+
+.visual-tooth-card.condition-crown {
+  background: linear-gradient(180deg, var(--canvas) 0%, rgba(245, 158, 11, 0.05) 100%);
+}
+
+.visual-tooth-card.condition-implant {
+  background: linear-gradient(180deg, var(--canvas) 0%, rgba(71, 85, 105, 0.05) 100%);
+}
+
+/* Anatomical SVG Rendering */
+.visual-tooth-svg {
+  display: block;
+  overflow: visible;
+  transition: transform 0.2s ease, filter 0.2s ease;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.07));
+}
+
+.visual-tooth-card.size-sm .visual-tooth-svg {
+  width: 38px;
+  height: 54px;
+}
+
+.visual-tooth-card.size-md .visual-tooth-svg {
+  width: 50px;
+  height: 70px;
+}
+
+.visual-tooth-card.size-lg .visual-tooth-svg {
+  width: 72px;
+  height: 100px;
+}
+
+.visual-tooth-root {
+  transition: opacity 0.2s ease, stroke 0.2s ease;
+}
+
+.visual-tooth-implant {
+  transition: filter 0.2s ease;
+}
+
+.visual-tooth-crown {
+  transition: filter 0.2s ease, stroke 0.2s ease;
+}
+
+/* Inner Card Header & Badges */
+.visual-tooth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 2px;
+}
+
+.visual-tooth-fdi {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.6875rem;
+  line-height: 1;
+  color: var(--body-strong);
+}
+
+.visual-tooth-card.size-sm .visual-tooth-fdi {
+  font-size: 0.5625rem;
+}
+
+.visual-tooth-card.size-lg .visual-tooth-fdi {
+  font-size: 0.8125rem;
+}
+
+.visual-tooth-num {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 0.625rem;
+  line-height: 1;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+.visual-tooth-card.size-sm .visual-tooth-num {
+  font-size: 0.5rem;
+  padding: 1px 2px;
+}
+
+.visual-tooth-card.size-lg .visual-tooth-num {
+  font-size: 0.75rem;
+  padding: 2px 5px;
+}
+
+.visual-tooth-tag {
+  font-family: var(--font-sans);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  line-height: 1.1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+  text-transform: capitalize;
+  border: 1px solid transparent;
+}
+
+.visual-tooth-card.size-sm .visual-tooth-tag {
+  font-size: 0.5rem;
+  padding: 1px 2px;
+}
+
+.visual-tooth-card.size-lg .visual-tooth-tag {
+  font-size: 0.6875rem;
+  padding: 3px 6px;
+}
+
+.visual-tooth-notes {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  line-height: 1;
+  color: var(--muted);
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: rgba(0, 0, 0, 0.04);
+  padding: 1px 3px;
+  border-radius: 3px;
+}
+
+/* ==========================================================================
+   Arch Midline Dividers & Arch Switcher Controls
+   ========================================================================== */
+
+.arch-midline-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  margin: 0 4px;
+  position: relative;
+  user-select: none;
+  align-self: stretch;
+}
+
+.arch-midline-line {
+  width: 2px;
+  height: 100%;
+  min-height: 70px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--hairline) 20%,
+    var(--primary) 50%,
+    var(--hairline) 80%,
+    transparent 100%
+  );
+  border-radius: 1px;
+}
+
+.arch-midline-badge {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  font-family: var(--font-sans);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--primary);
+  background: var(--canvas);
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--hairline);
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.arch-switcher-group {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-card);
+  padding: 3px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--hairline);
+  gap: 2px;
+}
+
+.arch-switcher-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: calc(var(--r-control) - 2px);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.arch-switcher-btn:hover {
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.arch-switcher-btn.is-active {
+  color: var(--ink);
+  background: var(--canvas);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
 .inspector-head {
   display: flex;
   align-items: center;
@@ -2613,6 +2921,26 @@ button.row:hover { background: var(--surface-soft); }
 
   .tooth-icon {
     font-size: 1.15rem;
+  }
+
+  .visual-tooth-card.size-md {
+    min-width: 58px;
+    max-width: 72px;
+    min-height: 96px;
+    padding: 4px 2px 4px 2px;
+  }
+
+  .visual-tooth-card.size-md .visual-tooth-svg {
+    width: 42px;
+    height: 58px;
+  }
+
+  .visual-tooth-card.size-md .visual-tooth-fdi {
+    font-size: 0.625rem;
+  }
+
+  .visual-tooth-card.size-md .visual-tooth-num {
+    font-size: 0.5625rem;
   }
 }
 

@@ -16,4 +16,5 @@ node_modules/
 tsconfig.tsbuildinfo
 .impeccable/hook.cache.json
 .data/
+.idea/
 

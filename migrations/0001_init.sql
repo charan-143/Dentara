@@ -252,6 +252,16 @@ CREATE TABLE IF NOT EXISTS notes (
 );
 CREATE INDEX IF NOT EXISTS idx_notes_patient ON notes(patient_id);
 
+CREATE TABLE IF NOT EXISTS examination_questionnaire (
+  id         TEXT PRIMARY KEY,
+  patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+  category   TEXT NOT NULL,
+  answers    JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(patient_id, category)
+);
+CREATE INDEX IF NOT EXISTS idx_examination_questionnaire_patient ON examination_questionnaire(patient_id);
+
 -- --------------------------------------------------------------------------
 -- audit
 -- --------------------------------------------------------------------------
