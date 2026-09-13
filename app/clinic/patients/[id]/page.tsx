@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { DentalChart } from "@/components/dental-chart";
+import { ExaminationQuestions } from "@/components/examination-questions";
+import { getExaminationAnswersAction } from "@/actions/clinical";
 import { PatientChartTabs } from "@/components/patient-chart-tabs";
 import { PatientDemographicsView } from "@/components/patient-demographics-view";
 import { TreatmentPlansView } from "@/components/treatment-plans-view";
@@ -175,6 +177,8 @@ export default async function PatientChartPage({ params }: { params: Promise<{ i
     ` as unknown as Promise<Array<{ tooth_num: number; condition: string; notes: string | null }>>,
   ]);
 
+  const examAnswers = await getExaminationAnswersAction(id).catch(() => null);
+
   const overviewSection = (
     <div key="sec-overview">
       <PatientDemographicsView
@@ -189,6 +193,10 @@ export default async function PatientChartPage({ params }: { params: Promise<{ i
 
   const odontogramSection = (
     <div key="sec-odontogram" style={{ display: "grid", gap: 24 }}>
+      <ExaminationQuestions
+        patientId={patient.id}
+        initialAnswers={examAnswers}
+      />
       <DentalChart
         patientId={patient.id}
         initialChart={savedChartRows}

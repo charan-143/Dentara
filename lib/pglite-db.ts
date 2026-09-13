@@ -100,6 +100,15 @@ async function initPGlite(): Promise<any> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE(patient_id, tooth_num)
     );
+
+    CREATE TABLE IF NOT EXISTS examination_questionnaire (
+      id         TEXT PRIMARY KEY,
+      patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      category   TEXT NOT NULL,
+      answers    JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(patient_id, category)
+    );
   `);
 
   // Seed demo data if clinicians table is empty

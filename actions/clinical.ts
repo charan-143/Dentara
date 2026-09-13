@@ -266,6 +266,139 @@ export async function getToothChartAction(
 }
 
 /**
+ * Saves or updates a patient's clinical examination questionnaire answers.
+ */
+export async function saveExaminationAnswersAction(
+  patientId: string,
+  answers: Record<string, any>,
+): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireStaff(`/clinic/patients/${patientId}`);
+  const sql = db();
+  const id = newId("eq");
+  const category = "clinical_examination";
+
+  try {
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS examination_questionnaire (
+          id TEXT PRIMARY KEY,
+          patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+          category TEXT NOT NULL,
+          answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE(patient_id, category)
+        );
+      `;
+    } catch (e) {}
+
+    const answersJson = JSON.stringify(answers || {});
+
+    try {
+      await sql`
+        INSERT INTO examination_questionnaire (id, patient_id, category, answers, updated_at)
+        VALUES (${id}, ${patientId}, ${category}, ${answersJson}, now())
+        ON CONFLICT (patient_id, category) DO UPDATE SET
+          answers = EXCLUDED.answers,
+          updated_at = now()
+      `;
+    } catch (tableErr) {
+      // Graceful fallback to conditions table
+      console.warn("examination_questionnaire save fallback to conditions table:", tableErr);
+      const condId = `exam_${patientId.replace(/[^a-zA-Z0-9]/g, "")}`;
+      const fallbackLabel = `EXAM_ANSWERS:${answersJson}`;
+      await sql`
+        INSERT INTO conditions (id, patient_id, label)
+        VALUES (${condId}, ${patientId}, ${fallbackLabel})
+        ON CONFLICT (id) DO UPDATE SET label = EXCLUDED.label
+      `;
+    }
+
+    await record({
+      actorId: user.clinicianId,
+      actorRole: user.role,
+      action: "updated clinical examination questionnaire answers",
+      entity: "patient",
+      entityId: patientId,
+      patientId,
+    });
+
+    revalidatePath(`/clinic/patients/${patientId}`);
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    console.error("save examination questionnaire answers failed:", message || "unknown");
+    return { ok: false, error: "Failed to save examination questionnaire answers." };
+  }
+}
+
+/**
+ * Retrieves a patient's clinical examination questionnaire answers from the database.
+ */
+export async function getExaminationAnswersAction(
+  patientId: string,
+): Promise<Record<string, any> | null> {
+  await requireStaff(`/clinic/patients/${patientId}`);
+  const sql = db();
+
+  try {
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS examination_questionnaire (
+          id TEXT PRIMARY KEY,
+          patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+          category TEXT NOT NULL,
+          answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          UNIQUE(patient_id, category)
+        );
+      `;
+    } catch (e) {}
+
+    const rows = (await sql`
+      SELECT answers FROM examination_questionnaire
+      WHERE patient_id = ${patientId} AND category = 'clinical_examination'
+      LIMIT 1
+    `) as Array<{ answers: Record<string, any> | string }>;
+
+    const firstRow = rows && rows.length > 0 ? rows[0] : undefined;
+    if (firstRow && firstRow.answers) {
+      const val = firstRow.answers;
+      if (typeof val === "string") {
+        try {
+          return JSON.parse(val);
+        } catch {
+          return {};
+        }
+      }
+      return val;
+    }
+
+    // Graceful fallback: check conditions table
+    const fallbackRows = (await sql`
+      SELECT label FROM conditions
+      WHERE patient_id = ${patientId} AND label LIKE 'EXAM_ANSWERS:%'
+      ORDER BY id DESC LIMIT 1
+    `) as Array<{ label: string }>;
+
+    const firstFallback = fallbackRows && fallbackRows.length > 0 ? fallbackRows[0] : undefined;
+    if (firstFallback) {
+      const raw = firstFallback.label.replace(/^EXAM_ANSWERS:/, "");
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error("get examination questionnaire answers failed:", error);
+    return null;
+  }
+}
+
+
+/**
  * Creates a treatment plan for a patient with bullet point steps ("Advice to ...").
  */
 export async function createTreatmentPlanAction(

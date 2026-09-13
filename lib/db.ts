@@ -44,6 +44,16 @@ async function ensureNeonColumns(client: NeonQueryFunction<false, false>) {
             SELECT id FROM clinicians WHERE active ORDER BY id LIMIT 1
           ) WHERE primary_clinician_id IS NULL;
         `);
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS examination_questionnaire (
+            id         TEXT PRIMARY KEY,
+            patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+            category   TEXT NOT NULL,
+            answers    JSONB NOT NULL DEFAULT '{}'::jsonb,
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE(patient_id, category)
+          );
+        `);
       } catch (colErr) {
         console.warn("Fast-path primary_clinician_id migration notice:", colErr instanceof Error ? colErr.message : String(colErr));
       }
@@ -325,6 +335,14 @@ async function ensureNeonColumns(client: NeonQueryFunction<false, false>) {
       clinician_id TEXT NOT NULL REFERENCES clinicians(id),
       body         TEXT NOT NULL,
       created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );`,
+    `CREATE TABLE IF NOT EXISTS examination_questionnaire (
+      id         TEXT PRIMARY KEY,
+      patient_id TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
+      category   TEXT NOT NULL,
+      answers    JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE(patient_id, category)
     );`,
     `CREATE TABLE IF NOT EXISTS audit (
       seq        BIGSERIAL PRIMARY KEY,

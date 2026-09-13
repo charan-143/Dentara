@@ -6,6 +6,7 @@ import {
   getToothChartAction,
 } from "@/actions/clinical";
 import { ClinicalDiagnosisCard } from "@/components/clinical-diagnosis-card";
+import { VisualTooth } from "@/components/visual-tooth";
 
 export type ToothCondition = string;
 
@@ -299,6 +300,7 @@ export function DentalChart({ patientId, initialChart, conditions = [] }: Dental
   }, [patientId, initialChart]);
 
   const [selectedNum, setSelectedNum] = useState<number | null>(19);
+  const [archFilter, setArchFilter] = useState<"all" | "maxillary" | "mandibular">("all");
   const selectedTooth = selectedNum ? teeth[selectedNum] : null;
 
   // Instant update + Auto-save to DB on condition button click
@@ -377,46 +379,18 @@ export function DentalChart({ patientId, initialChart, conditions = [] }: Dental
 
   const renderToothButton = (num: number) => {
     const t = teeth[num]!;
-    const condStyle = getConditionStyle(t.condition);
-    const isSelected = selectedNum === num;
-    const hasNotes = Boolean(t.notes && t.notes.trim().length > 0);
-
     return (
-      <button
+      <VisualTooth
         key={num}
-        type="button"
-        className={`tooth-btn ${isSelected ? "is-active" : ""}`}
-        style={{
-          backgroundColor: condStyle.bg,
-          color: condStyle.text,
-          borderColor: isSelected ? "var(--primary)" : "var(--hairline)",
-        }}
+        toothNum={t.num}
+        fdi={t.fdi}
+        name={t.name}
+        condition={t.condition}
+        isSelected={selectedNum === num}
+        notes={t.notes}
+        size="md"
         onClick={() => setSelectedNum(selectedNum === num ? null : num)}
-        title={`#${t.num} (FDI ${t.fdi}) - ${t.name}\nSaved Condition: ${condStyle.label}${hasNotes ? `\nSaved Notes: ${t.notes}` : ""}`}
-      >
-        <div style={{ display: "flex", justifyContent: "space-between", width: "100%", alignItems: "center" }}>
-          <span className="tooth-fdi">{t.fdi}</span>
-          <span className="tooth-num">#{t.num}</span>
-        </div>
-
-        <i className="ph-fill ph-tooth tooth-icon" />
-
-        <span
-          className="tooth-cond-tag"
-          style={{
-            color: condStyle.text,
-          }}
-        >
-          {condStyle.label}
-        </span>
-
-        {hasNotes && (
-          <span className="tooth-notes-tag" title={t.notes}>
-            <i className="ph ph-note-pencil" style={{ flexShrink: 0 }} />
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.notes}</span>
-          </span>
-        )}
-      </button>
+      />
     );
   };
 
@@ -425,20 +399,31 @@ export function DentalChart({ patientId, initialChart, conditions = [] }: Dental
 
     return (
       <div className="tooth-inspector-card" style={{ marginTop: 12 }}>
-        <div className="inspector-head">
-          <div>
-            <strong>Tooth #{selectedTooth.num} (FDI {selectedTooth.fdi})</strong>
-            <span className="meta">{selectedTooth.name}</span>
+        <div className="inspector-head" style={{ alignItems: "center", gap: 14 }}>
+          <VisualTooth
+            toothNum={selectedTooth.num}
+            fdi={selectedTooth.fdi}
+            name={selectedTooth.name}
+            condition={selectedTooth.condition}
+            isSelected={true}
+            notes={selectedTooth.notes}
+            size="sm"
+          />
+          <div style={{ flex: 1 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <strong>Tooth #{selectedTooth.num} (FDI {selectedTooth.fdi})</strong>
+              <span
+                className="badge"
+                style={{
+                  backgroundColor: getConditionStyle(selectedTooth.condition).bg,
+                  color: getConditionStyle(selectedTooth.condition).text,
+                }}
+              >
+                {getConditionStyle(selectedTooth.condition).label}
+              </span>
+            </div>
+            <span className="meta" style={{ display: "block", marginTop: 2 }}>{selectedTooth.name}</span>
           </div>
-          <span
-            className="badge"
-            style={{
-              backgroundColor: getConditionStyle(selectedTooth.condition).bg,
-              color: getConditionStyle(selectedTooth.condition).text,
-            }}
-          >
-            {getConditionStyle(selectedTooth.condition).label}
-          </span>
         </div>
 
         <div className="inspector-body" style={{ display: "grid", gap: 14 }}>
@@ -498,10 +483,36 @@ export function DentalChart({ patientId, initialChart, conditions = [] }: Dental
         <div className="panel-head">
           <h2>
             <i className="ph ph-tooth" aria-hidden="true" style={{ color: "var(--primary)" }} />
-            32-Tooth 4-Quadrant Dental Odontogram
+            32-Tooth Anatomical Odontogram
           </h2>
           <div className="spacer" />
-          <span className="badge badge-info">FDI 4-Quadrant View</span>
+          <div className="arch-switcher-group" role="tablist" aria-label="Odontogram Arch View">
+            <button
+              type="button"
+              className={`arch-switcher-btn ${archFilter === "all" ? "is-active" : ""}`}
+              onClick={() => setArchFilter("all")}
+            >
+              <i className="ph ph-squares-four" aria-hidden="true" />
+              Both Arches
+            </button>
+            <button
+              type="button"
+              className={`arch-switcher-btn ${archFilter === "maxillary" ? "is-active" : ""}`}
+              onClick={() => setArchFilter("maxillary")}
+            >
+              <i className="ph ph-arrow-up" aria-hidden="true" />
+              Maxillary
+            </button>
+            <button
+              type="button"
+              className={`arch-switcher-btn ${archFilter === "mandibular" ? "is-active" : ""}`}
+              onClick={() => setArchFilter("mandibular")}
+            >
+              <i className="ph ph-arrow-down" aria-hidden="true" />
+              Mandibular
+            </button>
+          </div>
+          <span className="badge badge-info" style={{ marginLeft: 8 }}>FDI 4-Quadrant View</span>
         </div>
 
         <div className="panel-body">
@@ -599,66 +610,104 @@ export function DentalChart({ patientId, initialChart, conditions = [] }: Dental
           {/* Main 4-Quadrant Arch Container */}
           <div style={{ display: "grid", gap: 20 }}>
             {/* Maxillary Arch (Upper Arch - 2 Quadrants) */}
-            <div className="card card-soft" style={{ padding: 16, display: "grid", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, font: "var(--title-sm)", color: "var(--primary)" }}>
-                <i className="ph ph-squares-four" aria-hidden="true" />
-                <strong>Maxillary Arch (Upper Teeth)</strong>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                {/* Maxillary Right Quadrant (Q1) */}
-                <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
-                  <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
-                    Maxillary Right (Q1)
+            {(archFilter === "all" || archFilter === "maxillary") && (
+              <div className="card card-soft" style={{ padding: 16, display: "grid", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, font: "var(--title-sm)", color: "var(--primary)" }}>
+                    <i className="ph ph-squares-four" aria-hidden="true" />
+                    <strong>Maxillary Arch (Upper Teeth 1–16)</strong>
                   </div>
-                  <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
-                    {q1MaxillaryRight.map(renderToothButton)}
-                  </div>
-                  {renderInspectorCardForQuadrant("UR")}
+                  <span className="caption" style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                    Roots Point Up (Maxilla) • Crown Points Down
+                  </span>
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                  {/* Maxillary Right Quadrant (Q1) */}
+                  <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
+                    <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
+                      Maxillary Right (Q1) • Teeth 1–8
+                    </div>
+                    <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
+                      {q1MaxillaryRight.map(renderToothButton)}
+                    </div>
+                    {renderInspectorCardForQuadrant("UR")}
+                  </div>
 
-                {/* Maxillary Left Quadrant (Q2) */}
-                <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
-                  <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
-                    Maxillary Left (Q2)
+                  {/* Maxillary Left Quadrant (Q2) */}
+                  <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
+                    <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
+                      Maxillary Left (Q2) • Teeth 9–16
+                    </div>
+                    <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
+                      {q2MaxillaryLeft.map(renderToothButton)}
+                    </div>
+                    {renderInspectorCardForQuadrant("UL")}
                   </div>
-                  <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
-                    {q2MaxillaryLeft.map(renderToothButton)}
-                  </div>
-                  {renderInspectorCardForQuadrant("UL")}
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Occlusal Plane Divider between Maxillary and Mandibular Arches */}
+            {archFilter === "all" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "2px 0" }} aria-hidden="true">
+                <div style={{ flex: 1, height: 1, background: "var(--hairline)" }} />
+                <span
+                  style={{
+                    font: "var(--caption)",
+                    color: "var(--muted)",
+                    fontSize: "0.6875rem",
+                    fontWeight: 700,
+                    letterSpacing: "0.5px",
+                    textTransform: "uppercase",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <i className="ph ph-arrows-down-up" style={{ color: "var(--primary)" }} />
+                  Occlusal Plane (Coronal Bite Line)
+                </span>
+                <div style={{ flex: 1, height: 1, background: "var(--hairline)" }} />
+              </div>
+            )}
 
             {/* Mandibular Arch (Lower Arch - 2 Quadrants) */}
-            <div className="card card-soft" style={{ padding: 16, display: "grid", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, font: "var(--title-sm)", color: "var(--primary)" }}>
-                <i className="ph ph-squares-four" aria-hidden="true" />
-                <strong>Mandibular Arch (Lower Teeth)</strong>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
-                {/* Mandibular Right Quadrant (Q4) */}
-                <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
-                  <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
-                    Mandibular Right (Q4)
+            {(archFilter === "all" || archFilter === "mandibular") && (
+              <div className="card card-soft" style={{ padding: 16, display: "grid", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, font: "var(--title-sm)", color: "var(--primary)" }}>
+                    <i className="ph ph-squares-four" aria-hidden="true" />
+                    <strong>Mandibular Arch (Lower Teeth 17–32)</strong>
                   </div>
-                  <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
-                    {q4MandibularRight.map(renderToothButton)}
-                  </div>
-                  {renderInspectorCardForQuadrant("LR")}
+                  <span className="caption" style={{ color: "var(--muted)", fontSize: "0.75rem" }}>
+                    Roots Point Down (Mandible) • Crown Points Up
+                  </span>
                 </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+                  {/* Mandibular Right Quadrant (Q4) */}
+                  <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
+                    <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
+                      Mandibular Right (Q4) • Teeth 25–32
+                    </div>
+                    <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
+                      {q4MandibularRight.map(renderToothButton)}
+                    </div>
+                    {renderInspectorCardForQuadrant("LR")}
+                  </div>
 
-                {/* Mandibular Left Quadrant (Q3) */}
-                <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
-                  <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
-                    Mandibular Left (Q3)
+                  {/* Mandibular Left Quadrant (Q3) */}
+                  <div style={{ background: "var(--canvas)", padding: 12, borderRadius: "var(--r-card)", border: "1px solid var(--border)" }}>
+                    <div style={{ font: "var(--caption)", color: "var(--muted)", marginBottom: 8, fontWeight: 600 }}>
+                      Mandibular Left (Q3) • Teeth 17–24
+                    </div>
+                    <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
+                      {q3MandibularLeft.map(renderToothButton)}
+                    </div>
+                    {renderInspectorCardForQuadrant("LL")}
                   </div>
-                  <div className="arch-teeth-row" style={{ justifyContent: "flex-start", flexWrap: "wrap", gap: 6 }}>
-                    {q3MandibularLeft.map(renderToothButton)}
-                  </div>
-                  {renderInspectorCardForQuadrant("LL")}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
