@@ -486,7 +486,7 @@ private fun OdontogramView(
     onToothClick: (ToothRecord) -> Unit
 ) {
     val scrollState = rememberScrollState()
-    var selectedArch by remember { mutableStateOf(ArchSelection.SPLIT) }
+    var quadrantFilter by remember { mutableStateOf(QuadrantFilter.ALL) }
 
     Column(
         modifier = Modifier
@@ -494,46 +494,13 @@ private fun OdontogramView(
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
-        // Arch Switcher Bar for fast mobile ergonomics
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(6.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                ArchSelection.values().forEach { arch ->
-                    val isSelected = arch == selectedArch
-                    Surface(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { selectedArch = arch },
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) ThornburyPrimary else Color.Transparent,
-                        border = if (isSelected) null else BorderStroke(1.dp, ThornburyHairline.copy(alpha = 0.5f))
-                    ) {
-                        Text(
-                            text = when (arch) {
-                                ArchSelection.SPLIT -> "Full Mouth"
-                                ArchSelection.MAXILLARY -> "Upper Arch"
-                                ArchSelection.MANDIBULAR -> "Lower Arch"
-                            },
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            ),
-                            color = if (isSelected) Color.White else ThornburyInk,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-                }
+        // Arch & Quadrant Filter Bar for fast mobile ergonomics
+        QuadrantFilterRow(
+            selectedFilter = quadrantFilter,
+            onFilterSelected = { filter ->
+                quadrantFilter = filter
             }
-        }
+        )
 
         Spacer(modifier = Modifier.height(14.dp))
 
@@ -568,177 +535,39 @@ private fun OdontogramView(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Upper Arch (Maxillary Teeth 1 to 16)
-        if (selectedArch == ArchSelection.SPLIT || selectedArch == ArchSelection.MAXILLARY) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(ThornburyPrimary, CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Maxillary Arch (Upper Teeth 1 - 16)",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
-                                ),
-                                color = ThornburyInk
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = ThornburyPrimaryWash
-                        ) {
-                            Text(
-                                text = "UR 1-8  |  UL 9-16",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = ThornburyPrimaryText,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Upper Teeth Row with Quadrant Midline
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Upper Right (1 to 8)
-                        for (num in 1..8) {
-                            val tooth = teeth[num] ?: ToothRecord(num, num, "Tooth $num", "Upper")
-                            AnatomicalToothView(
-                                tooth = tooth,
-                                isSelected = selectedToothId == tooth.number,
-                                onClick = { onToothClick(tooth) }
-                            )
-                        }
-
-                        // Midline Divider
-                        Box(
-                            modifier = Modifier
-                                .width(2.dp)
-                                .height(80.dp)
-                                .background(ThornburyPrimary.copy(alpha = 0.4f), RoundedCornerShape(1.dp))
-                        )
-
-                        // Upper Left (9 to 16)
-                        for (num in 9..16) {
-                            val tooth = teeth[num] ?: ToothRecord(num, num, "Tooth $num", "Upper")
-                            AnatomicalToothView(
-                                tooth = tooth,
-                                isSelected = selectedToothId == tooth.number,
-                                onClick = { onToothClick(tooth) }
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
+        // Upper Arch (Maxillary Teeth 1 to 16, split into Upper Right & Upper Left quadrants)
+        if (quadrantFilter == QuadrantFilter.ALL ||
+            quadrantFilter == QuadrantFilter.UPPER ||
+            quadrantFilter == QuadrantFilter.UPPER_RIGHT ||
+            quadrantFilter == QuadrantFilter.UPPER_LEFT
+        ) {
+            MaxillaryArchContainer(
+                teeth = teeth,
+                selectedToothId = selectedToothId,
+                onToothClick = onToothClick,
+                activeFilter = quadrantFilter
+            )
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Lower Arch (Mandibular Teeth 17 - 32)
-        if (selectedArch == ArchSelection.SPLIT || selectedArch == ArchSelection.MANDIBULAR) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .background(ThornburyAccentTeal, CircleShape)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Mandibular Arch (Lower Teeth 17 - 32)",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
-                                ),
-                                color = ThornburyInk
-                            )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = ThornburyInfoWash
-                        ) {
-                            Text(
-                                text = "LL 17-24  |  LR 25-32",
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = ThornburyPrimaryText,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
+        // Occlusal Plane Divider between Upper and Lower Arches (Coronal Bite Line)
+        if (quadrantFilter == QuadrantFilter.ALL) {
+            OcclusalPlaneDivider()
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Lower Teeth Row with Quadrant Midline
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Lower Left (17 to 24)
-                        for (num in 17..24) {
-                            val tooth = teeth[num] ?: ToothRecord(num, num, "Tooth $num", "Lower")
-                            AnatomicalToothView(
-                                tooth = tooth,
-                                isSelected = selectedToothId == tooth.number,
-                                onClick = { onToothClick(tooth) }
-                            )
-                        }
-
-                        // Midline Divider
-                        Box(
-                            modifier = Modifier
-                                .width(2.dp)
-                                .height(80.dp)
-                                .background(ThornburyAccentTeal.copy(alpha = 0.4f), RoundedCornerShape(1.dp))
-                        )
-
-                        // Lower Right (25 to 32)
-                        for (num in 25..32) {
-                            val tooth = teeth[num] ?: ToothRecord(num, num, "Tooth $num", "Lower")
-                            AnatomicalToothView(
-                                tooth = tooth,
-                                isSelected = selectedToothId == tooth.number,
-                                onClick = { onToothClick(tooth) }
-                            )
-                        }
-                    }
-                }
-            }
-
+        // Lower Arch (Mandibular Teeth 17 to 32, split into Lower Left & Lower Right quadrants)
+        if (quadrantFilter == QuadrantFilter.ALL ||
+            quadrantFilter == QuadrantFilter.LOWER ||
+            quadrantFilter == QuadrantFilter.LOWER_LEFT ||
+            quadrantFilter == QuadrantFilter.LOWER_RIGHT
+        ) {
+            MandibularArchContainer(
+                teeth = teeth,
+                selectedToothId = selectedToothId,
+                onToothClick = onToothClick,
+                activeFilter = quadrantFilter
+            )
             Spacer(modifier = Modifier.height(16.dp))
         }
 
