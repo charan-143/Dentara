@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,11 +45,9 @@ fun AddReportDialog(
     var selectedKind by remember { mutableStateOf(kinds[0]) }
 
     var title by remember { mutableStateOf("") }
-    var selectedClinician by remember {
-        mutableStateOf(DentalRepository.clinicians.firstOrNull()?.name ?: "Dr. Ingrid Halvorsen")
-    }
+    val selectedClinician = "Dr. Ingrid Halvorsen"
     var summary by remember { mutableStateOf("") }
-    var releasedImmediately by remember { mutableStateOf(false) }
+    val releasedImmediately = false
 
     val quickTitles = listOf(
         "Periapical Radiograph Tooth #19",
@@ -92,7 +89,6 @@ fun AddReportDialog(
                             text = "New Diagnostic Record",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
                             ),
                             color = ThornburyInk
                         )
@@ -182,10 +178,7 @@ fun AddReportDialog(
                     placeholder = { Text("e.g. Periapical Radiograph Tooth #19") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    ),
+                    colors = thornburyTextFieldColors(containerColor = ThornburySurfaceSoft),
                     singleLine = true
                 )
 
@@ -217,60 +210,7 @@ fun AddReportDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 3. Attending Clinician Selector
-                Text(
-                    text = "Attending Clinician",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = ThornburyInk
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    DentalRepository.clinicians.forEach { clinician ->
-                        val isSelected = clinician.name == selectedClinician
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedClinician = clinician.name },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) ThornburySurfaceSoft else ThornburyCanvas,
-                            border = BorderStroke(
-                                1.dp,
-                                if (isSelected) ThornburyPrimary else ThornburyHairline
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { selectedClinician = clinician.name },
-                                    colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Column {
-                                    Text(
-                                        text = clinician.name,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        color = ThornburyInk
-                                    )
-                                    Text(
-                                        text = "${clinician.specialty} • ${clinician.room}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ThornburyMuted
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 4. Clinical Findings / Diagnostic Summary
+                // 3. Clinical Findings & Diagnostic Summary
                 Text(
                     text = "Clinical Findings & Diagnostic Summary",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
@@ -286,10 +226,7 @@ fun AddReportDialog(
                         .fillMaxWidth()
                         .height(110.dp),
                     shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
+                    colors = thornburyTextFieldColors(containerColor = ThornburySurfaceSoft)
                 )
 
                 Spacer(modifier = Modifier.height(6.dp))
@@ -317,63 +254,6 @@ fun AddReportDialog(
                                 color = ThornburyMuted
                             )
                         }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 5. Patient Safety Release Switch
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = if (releasedImmediately) ThornburySuccessWash else ThornburySurfaceSoft,
-                    border = BorderStroke(
-                        1.dp,
-                        if (releasedImmediately) ThornburySuccess.copy(alpha = 0.5f) else ThornburyHairline
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = if (releasedImmediately) Icons.Default.Visibility else Icons.Default.Lock,
-                                    contentDescription = null,
-                                    tint = if (releasedImmediately) ThornburySuccess else ThornburyWarning,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Save & Release Immediately",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = if (releasedImmediately) ThornburySuccess else ThornburyInk
-                                )
-                            }
-                            Text(
-                                text = if (releasedImmediately)
-                                    "Result will instantly be visible in patient's portal."
-                                else
-                                    "Result remains 'Held in Surgery' until clinician signs off.",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                color = ThornburyMuted
-                            )
-                        }
-
-                        Switch(
-                            checked = releasedImmediately,
-                            onCheckedChange = { releasedImmediately = it },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = Color.White,
-                                checkedTrackColor = ThornburySuccess,
-                                uncheckedThumbColor = ThornburyMuted,
-                                uncheckedTrackColor = ThornburyHairline
-                            )
-                        )
                     }
                 }
 

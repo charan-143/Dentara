@@ -107,7 +107,6 @@ fun ReportViewerLightboxDialog(
                                 text = report.title,
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Serif
                                 ),
                                 color = ThornburyInk
                             )

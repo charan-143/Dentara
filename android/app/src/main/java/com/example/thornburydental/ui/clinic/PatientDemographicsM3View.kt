@@ -1,5 +1,6 @@
 package com.example.thornburydental.ui.clinic
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -20,10 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.thornburydental.data.*
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.ui.components.ThornburyDatePickerField
 import java.util.Calendar
 
 // =============================================================================
@@ -45,16 +48,24 @@ fun PatientDemographicsM3View(
 ) {
     val scrollState = rememberScrollState()
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val coroutineScope = rememberCoroutineScope()
 
     // Dialog states
     var showEditContactDialog by remember { mutableStateOf(false) }
     var activeHistoryEditType by remember { mutableStateOf<ClinicalHistoryEditType?>(null) }
-    var showAddAllergyDialog by remember { mutableStateOf(false) }
-    var showAddAlertDialog by remember { mutableStateOf(false) }
 
     // Pre-parsed clinical bullet points
-    val medBullets = remember(patient.medicalHistory) { parseClinicalBullets(patient.medicalHistory) }
+    val medBullets = remember(patient.medicalHistory) {
+        parseClinicalBullets(patient.medicalHistory).filterNot { bullet ->
+            bullet.contains("Mild Asthma", ignoreCase = true) ||
+            bullet.contains("Allergy", ignoreCase = true) ||
+            bullet.contains("Penicillin", ignoreCase = true) ||
+            bullet.contains("Latex", ignoreCase = true) ||
+            bullet.contains("NSAIDs", ignoreCase = true) ||
+            bullet.contains("Sulfa", ignoreCase = true)
+        }
+    }
     val famBullets = remember(patient.familyHistory) { parseClinicalBullets(patient.familyHistory) }
     val dentalBullets = remember(patient.pastDentalHistory) { parseClinicalBullets(patient.pastDentalHistory) }
 
@@ -71,7 +82,9 @@ fun PatientDemographicsM3View(
         HeroPatientIdCard(
             patient = patient,
             onCopyOp = {
-                clipboardManager.setText(AnnotatedString(patient.opNo))
+                coroutineScope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("OP Number", patient.opNo)))
+                }
                 Toast.makeText(context, "OP No ${patient.opNo} copied", Toast.LENGTH_SHORT).show()
             },
             onCall = {
@@ -103,22 +116,7 @@ fun PatientDemographicsM3View(
             onEditProfile = { showEditContactDialog = true }
         )
 
-        // ---------------------------------------------------------------------
-        // 2. Vital Safety & Contraindications Section
-        // ---------------------------------------------------------------------
-        VitalSafetyContraindicationsSection(
-            patient = patient,
-            onAddAllergyClick = { showAddAllergyDialog = true },
-            onRemoveAllergyClick = { allergen ->
-                DentalRepository.removePatientAllergy(patient.id, allergen)
-                Toast.makeText(context, "Allergy '$allergen' removed", Toast.LENGTH_SHORT).show()
-            },
-            onAddAlertClick = { showAddAlertDialog = true },
-            onRemoveAlertClick = { alert ->
-                DentalRepository.removePatientMedicalAlert(patient.id, alert)
-                Toast.makeText(context, "Alert removed", Toast.LENGTH_SHORT).show()
-            }
-        )
+        Spacer(modifier = Modifier.height(0.dp))
 
         // ---------------------------------------------------------------------
         // 3. Categorized Clinical History Cards
@@ -129,7 +127,9 @@ fun PatientDemographicsM3View(
             patient = patient,
             onEditClick = { showEditContactDialog = true },
             onCopyPhone = {
-                clipboardManager.setText(AnnotatedString(patient.phone))
+                coroutineScope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Phone", patient.phone)))
+                }
                 Toast.makeText(context, "Phone copied", Toast.LENGTH_SHORT).show()
             },
             onCallPhone = {
@@ -138,7 +138,9 @@ fun PatientDemographicsM3View(
                 }
             },
             onCopyEmail = {
-                clipboardManager.setText(AnnotatedString(patient.email))
+                coroutineScope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Email", patient.email)))
+                }
                 Toast.makeText(context, "Email copied", Toast.LENGTH_SHORT).show()
             },
             onSendEmail = {
@@ -150,7 +152,9 @@ fun PatientDemographicsM3View(
                 }
             },
             onCopyAddress = {
-                clipboardManager.setText(AnnotatedString(patient.address))
+                coroutineScope.launch {
+                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Address", patient.address)))
+                }
                 Toast.makeText(context, "Address copied", Toast.LENGTH_SHORT).show()
             },
             onOpenAddressMap = {
@@ -280,30 +284,6 @@ fun PatientDemographicsM3View(
             }
         )
     }
-
-    // 3. Add Allergy Dialog
-    if (showAddAllergyDialog) {
-        AddAllergyM3Dialog(
-            onDismiss = { showAddAllergyDialog = false },
-            onSave = { allergen, severity, reaction ->
-                DentalRepository.addPatientAllergy(patient.id, allergen, severity, reaction)
-                showAddAllergyDialog = false
-                Toast.makeText(context, "Allergy recorded", Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
-
-    // 4. Add Medical Alert Dialog
-    if (showAddAlertDialog) {
-        AddMedicalAlertM3Dialog(
-            onDismiss = { showAddAlertDialog = false },
-            onSave = { alert ->
-                DentalRepository.addPatientMedicalAlert(patient.id, alert)
-                showAddAlertDialog = false
-                Toast.makeText(context, "Medical alert added", Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
 }
 
 // =============================================================================
@@ -359,7 +339,6 @@ private fun HeroPatientIdCard(
                         text = getPatientMonogram(patient.name),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif
                         ),
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -377,7 +356,6 @@ private fun HeroPatientIdCard(
                             text = patient.name,
                             style = MaterialTheme.typography.headlineSmall.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
                             ),
                             color = ThornburyInk,
                             modifier = Modifier.weight(1f, fill = false)
@@ -576,367 +554,7 @@ private fun VitalMetricItem(
     }
 }
 
-// =============================================================================
-// 2. Vital Safety & Contraindications Section
-// =============================================================================
 
-@Composable
-private fun VitalSafetyContraindicationsSection(
-    patient: Patient,
-    onAddAllergyClick: () -> Unit,
-    onRemoveAllergyClick: (String) -> Unit,
-    onAddAlertClick: () -> Unit,
-    onRemoveAlertClick: (String) -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-        // A. Contraindications & Drug Allergies Card (M3 errorContainer surface)
-        val hasAllergies = patient.allergies.isNotEmpty()
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (hasAllergies) ThornburyErrorWash else ThornburyCanvas
-            ),
-            border = BorderStroke(
-                1.dp,
-                if (hasAllergies) ThornburyError.copy(alpha = 0.35f) else ThornburyHairline
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = if (hasAllergies) Icons.Default.Warning else Icons.Default.CheckCircle,
-                            contentDescription = null,
-                            tint = if (hasAllergies) ThornburyError else ThornburySuccess,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Allergies & Contraindications",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (hasAllergies) ThornburyError else ThornburyInk
-                        )
-                        if (hasAllergies) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = ThornburyError,
-                                contentColor = Color.White
-                            ) {
-                                Text(
-                                    text = patient.allergies.size.toString(),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    AssistChip(
-                        onClick = onAddAllergyClick,
-                        label = {
-                            Text(
-                                text = "Add Allergy",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = ThornburyCanvas,
-                            labelColor = ThornburyPrimary,
-                            leadingIconContentColor = ThornburyPrimary
-                        ),
-                        border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.3f))
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (!hasAllergies) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "No recorded drug or material allergies (NKDA). Always confirm with patient before chairside administration.",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                fontStyle = FontStyle.Italic
-                            ),
-                            color = ThornburyMuted
-                        )
-                    }
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        patient.allergies.forEach { allergy ->
-                            AllergyItemCard(
-                                allergy = allergy,
-                                onDismiss = { onRemoveAllergyClick(allergy.allergen) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // B. Systemic Medical Alerts Card (M3 warningContainer surface)
-        val hasAlerts = patient.medicalAlerts.isNotEmpty()
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (hasAlerts) ThornburyWarningWash else ThornburyCanvas
-            ),
-            border = BorderStroke(
-                1.dp,
-                if (hasAlerts) ThornburyWarning.copy(alpha = 0.35f) else ThornburyHairline
-            )
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = if (hasAlerts) ThornburyWarning else ThornburyMuted,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Systemic Medical Alerts & Precautions",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (hasAlerts) ThornburyWarning else ThornburyInk
-                        )
-                        if (hasAlerts) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = ThornburyWarning,
-                                contentColor = Color.White
-                            ) {
-                                Text(
-                                    text = patient.medicalAlerts.size.toString(),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    AssistChip(
-                        onClick = onAddAlertClick,
-                        label = {
-                            Text(
-                                text = "Add Alert",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                            )
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = ThornburyCanvas,
-                            labelColor = ThornburyPrimary,
-                            leadingIconContentColor = ThornburyPrimary
-                        ),
-                        border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.3f))
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (!hasAlerts) {
-                    Text(
-                        text = "No active systemic medical alerts or special surgical precautions recorded.",
-                        style = MaterialTheme.typography.bodySmall.copy(
-                            fontStyle = FontStyle.Italic
-                        ),
-                        color = ThornburyMuted
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        patient.medicalAlerts.forEach { alert ->
-                            MedicalAlertItemRow(
-                                alert = alert,
-                                onDismiss = { onRemoveAlertClick(alert) }
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AllergyItemCard(
-    allergy: Allergy,
-    onDismiss: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(10.dp),
-        color = ThornburyCanvas,
-        border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.25f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = allergy.allergen,
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyInk
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    AllergySeverityBadge(severity = allergy.severity)
-                }
-
-                if (allergy.reaction.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = "Reaction: ${allergy.reaction}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ThornburyBodyStrong
-                    )
-                }
-            }
-
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(28.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Remove ${allergy.allergen} allergy",
-                    tint = ThornburyError,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AllergySeverityBadge(severity: String) {
-    val upper = severity.uppercase()
-    val isSevere = upper.contains("SEVERE") || upper.contains("ANAPHYLAXIS")
-    val isModerate = upper.contains("MODERATE")
-
-    val bg = when {
-        isSevere -> ThornburyError
-        isModerate -> ThornburyAccentAmber
-        else -> ThornburySurfaceSoft
-    }
-    val fg = when {
-        isSevere -> Color.White
-        isModerate -> ThornburyInk
-        else -> ThornburyBodyStrong
-    }
-
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = bg
-    ) {
-        Text(
-            text = severity.uppercase(),
-            style = MaterialTheme.typography.labelSmall.copy(
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 0.4.sp
-            ),
-            color = fg,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-        )
-    }
-}
-
-@Composable
-private fun MedicalAlertItemRow(
-    alert: String,
-    onDismiss: () -> Unit
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = ThornburyCanvas,
-        border = BorderStroke(1.dp, ThornburyWarning.copy(alpha = 0.25f))
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = ThornburyWarning,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = alert,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                    color = ThornburyInk
-                )
-            }
-
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.size(26.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Remove Alert",
-                    tint = ThornburyWarning,
-                    modifier = Modifier.size(14.dp)
-                )
-            }
-        }
-    }
-}
 
 // =============================================================================
 // 3. Categorized Clinical History Cards
@@ -1312,7 +930,6 @@ private fun EditContactInfoM3Dialog(
                         text = "Edit Personal & Contact Info",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif
                         ),
                         color = ThornburyInk
                     )
@@ -1327,12 +944,7 @@ private fun EditContactInfoM3Dialog(
                     label = { Text("Full Patient Name") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
+                    colors = thornburyTextFieldColors()
                 )
 
                 Row(
@@ -1345,26 +957,17 @@ private fun EditContactInfoM3Dialog(
                         label = { Text("OP Number") },
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
+                        colors = thornburyTextFieldColors()
                     )
 
-                    OutlinedTextField(
+                    ThornburyDatePickerField(
                         value = dob,
                         onValueChange = { dob = it },
-                        label = { Text("DOB (YYYY-MM-DD)") },
+                        label = "DOB",
+                        placeholder = "YYYY-MM-DD",
                         modifier = Modifier.weight(1.2f),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
+                        isOptional = true,
+                        helperText = null
                     )
                 }
 
@@ -1374,12 +977,7 @@ private fun EditContactInfoM3Dialog(
                     label = { Text("Telephone Number") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
+                    colors = thornburyTextFieldColors()
                 )
 
                 OutlinedTextField(
@@ -1388,12 +986,7 @@ private fun EditContactInfoM3Dialog(
                     label = { Text("Email Address") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
+                    colors = thornburyTextFieldColors()
                 )
 
                 OutlinedTextField(
@@ -1402,12 +995,7 @@ private fun EditContactInfoM3Dialog(
                     label = { Text("Postal / Residential Address") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 2,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
+                    colors = thornburyTextFieldColors()
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -1475,7 +1063,6 @@ private fun EditClinicalHistoryM3Dialog(
                         text = type.title,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif
                         ),
                         color = ThornburyInk
                     )
@@ -1496,12 +1083,7 @@ private fun EditClinicalHistoryM3Dialog(
                     label = { Text("Clinical observations (one per line)") },
                     modifier = Modifier.fillMaxWidth(),
                     minLines = 5,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
+                    colors = thornburyTextFieldColors()
                 )
 
                 Text(
@@ -1537,244 +1119,7 @@ private fun EditClinicalHistoryM3Dialog(
     }
 }
 
-@Composable
-private fun AddAllergyM3Dialog(
-    onDismiss: () -> Unit,
-    onSave: (allergen: String, severity: String, reaction: String) -> Unit
-) {
-    var allergen by remember { mutableStateOf("") }
-    var severity by remember { mutableStateOf("Moderate") }
-    var reaction by remember { mutableStateOf("") }
 
-    val severityOptions = listOf("Mild", "Moderate", "Severe / Anaphylaxis")
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(16.dp),
-            color = ThornburyCanvas,
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = null,
-                            tint = ThornburyError,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Record Drug / Material Allergy",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
-                            ),
-                            color = ThornburyInk
-                        )
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = ThornburyMuted)
-                    }
-                }
-
-                OutlinedTextField(
-                    value = allergen,
-                    onValueChange = { allergen = it },
-                    label = { Text("Allergen (e.g. Penicillin, Latex, Ibuprofen)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
-                )
-
-                Text(
-                    text = "Clinical Severity:",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                    color = ThornburyMuted
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    severityOptions.forEach { opt ->
-                        FilterChip(
-                            selected = severity == opt,
-                            onClick = { severity = opt },
-                            label = {
-                                Text(
-                                    text = opt,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 11.sp,
-                                        fontWeight = if (severity == opt) FontWeight.Bold else FontWeight.Normal
-                                    )
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = if (opt.contains("Severe")) ThornburyErrorWash else ThornburyPrimaryWash,
-                                selectedLabelColor = if (opt.contains("Severe")) ThornburyError else ThornburyPrimary
-                            )
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = reaction,
-                    onValueChange = { reaction = it },
-                    label = { Text("Clinical Manifestation (e.g. Urticaria, Bronchospasm)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = ThornburyMuted)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (allergen.isNotBlank()) {
-                                onSave(allergen.trim(), severity.trim(), reaction.trim())
-                            }
-                        },
-                        enabled = allergen.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ThornburyError,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Add Allergy")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddMedicalAlertM3Dialog(
-    onDismiss: () -> Unit,
-    onSave: (alert: String) -> Unit
-) {
-    var alertText by remember { mutableStateOf("") }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
-            shape = RoundedCornerShape(16.dp),
-            color = ThornburyCanvas,
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = null,
-                            tint = ThornburyWarning,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Add Systemic Medical Alert",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
-                            ),
-                            color = ThornburyInk
-                        )
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = ThornburyMuted)
-                    }
-                }
-
-                OutlinedTextField(
-                    value = alertText,
-                    onValueChange = { alertText = it },
-                    label = { Text("Alert Description (e.g. On daily Apixaban anticoagulant)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel", color = ThornburyMuted)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            if (alertText.isNotBlank()) {
-                                onSave(alertText.trim())
-                            }
-                        },
-                        enabled = alertText.isNotBlank(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ThornburyWarning,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Add Alert")
-                    }
-                }
-            }
-        }
-    }
-}
 
 // =============================================================================
 // Helper Functions: Parsing & Clinical Logic

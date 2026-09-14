@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.ThornburyDental" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      Bootstrap window theme, used only for the brief cold-start frame before
+      Compose takes over (MainActivity.enableEdgeToEdge + ThornburyDentalTheme
+      own everything after that). Values mirror theme/Color.kt's
+      ThornburyCanvas / ThornburyPrimary / ThornburyInk — keep in sync.
+    -->
+    <style name="Theme.ThornburyDental" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">#F6FAFA</item>
+        <item name="android:colorPrimary">#0D7377</item>
+        <item name="android:colorPrimaryDark">#0A5A5D</item>
+        <item name="android:textColorPrimary">#12181B</item>
+        <item name="android:colorAccent">#0D7377</item>
+    </style>
 </resources>

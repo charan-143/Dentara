@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +63,9 @@ fun IssuePrescriptionDialog(
         DentalRepository.checkAllergyConflict(patient, drug.name)
     }
 
+    var overrideConfirmed by remember { mutableStateOf(false) }
+    var overrideReason by remember { mutableStateOf("") }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -89,7 +91,6 @@ fun IssuePrescriptionDialog(
                             text = "Issue Dental Prescription",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
                             ),
                             color = ThornburyInk
                         )
@@ -134,6 +135,38 @@ fun IssuePrescriptionDialog(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = overrideConfirmed,
+                            onCheckedChange = { overrideConfirmed = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = ThornburyError,
+                                checkmarkColor = Color.White
+                            )
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Override allergy contraindication with senior clinician sign-off",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = ThornburyInk,
+                            modifier = Modifier.clickable { overrideConfirmed = !overrideConfirmed }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = overrideReason,
+                        onValueChange = { overrideReason = it },
+                        label = { Text("Clinical Justification (required)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -240,7 +273,8 @@ fun IssuePrescriptionDialog(
                     onValueChange = { dosage = it },
                     label = { Text("Dosage / Formulation") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -251,14 +285,16 @@ fun IssuePrescriptionDialog(
                         onValueChange = { frequency = it },
                         label = { Text("Frequency") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                     )
                     OutlinedTextField(
                         value = duration,
                         onValueChange = { duration = it },
                         label = { Text("Duration") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                     )
                 }
 
@@ -269,7 +305,8 @@ fun IssuePrescriptionDialog(
                     onValueChange = { instructions = it },
                     label = { Text("Pharmacist & Patient Instructions") },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
@@ -323,10 +360,12 @@ fun IssuePrescriptionDialog(
                                 dosage = dosage,
                                 frequency = frequency,
                                 duration = duration,
-                                instructions = instructions
+                                instructions = instructions,
+                                overrideReason = if (allergyWarning != null) overrideReason else null
                             )
                             onSuccess()
                         },
+                        enabled = (allergyWarning == null) || (overrideConfirmed && overrideReason.isNotBlank()),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1.5f),
                         colors = ButtonDefaults.buttonColors(

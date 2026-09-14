@@ -212,7 +212,7 @@ fun ToothConditionBadge(
             Box(
                 modifier = modifier
                     .size(6.dp)
-                    .background(Color(0xFFDFD2BE), CircleShape)
+                    .background(ThornburyMutedSoft.copy(alpha = 0.4f), CircleShape)
             )
         }
         ToothCondition.DECAY -> {
@@ -234,13 +234,13 @@ fun ToothConditionBadge(
             Surface(
                 modifier = modifier,
                 shape = RoundedCornerShape(3.dp),
-                color = Color(0xFFE6F6F4)
+                color = ThornburyInfoWash
             ) {
                 Text(
                     text = "F",
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF0F6E63),
+                    color = ThornburyTertiaryText,
                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                 )
             }
@@ -249,13 +249,13 @@ fun ToothConditionBadge(
             Surface(
                 modifier = modifier,
                 shape = RoundedCornerShape(3.dp),
-                color = Color(0xFFFEF3C7)
+                color = ThornburyWarningWash
             ) {
                 Text(
                     text = "Cr",
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF92400E),
+                    color = ThornburyWarning,
                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                 )
             }
@@ -264,13 +264,13 @@ fun ToothConditionBadge(
             Surface(
                 modifier = modifier,
                 shape = RoundedCornerShape(3.dp),
-                color = Color(0xFFFFE4E6)
+                color = ThornburyRoseWash
             ) {
                 Text(
                     text = "RCT",
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFBE123C),
+                    color = ThornburyRoseText,
                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                 )
             }
@@ -279,13 +279,13 @@ fun ToothConditionBadge(
             Surface(
                 modifier = modifier,
                 shape = RoundedCornerShape(3.dp),
-                color = Color(0xFFF3E8FF)
+                color = ThornburyPurpleWash
             ) {
                 Text(
                     text = "Imp",
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF7E22CE),
+                    color = ThornburyPurpleText,
                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                 )
             }
@@ -294,13 +294,13 @@ fun ToothConditionBadge(
             Surface(
                 modifier = modifier,
                 shape = RoundedCornerShape(3.dp),
-                color = Color(0xFFF1F5F9)
+                color = ThornburyNeutralWash
             ) {
                 Text(
                     text = "✕",
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF64748B),
+                    color = ThornburySlateText,
                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
                 )
             }
@@ -442,7 +442,7 @@ fun AnatomicalToothCanvas(
                 paths.crownPath.let { drawPath(it, ghostColor, style = ghostStroke) }
 
                 // Bold clinical "✕" cross in red
-                val crossColor = Color(0xFFE11D48)
+                val crossColor = ThornburyError
                 drawLine(
                     color = crossColor,
                     start = Offset(14f, 14f),
@@ -529,21 +529,21 @@ fun AnatomicalToothCanvas(
                                 if (isUpper) {
                                     // 3 canals: mesiobuccal, distobuccal, palatal
                                     drawLine(
-                                        color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                        color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                         start = Offset(14f, 42f),
                                         end = Offset(13f, 13f),
                                         strokeWidth = if (isRootCanal) 2.2f else 1.2f,
                                         cap = StrokeCap.Round
                                     )
                                     drawLine(
-                                        color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                        color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                         start = Offset(33f, 42f),
                                         end = Offset(33f, 9f),
                                         strokeWidth = if (isRootCanal) 2.2f else 1.2f,
                                         cap = StrokeCap.Round
                                     )
                                     drawLine(
-                                        color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                        color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                         start = Offset(51f, 42f),
                                         end = Offset(52f, 13f),
                                         strokeWidth = if (isRootCanal) 2.2f else 1.2f,
@@ -552,14 +552,14 @@ fun AnatomicalToothCanvas(
                                 } else {
                                     // 2 canals: mesial and distal
                                     drawLine(
-                                        color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                        color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                         start = Offset(16f, 42f),
                                         end = Offset(16f, 11f),
                                         strokeWidth = if (isRootCanal) 2.2f else 1.2f,
                                         cap = StrokeCap.Round
                                     )
                                     drawLine(
-                                        color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                        color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                         start = Offset(48f, 42f),
                                         end = Offset(48f, 11f),
                                         strokeWidth = if (isRootCanal) 2.2f else 1.2f,
@@ -569,7 +569,7 @@ fun AnatomicalToothCanvas(
                             }
                             ToothAnatomyType.PREMOLAR -> {
                                 drawLine(
-                                    color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                    color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                     start = Offset(32.5f, 42f),
                                     end = Offset(32.5f, 11f),
                                     strokeWidth = if (isRootCanal) 2.2f else 1.2f,
@@ -578,7 +578,7 @@ fun AnatomicalToothCanvas(
                             }
                             ToothAnatomyType.CANINE -> {
                                 drawLine(
-                                    color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                    color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                     start = Offset(32f, 42f),
                                     end = Offset(32f, 8f),
                                     strokeWidth = if (isRootCanal) 2.2f else 1.4f,
@@ -587,7 +587,7 @@ fun AnatomicalToothCanvas(
                             }
                             ToothAnatomyType.INCISOR -> {
                                 drawLine(
-                                    color = if (isRootCanal) Color(0xFFE11D48) else Color(0xFFB4A38D),
+                                    color = if (isRootCanal) ToothRootCanal else Color(0xFFB4A38D),
                                     start = Offset(32f, 42f),
                                     end = Offset(32f, 10f),
                                     strokeWidth = if (isRootCanal) 2.2f else 1.2f,
@@ -599,7 +599,7 @@ fun AnatomicalToothCanvas(
                         // Root Canal Endodontic Obturation Gutta-Percha core
                         if (isRootCanal) {
                             drawOval(
-                                color = Color(0xFFE11D48),
+                                color = ToothRootCanal,
                                 topLeft = Offset(26f, 41f),
                                 size = Size(12f, 6f)
                             )
@@ -630,7 +630,7 @@ fun AnatomicalToothCanvas(
                 )
                 drawPath(
                     path = paths.crownPath,
-                    color = if (isCrown) Color(0xFF92400E) else Color(0xFFD4C8B8),
+                    color = if (isCrown) ThornburyWarning else Color(0xFFD4C8B8),
                     style = Stroke(width = 1.2f)
                 )
 
