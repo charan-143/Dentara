@@ -14,7 +14,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,7 +89,6 @@ fun BookAppointmentDialog(
                             text = "Book Follow-up Visit",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
                             ),
                             color = ThornburyInk
                         )
@@ -110,36 +108,7 @@ fun BookAppointmentDialog(
                     }
                 }
 
-                // Allergy Caution Banner if patient has allergy
-                if (patient.allergies.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = ThornburyErrorWash,
-                        border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.4f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = ThornburyError,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Allergy Alert: ${patient.allergies.joinToString { it.allergen }}",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = ThornburyError
-                                )
-                            )
-                        }
-                    }
-                }
+
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -157,10 +126,7 @@ fun BookAppointmentDialog(
                     placeholder = { Text("e.g. Full Crown Preparation") },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline
-                    ),
+                    colors = thornburyTextFieldColors(containerColor = ThornburySurfaceSoft),
                     singleLine = true
                 )
 
@@ -269,6 +235,7 @@ fun BookAppointmentDialog(
                             placeholder = { Text("09:30 AM") },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(8.dp),
+                            colors = thornburyTextFieldColors(containerColor = ThornburySurfaceSoft),
                             singleLine = true
                         )
                     }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,6 +38,7 @@ fun PatientDetailChartScreen(
     patientId: String,
     onBack: () -> Unit,
     onOpenIssuePrescription: (Patient) -> Unit,
+    onOpenAddReportScreen: (Patient) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val patients by DentalRepository.patients.collectAsState()
@@ -86,7 +87,7 @@ fun PatientDetailChartScreen(
             ) {
                 IconButton(onClick = onBack) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
                         tint = ThornburyInk
                     )
@@ -97,7 +98,6 @@ fun PatientDetailChartScreen(
                         text = patient.name,
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif
                         ),
                         color = ThornburyInk
                     )
@@ -105,81 +105,6 @@ fun PatientDetailChartScreen(
                         text = "OP: ${patient.opNo} • DOB: ${patient.dob}",
                         style = ClinicalCodeStyle.copy(fontSize = 11.sp),
                         color = ThornburyMuted
-                    )
-                }
-
-                FilledTonalButton(
-                    onClick = { onOpenIssuePrescription(patient) },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.filledTonalButtonColors(
-                        containerColor = ThornburyPrimary,
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Medication,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Rx", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-                }
-            }
-        }
-
-        // --- Allergy & Medical Alert Banners ---
-        if (patient.allergies.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = ThornburyErrorWash,
-                border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = ThornburyError,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "CONTRAINDICATION WARNING: " + patient.allergies.joinToString { "${it.allergen} (${it.severity})" },
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = ThornburyError
-                        )
-                    )
-                }
-            }
-        }
-
-        if (patient.medicalAlerts.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = ThornburyWarningWash,
-                border = BorderStroke(1.dp, ThornburyWarning.copy(alpha = 0.3f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = ThornburyWarning,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Medical History: " + patient.medicalAlerts.joinToString("; "),
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            fontWeight = FontWeight.Medium,
-                            color = ThornburyWarning
-                        )
                     )
                 }
             }
@@ -195,7 +120,7 @@ fun PatientDetailChartScreen(
             "Visit History" to patientAppointments.size
         )
 
-        ScrollableTabRow(
+        PrimaryScrollableTabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = ThornburyCanvas,
             contentColor = ThornburyPrimary,
@@ -248,7 +173,7 @@ fun PatientDetailChartScreen(
             )
             2 -> ReportsAndImagingView(
                 reports = patientReports,
-                onAddReportClick = { showAddReportDialog = true },
+                onAddReportClick = { onOpenAddReportScreen(patient) },
                 onReportClick = { report -> selectedReportForLightbox = report },
                 onToggleRelease = { reportId -> DentalRepository.toggleReportRelease(reportId) }
             )
@@ -429,7 +354,7 @@ private fun ExaminationAndOdontogramTabView(
                     },
                     leadingIcon = {
                         Icon(
-                            imageVector = Icons.Default.Assignment,
+                            imageVector = Icons.AutoMirrored.Filled.Assignment,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp)
                         )
@@ -504,37 +429,6 @@ private fun OdontogramView(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Condition Legend Bar
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = "Odontogram Legend (Tap any tooth to inspect or chart):",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = ThornburyInk
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    LegendItem("Sound", ToothSound, border = true)
-                    LegendItem("Decay", ToothDecay)
-                    LegendItem("Filled", ToothFilled)
-                    LegendItem("Crown", ToothCrown)
-                    LegendItem("RCT", ToothRootCanal)
-                    LegendItem("Implant", ToothImplant)
-                    LegendItem("Missing", ToothMissing)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Upper Arch (Maxillary Teeth 1 to 16, split into Upper Right & Upper Left quadrants)
         if (quadrantFilter == QuadrantFilter.ALL ||
             quadrantFilter == QuadrantFilter.UPPER ||
@@ -568,68 +462,6 @@ private fun OdontogramView(
                 onToothClick = onToothClick,
                 activeFilter = quadrantFilter
             )
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
-        // Selected Teeth Summary Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "Restorative Charting Summary",
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif
-                    ),
-                    color = ThornburyInk
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val nonSoundTeeth = teeth.values.filter { it.condition != ToothCondition.SOUND }
-                if (nonSoundTeeth.isEmpty()) {
-                    Text(
-                        text = "All 32 teeth charted as sound. No active restorative pathologies flagged.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ThornburySuccess
-                    )
-                } else {
-                    nonSoundTeeth.forEach { t ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(10.dp)
-                                        .background(getToothColor(t.condition), CircleShape)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "#${t.number} (${t.fdiNumber}): ${t.condition.label}",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                    color = ThornburyInk
-                                )
-                            }
-                            if (t.notes.isNotBlank()) {
-                                Text(
-                                    text = t.notes,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = ThornburyMuted,
-                                    maxLines = 1
-                                )
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }
@@ -758,7 +590,6 @@ private fun ToothEditDialog(
                             text = "Tooth #${tooth.number} (FDI ${tooth.fdiNumber})",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Serif
                             ),
                             color = ThornburyInk
                         )
@@ -901,7 +732,6 @@ private fun TreatmentPlansView(
                         text = "Treatment Plans",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Serif
                         ),
                         color = ThornburyInk
                     )
@@ -983,7 +813,6 @@ private fun TreatmentPlansView(
                                     text = "Treatment Plan #${plan.id}",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Serif
                                     ),
                                     color = ThornburyInk
                                 )
@@ -1120,11 +949,6 @@ private fun TreatmentPlansView(
                                             }
                                         }
                                     }
-                                    Text(
-                                        text = "$${"%.2f".format(step.fee)}",
-                                        style = ClinicalCodeStyle.copy(fontSize = 12.sp, fontWeight = FontWeight.Bold),
-                                        color = ThornburyInk
-                                    )
                                 }
                             }
                         }
@@ -1180,15 +1004,9 @@ private fun TreatmentPlansView(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val total = plan.steps.sumOf { it.fee }
-                            Text(
-                                text = "Total Estimated Fee: $${"%.2f".format(total)}",
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
 
                             TextButton(
                                 onClick = { onToggleLock(plan.id) }
@@ -1233,7 +1051,6 @@ private fun PatientPrescriptionsView(
                 text = "Prescription History",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Serif
                 ),
                 color = ThornburyInk
             )
@@ -1385,1051 +1202,6 @@ private fun PatientPrescriptionsView(
 }
 
 // =============================================================================
-// Demographics / Overview View (Matches patient-demographics-view.tsx)
-// =============================================================================
-
-private enum class DemographicsEditField(val title: String) {
-    OP_NO("Edit OP Number"),
-    NAME_DOB("Edit Patient Name & DOB"),
-    PHONE_EMAIL("Edit Phone & Email"),
-    ADDRESS("Edit Address"),
-    MEDICAL_HISTORY("Edit Medical History"),
-    FAMILY_HISTORY("Edit Family History"),
-    PAST_DENTAL_HISTORY("Edit Past Dental History")
-}
-
-private fun parseBulletLines(raw: String): List<String> {
-    if (raw.isBlank()) return emptyList()
-    val lines = raw.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-    val result = mutableListOf<String>()
-    for (line in lines) {
-        val cleaned = line.replace(Regex("^(\\s*[-*•]\\s*|\\s*\\d+[.)]\\s*)"), "").trim()
-        if (cleaned.isNotEmpty()) result.add(cleaned)
-    }
-    if (result.size <= 1 && raw.contains(".")) {
-        val sentences = raw.split(Regex("\\.\\s+")).map { it.trim().removeSuffix(".") }.filter { it.isNotEmpty() }
-        if (sentences.size > 1) return sentences
-    }
-    return if (result.isNotEmpty()) result else listOf(raw.trim())
-}
-
-@Composable
-private fun PatientDemographicsView(patient: Patient) {
-    val scrollState = rememberScrollState()
-
-    // Inline edit states
-    var editingField by remember { mutableStateOf<DemographicsEditField?>(null) }
-    var opNoInput by remember(patient.opNo) { mutableStateOf(patient.opNo) }
-    var nameInput by remember(patient.name) { mutableStateOf(patient.name) }
-    var dobInput by remember(patient.dob) { mutableStateOf(patient.dob) }
-    var phoneInput by remember(patient.phone) { mutableStateOf(patient.phone) }
-    var emailInput by remember(patient.email) { mutableStateOf(patient.email) }
-    var addressInput by remember(patient.address) { mutableStateOf(patient.address) }
-    var medHistInput by remember(patient.medicalHistory) { mutableStateOf(patient.medicalHistory) }
-    var famHistInput by remember(patient.familyHistory) { mutableStateOf(patient.familyHistory) }
-    var dentalHistInput by remember(patient.pastDentalHistory) { mutableStateOf(patient.pastDentalHistory) }
-
-    // Allergy add dialog states
-    var showAddAllergyDialog by remember { mutableStateOf(false) }
-    var newAllergen by remember { mutableStateOf("") }
-    var newSeverity by remember { mutableStateOf("Moderate") }
-    var newReaction by remember { mutableStateOf("") }
-
-    // Medical alert add dialog states
-    var showAddAlertDialog by remember { mutableStateOf(false) }
-    var newAlertText by remember { mutableStateOf("") }
-
-    val medBullets = remember(patient.medicalHistory) { parseBulletLines(patient.medicalHistory) }
-    val famBullets = remember(patient.familyHistory) { parseBulletLines(patient.familyHistory) }
-    val dentalBullets = remember(patient.pastDentalHistory) { parseBulletLines(patient.pastDentalHistory) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Section Header Card - Clean title without badge
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Badge,
-                    contentDescription = null,
-                    tint = ThornburyPrimary,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    text = "Patient Demographics & Clinical Profile",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif
-                    ),
-                    color = ThornburyInk
-                )
-            }
-        }
-
-        // --- 1. OP Number Field (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Tag, contentDescription = null, tint = ThornburyMuted, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Outpatient (OP) Number", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = ThornburyMuted)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.OP_NO) editingField = null
-                            else {
-                                opNoInput = patient.opNo
-                                editingField = DemographicsEditField.OP_NO
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.OP_NO) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.OP_NO) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                if (editingField == DemographicsEditField.OP_NO) {
-                    OutlinedTextField(
-                        value = opNoInput,
-                        onValueChange = { opNoInput = it },
-                        label = { Text("OP Number") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = opNoInput,
-                                name = patient.name,
-                                phone = patient.phone,
-                                email = patient.email,
-                                address = patient.address,
-                                medicalHistory = patient.medicalHistory,
-                                familyHistory = patient.familyHistory,
-                                pastDentalHistory = patient.pastDentalHistory
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save OP Number")
-                    }
-                } else {
-                    Text(
-                        text = patient.opNo,
-                        style = ClinicalCodeStyle.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
-                        color = ThornburyInk
-                    )
-                }
-            }
-        }
-
-        // --- 2. Patient Name & DOB Field (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = ThornburyMuted, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Patient Name & Date of Birth", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = ThornburyMuted)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.NAME_DOB) editingField = null
-                            else {
-                                nameInput = patient.name
-                                dobInput = patient.dob
-                                editingField = DemographicsEditField.NAME_DOB
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.NAME_DOB) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.NAME_DOB) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                if (editingField == DemographicsEditField.NAME_DOB) {
-                    OutlinedTextField(
-                        value = nameInput,
-                        onValueChange = { nameInput = it },
-                        label = { Text("Full Name") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = dobInput,
-                        onValueChange = { dobInput = it },
-                        label = { Text("Date of Birth (YYYY-MM-DD)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = patient.opNo,
-                                name = nameInput,
-                                phone = patient.phone,
-                                email = patient.email,
-                                address = patient.address,
-                                medicalHistory = patient.medicalHistory,
-                                familyHistory = patient.familyHistory,
-                                pastDentalHistory = patient.pastDentalHistory,
-                                dob = dobInput
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Name & DOB")
-                    }
-                } else {
-                    Text(text = patient.name, style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(text = "Date of Birth: ${patient.dob} • Last Visit: ${patient.lastVisit}", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-                }
-            }
-        }
-
-        // --- 3. Phone & Email Field (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Phone, contentDescription = null, tint = ThornburyMuted, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Phone & Email", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = ThornburyMuted)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.PHONE_EMAIL) editingField = null
-                            else {
-                                phoneInput = patient.phone
-                                emailInput = patient.email
-                                editingField = DemographicsEditField.PHONE_EMAIL
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.PHONE_EMAIL) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.PHONE_EMAIL) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                if (editingField == DemographicsEditField.PHONE_EMAIL) {
-                    OutlinedTextField(
-                        value = phoneInput,
-                        onValueChange = { phoneInput = it },
-                        label = { Text("Phone Number") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = emailInput,
-                        onValueChange = { emailInput = it },
-                        label = { Text("Email Address") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = patient.opNo,
-                                name = patient.name,
-                                phone = phoneInput,
-                                email = emailInput,
-                                address = patient.address,
-                                medicalHistory = patient.medicalHistory,
-                                familyHistory = patient.familyHistory,
-                                pastDentalHistory = patient.pastDentalHistory
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Phone & Email")
-                    }
-                } else {
-                    Text(
-                        text = if (patient.phone.isNotBlank()) patient.phone else "Not recorded",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyInk
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = if (patient.email.isNotBlank()) "Email: ${patient.email}" else "Email: Not recorded",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = ThornburyMuted
-                    )
-                }
-            }
-        }
-
-        // --- 4. Postal Address Field (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Place, contentDescription = null, tint = ThornburyMuted, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Postal Address", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = ThornburyMuted)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.ADDRESS) editingField = null
-                            else {
-                                addressInput = patient.address
-                                editingField = DemographicsEditField.ADDRESS
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.ADDRESS) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.ADDRESS) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                if (editingField == DemographicsEditField.ADDRESS) {
-                    OutlinedTextField(
-                        value = addressInput,
-                        onValueChange = { addressInput = it },
-                        label = { Text("Postal Address") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = patient.opNo,
-                                name = patient.name,
-                                phone = patient.phone,
-                                email = patient.email,
-                                address = addressInput,
-                                medicalHistory = patient.medicalHistory,
-                                familyHistory = patient.familyHistory,
-                                pastDentalHistory = patient.pastDentalHistory
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Address")
-                    }
-                } else {
-                    Text(
-                        text = if (patient.address.isNotBlank()) patient.address else "No address recorded on file.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = ThornburyInk
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider(color = ThornburyHairline, modifier = Modifier.padding(vertical = 4.dp))
-
-        // --- 5. Medical History (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.LocalHospital, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Medical History", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.MEDICAL_HISTORY) editingField = null
-                            else {
-                                medHistInput = medBullets.joinToString("\n")
-                                editingField = DemographicsEditField.MEDICAL_HISTORY
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.MEDICAL_HISTORY) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.MEDICAL_HISTORY) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (editingField == DemographicsEditField.MEDICAL_HISTORY) {
-                    OutlinedTextField(
-                        value = medHistInput,
-                        onValueChange = { medHistInput = it },
-                        label = { Text("Enter each condition on a new line") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = patient.opNo,
-                                name = patient.name,
-                                phone = patient.phone,
-                                email = patient.email,
-                                address = patient.address,
-                                medicalHistory = medHistInput,
-                                familyHistory = patient.familyHistory,
-                                pastDentalHistory = patient.pastDentalHistory
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Medical History")
-                    }
-                } else {
-                    if (medBullets.isEmpty()) {
-                        Text(text = "No medical conditions or systemic illnesses recorded.", style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = ThornburyMuted)
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            medBullets.forEach { item ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Text(text = "• ", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
-                                    Text(text = item, style = MaterialTheme.typography.bodyMedium, color = ThornburyInk)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- 6. Family History (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Groups, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Family History", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.FAMILY_HISTORY) editingField = null
-                            else {
-                                famHistInput = famBullets.joinToString("\n")
-                                editingField = DemographicsEditField.FAMILY_HISTORY
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.FAMILY_HISTORY) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.FAMILY_HISTORY) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (editingField == DemographicsEditField.FAMILY_HISTORY) {
-                    OutlinedTextField(
-                        value = famHistInput,
-                        onValueChange = { famHistInput = it },
-                        label = { Text("Enter each familial trait on a new line") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = patient.opNo,
-                                name = patient.name,
-                                phone = patient.phone,
-                                email = patient.email,
-                                address = patient.address,
-                                medicalHistory = patient.medicalHistory,
-                                familyHistory = famHistInput,
-                                pastDentalHistory = patient.pastDentalHistory
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Family History")
-                    }
-                } else {
-                    if (famBullets.isEmpty()) {
-                        Text(text = "No hereditary or family medical conditions noted.", style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = ThornburyMuted)
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            famBullets.forEach { item ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Text(text = "• ", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
-                                    Text(text = item, style = MaterialTheme.typography.bodyMedium, color = ThornburyInk)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- 7. Past Dental History (Inline Editing) ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.MedicalServices, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Past Dental History", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-                    TextButton(
-                        onClick = {
-                            if (editingField == DemographicsEditField.PAST_DENTAL_HISTORY) editingField = null
-                            else {
-                                dentalHistInput = dentalBullets.joinToString("\n")
-                                editingField = DemographicsEditField.PAST_DENTAL_HISTORY
-                            }
-                        },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (editingField == DemographicsEditField.PAST_DENTAL_HISTORY) Icons.Default.Close else Icons.Default.Edit,
-                            contentDescription = null,
-                            modifier = Modifier.size(12.dp),
-                            tint = ThornburyPrimary
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(if (editingField == DemographicsEditField.PAST_DENTAL_HISTORY) "Cancel" else "Edit", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (editingField == DemographicsEditField.PAST_DENTAL_HISTORY) {
-                    OutlinedTextField(
-                        value = dentalHistInput,
-                        onValueChange = { dentalHistInput = it },
-                        label = { Text("Enter each past treatment or restoration on a new line") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedContainerColor = ThornburyCanvas,
-                            unfocusedContainerColor = ThornburyCanvas,
-                            focusedBorderColor = ThornburyPrimary,
-                            unfocusedBorderColor = ThornburyHairline
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Button(
-                        onClick = {
-                            DentalRepository.updatePatientDemographics(
-                                patientId = patient.id,
-                                opNo = patient.opNo,
-                                name = patient.name,
-                                phone = patient.phone,
-                                email = patient.email,
-                                address = patient.address,
-                                medicalHistory = patient.medicalHistory,
-                                familyHistory = patient.familyHistory,
-                                pastDentalHistory = dentalHistInput
-                            )
-                            editingField = null
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Save Past Dental History")
-                    }
-                } else {
-                    if (dentalBullets.isEmpty()) {
-                        Text(text = "No previous restorations, trauma, or treatments noted.", style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic), color = ThornburyMuted)
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            dentalBullets.forEach { item ->
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Text(text = "• ", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
-                                    Text(text = item, style = MaterialTheme.typography.bodyMedium, color = ThornburyInk)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- 8. Recorded Allergies & Adverse Reactions ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Warning, contentDescription = null, tint = ThornburyError, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Allergies & Contraindications (${patient.allergies.size})", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-
-                    TextButton(
-                        onClick = { showAddAllergyDialog = true },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = ThornburyPrimary)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Allergy", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (patient.allergies.isEmpty()) {
-                    Text(
-                        text = "No recorded drug or material allergies (NKA).",
-                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
-                        color = ThornburyMuted
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        patient.allergies.forEach { allergy ->
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                color = ThornburyErrorWash,
-                                border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.3f))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = allergy.allergen,
-                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                                color = ThornburyError
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Surface(
-                                                shape = RoundedCornerShape(9999.dp),
-                                                color = ThornburyError.copy(alpha = 0.15f)
-                                            ) {
-                                                Text(
-                                                    text = allergy.severity.uppercase(),
-                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        color = ThornburyError
-                                                    )
-                                                )
-                                            }
-                                        }
-                                        if (allergy.reaction.isNotBlank()) {
-                                            Text(
-                                                text = "Reaction: ${allergy.reaction}",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = ThornburyError.copy(alpha = 0.8f)
-                                            )
-                                        }
-                                    }
-
-                                    IconButton(
-                                        onClick = { DentalRepository.removePatientAllergy(patient.id, allergy.allergen) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Remove Allergy",
-                                            tint = ThornburyError,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // --- 9. Systemic Medical Alerts & Special Precautions ---
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = ThornburyWarning, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Systemic Medical Alerts (${patient.medicalAlerts.size})", style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-
-                    TextButton(
-                        onClick = { showAddAlertDialog = true },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp), tint = ThornburyPrimary)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Add Alert", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                if (patient.medicalAlerts.isEmpty()) {
-                    Text(
-                        text = "No active systemic medical alerts or surgical cautions.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
-                        color = ThornburyMuted
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        patient.medicalAlerts.forEach { alert ->
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                color = ThornburyWarningWash,
-                                border = BorderStroke(1.dp, ThornburyWarning.copy(alpha = 0.3f))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = alert,
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                        color = ThornburyWarning,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    IconButton(
-                                        onClick = { DentalRepository.removePatientMedicalAlert(patient.id, alert) },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Remove Alert",
-                                            tint = ThornburyWarning,
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Add Allergy Dialog
-    if (showAddAllergyDialog) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = { showAddAllergyDialog = false }) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = ThornburySurfaceCard,
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Add Patient Allergy", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = newAllergen,
-                        onValueChange = { newAllergen = it },
-                        label = { Text("Allergen (e.g. Penicillin, Latex)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Severity:", style = MaterialTheme.typography.labelSmall, color = ThornburyMuted)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("Mild", "Moderate", "Severe").forEach { sev ->
-                            FilterChip(
-                                selected = newSeverity == sev,
-                                onClick = { newSeverity = sev },
-                                label = { Text(sev) }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = newReaction,
-                        onValueChange = { newReaction = it },
-                        label = { Text("Clinical Reaction (e.g. Anaphylaxis, Rash)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showAddAllergyDialog = false }) { Text("Cancel") }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (newAllergen.isNotBlank()) {
-                                    DentalRepository.addPatientAllergy(patient.id, newAllergen, newSeverity, newReaction)
-                                    newAllergen = ""
-                                    newReaction = ""
-                                    showAddAllergyDialog = false
-                                }
-                            },
-                            enabled = newAllergen.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary)
-                        ) {
-                            Text("Add Allergy")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Add Medical Alert Dialog
-    if (showAddAlertDialog) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = { showAddAlertDialog = false }) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                color = ThornburySurfaceCard,
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Add Medical Alert", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedTextField(
-                        value = newAlertText,
-                        onValueChange = { newAlertText = it },
-                        label = { Text("Alert Description (e.g. On daily Warfarin)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { showAddAlertDialog = false }) { Text("Cancel") }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (newAlertText.isNotBlank()) {
-                                    DentalRepository.addPatientMedicalAlert(patient.id, newAlertText)
-                                    newAlertText = ""
-                                    showAddAlertDialog = false
-                                }
-                            },
-                            enabled = newAlertText.isNotBlank(),
-                            colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary)
-                        ) {
-                            Text("Add Alert")
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// =============================================================================
 // Reports & Imaging View (Matches reports-and-imaging-view.tsx)
 // =============================================================================
 
@@ -2463,7 +1235,6 @@ private fun ReportsAndImagingView(
                     text = "Diagnostic Reports & Imaging",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif
                     ),
                     color = ThornburyInk
                 )
@@ -2626,38 +1397,6 @@ private fun ReportsAndImagingView(
                                         color = ThornburyMuted
                                     )
                                 }
-
-                                // Interactive Release Status Button
-                                Surface(
-                                    modifier = Modifier.clickable { onToggleRelease(item.id) },
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = if (item.releasedAt != null) ThornburySuccessWash else ThornburyWarningWash,
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (item.releasedAt != null) ThornburySuccess.copy(alpha = 0.4f) else ThornburyWarning.copy(alpha = 0.4f)
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = if (item.releasedAt != null) Icons.Default.CheckCircle else Icons.Default.Lock,
-                                            contentDescription = null,
-                                            tint = if (item.releasedAt != null) ThornburySuccess else ThornburyWarning,
-                                            modifier = Modifier.size(12.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = if (item.releasedAt != null) "RELEASED TO PORTAL" else "HELD IN SURGERY",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp
-                                            ),
-                                            color = if (item.releasedAt != null) ThornburySuccess else ThornburyWarning
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
@@ -2695,7 +1434,6 @@ private fun VisitHistoryView(
                     text = "Appointment & Visit History",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Serif
                     ),
                     color = ThornburyInk
                 )

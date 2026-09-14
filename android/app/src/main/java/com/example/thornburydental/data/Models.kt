@@ -7,6 +7,23 @@ import kotlinx.serialization.Serializable
 // =============================================================================
 
 @Serializable
+enum class UserRole {
+    CLINICIAN,
+    PATIENT,
+    RECEPTIONIST
+}
+
+@Serializable
+data class User(
+    val id: String,
+    val email: String,
+    val name: String,
+    val role: UserRole,
+    val phone: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
 data class Clinician(
     val id: String,
     val name: String,
@@ -99,6 +116,15 @@ data class Patient(
 )
 
 @Serializable
+data class ReportAttachment(
+    val id: String,
+    val name: String,
+    val sizeStr: String,
+    val mimeType: String,
+    val uri: String? = null
+)
+
+@Serializable
 data class DiagnosticReport(
     val id: String,
     val patientId: String,
@@ -108,8 +134,11 @@ data class DiagnosticReport(
     val summary: String,
     val takenAt: String,
     val releasedAt: String? = null,
-    val image: String? = null
+    val image: String? = null,
+    val attachments: List<ReportAttachment> = emptyList()
 )
+
+typealias DentalReport = DiagnosticReport
 
 @Serializable
 data class PlanStep(
@@ -119,7 +148,9 @@ data class PlanStep(
     val code: String,
     val fee: Double,
     val completed: Boolean = false
-)
+) {
+    val procedureCode: String get() = code
+}
 
 @Serializable
 data class PlanAddendum(
@@ -191,3 +222,25 @@ data class HeldResult(
     val title: String,
     val kind: String // "Imaging", "Histology", "Periodontal Probe"
 )
+
+@Serializable
+data class UserProfilePreferences(
+    val id: String = "primary_profile",
+    val fullName: String = "",
+    val pronouns: String = "",
+    val dob: String = "",
+    val phone: String = "",
+    val email: String = "",
+    val dentalGoals: List<String> = emptyList(),
+    val anxietyLevel: String = "Relaxed",
+    val comfortAmenities: List<String> = emptyList(),
+    val anesthesiaPreference: String = "Standard Local Anesthetic",
+    val medicalAlerts: List<String> = emptyList(),
+    val lastVisit: String = "Within 6 months",
+    val schedulePreference: String = "Morning (8am - 12pm)",
+    val contactChannel: String = "SMS / WhatsApp",
+    val additionalNotes: String = "",
+    val isOnboardingCompleted: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+

@@ -22,7 +22,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,9 +81,7 @@ fun DentalModelView(
             ) {
                 Text(
                     text = "Interactive Anatomy Model",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFamily = FontFamily.Serif
-                    ),
+                    style = MaterialTheme.typography.titleMedium,
                     color = ThornburyInk
                 )
                 Surface(

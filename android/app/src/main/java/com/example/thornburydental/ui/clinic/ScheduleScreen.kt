@@ -1,0 +1,800 @@
+package com.example.thornburydental.ui.clinic
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.thornburydental.data.Appointment
+import com.example.thornburydental.data.DentalRepository
+import com.example.thornburydental.data.Patient
+import com.example.thornburydental.theme.*
+import java.util.Calendar
+
+private fun calculateAge(dobStr: String): Int {
+    return try {
+        val parts = dobStr.split("-").map { it.toInt() }
+        val birthYear = parts[0]
+        val birthMonth = parts[1] - 1
+        val birthDay = parts[2]
+
+        val today = Calendar.getInstance()
+        var age = today.get(Calendar.YEAR) - birthYear
+
+        val currentMonth = today.get(Calendar.MONTH)
+        val currentDay = today.get(Calendar.DAY_OF_MONTH)
+
+        if (currentMonth < birthMonth || (currentMonth == birthMonth && currentDay < birthDay)) {
+            age--
+        }
+        if (age < 0) 0 else age
+    } catch (_: Exception) {
+        38
+    }
+}
+
+private fun formatTimeWithAmPm(timeStr: String): String {
+    return try {
+        val cleanTime = timeStr.trim()
+        if (cleanTime.uppercase().contains("AM") || cleanTime.uppercase().contains("PM")) {
+            return cleanTime
+        }
+        val parts = cleanTime.split(":")
+        val hour = parts[0].toInt()
+        val minute = parts[1]
+        val amPm = if (hour < 12) "AM" else "PM"
+        val hour12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
+        String.format("%02d:%s %s", hour12, minute, amPm)
+    } catch (_: Exception) {
+        timeStr
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ScheduleScreen(
+    onOpenPatientChart: (String) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val appointments by DentalRepository.appointments.collectAsState()
+    val patients by DentalRepository.patients.collectAsState()
+
+    var roomFilter by remember { mutableStateOf("all") }
+    var statusFilter by remember { mutableStateOf("all") }
+    var searchQuery by remember { mutableStateOf("") }
+    var showSelectPatientDialog by remember { mutableStateOf(false) }
+    var bookingTargetPatient by remember { mutableStateOf<Patient?>(null) }
+    var appointmentToCancel by remember { mutableStateOf<Appointment?>(null) }
+
+    val filteredAppointments = remember(appointments, roomFilter, statusFilter, searchQuery) {
+        appointments.filter { appt ->
+            if (roomFilter != "all" && appt.room != roomFilter) return@filter false
+            if (statusFilter != "all" && appt.status != statusFilter) return@filter false
+            if (searchQuery.isNotBlank()) {
+                val q = searchQuery.trim().lowercase()
+                val matchName = appt.patientName.lowercase().contains(q)
+                val matchOp = appt.patientOpNo.lowercase().contains(q)
+                val matchProc = appt.procedure.lowercase().contains(q)
+                val matchClin = appt.clinicianName.lowercase().contains(q)
+                val matchRoom = appt.room.lowercase().contains(q)
+                if (!matchName && !matchOp && !matchProc && !matchClin && !matchRoom) return@filter false
+            }
+            true
+        }
+    }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(ThornburyCanvas),
+        contentPadding = PaddingValues(bottom = 32.dp)
+    ) {
+        // =====================================================================
+        // 1. HEADER SURFACE
+        // =====================================================================
+        item {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ThornburyCanvas,
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Surgery Schedule & Booking",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = ThornburyInk
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Manage surgery appointments, chair allocations, and book patient visits",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThornburyMuted
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        Button(
+                            onClick = { showSelectPatientDialog = true },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ThornburyPrimary,
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Book Appointment",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 2. SEARCH & FILTER SECTION
+        // =====================================================================
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // 24dp Pill-shaped Search Text Field
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = {
+                        Text(
+                            text = "Search patient, OP, procedure, room...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = ThornburyMuted
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = ThornburyMuted
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Clear",
+                                    tint = ThornburyMuted
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = ThornburyCanvas,
+                        unfocusedContainerColor = ThornburyCanvas,
+                        focusedBorderColor = ThornburyPrimary,
+                        unfocusedBorderColor = ThornburyHairline
+                    ),
+                    singleLine = true
+                )
+
+                // Room FilterChips Row
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Surgery Room",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyMuted
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val roomOptions = listOf(
+                            "all" to "All Surgeries (${appointments.size})",
+                            "Surgery 1" to "Surgery 1",
+                            "Surgery 2" to "Surgery 2",
+                            "Surgery 3" to "Surgery 3"
+                        )
+                        roomOptions.forEach { (key, label) ->
+                            val isSelected = roomFilter == key
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { roomFilter = key },
+                                label = { Text(label) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ThornburyPrimary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = ThornburySurfaceSoft,
+                                    labelColor = ThornburyInk
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Status FilterChips Row
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        text = "Appointment Status",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyMuted
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val statusOptions = listOf(
+                            "all" to "All",
+                            "confirmed" to "Upcoming",
+                            "completed" to "Seen",
+                            "cancelled" to "Cancelled"
+                        )
+                        statusOptions.forEach { (key, label) ->
+                            val isSelected = statusFilter == key
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { statusFilter = key },
+                                label = { Text(label) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ThornburyPrimary,
+                                    selectedLabelColor = Color.White,
+                                    containerColor = ThornburySurfaceSoft,
+                                    labelColor = ThornburyInk
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 3. APPOINTMENTS SCHEDULE LIST
+        // =====================================================================
+        if (filteredAppointments.isEmpty()) {
+            item {
+                OutlinedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(containerColor = ThornburyCanvas),
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EventBusy,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = ThornburyMutedSoft
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No Appointments Found",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = ThornburyInk
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "No surgery appointments match your active room filter, status filter, or search query.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ThornburyMuted,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        } else {
+            items(filteredAppointments, key = { it.id }) { appt ->
+                OutlinedCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceCard),
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        // 1. Top Row: Time & duration badge on the left, Surgery room badge and Status badge on the right
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Left: Time & Duration Badge
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = ThornburySurfaceSoft,
+                                border = BorderStroke(1.dp, ThornburyHairlineSoft)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Schedule,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp),
+                                        tint = ThornburyPrimary
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${formatTimeWithAmPm(appt.time)} • ${appt.durationMin} MIN",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = ThornburyPrimaryText
+                                    )
+                                }
+                            }
+
+                            // Right: Surgery Room Badge & Status Badge
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Surgery Room Badge
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = ThornburyPrimaryWash,
+                                    border = BorderStroke(1.dp, ThornburyHairline)
+                                ) {
+                                    Text(
+                                        text = appt.room,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = ThornburyPrimaryText
+                                    )
+                                }
+
+                                // Status Badge
+                                val (statusText, statusBg, statusFg) = when (appt.status) {
+                                    "completed" -> Triple("Seen", ThornburySuccessWash, ThornburySuccess)
+                                    "cancelled" -> Triple("Cancelled", ThornburyErrorWash, ThornburyError)
+                                    else -> Triple("Confirmed", ThornburyPrimaryWash, ThornburyPrimaryText)
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(9999.dp),
+                                    color = statusBg,
+                                    border = BorderStroke(1.dp, statusFg.copy(alpha = 0.3f))
+                                ) {
+                                    Text(
+                                        text = statusText,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = statusFg
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // 2. Middle Section: Full width patient name + age, OP number, procedure, and clinician name
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            // Patient Name + Age
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable { onOpenPatientChart(appt.patientId) }
+                            ) {
+                                Text(
+                                    text = appt.patientName,
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    color = ThornburyInk
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "(${calculateAge(appt.patientDob)} yrs)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = ThornburyMuted
+                                )
+                            }
+
+                            // OP Number
+                            Text(
+                                text = "OP: ${appt.patientOpNo}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = ThornburyMuted
+                            )
+
+                            // Procedure
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MedicalServices,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = ThornburyPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = appt.procedure,
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = ThornburyInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            // Clinician Name
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = ThornburyMuted
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = appt.clinicianName,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ThornburyMuted
+                                )
+                            }
+
+                            if (!appt.allergyList.isNullOrBlank()) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = ThornburyErrorWash
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(14.dp),
+                                            tint = ThornburyError
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "Allergies: ${appt.allergyList}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = ThornburyError
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+                        HorizontalDivider(color = ThornburyHairlineSoft, thickness = 1.dp)
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // 3. Bottom Action Row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = { onOpenPatientChart(appt.patientId) },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(36.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FolderOpen,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Chart",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                                )
+                            }
+
+                            if (appt.status == "confirmed") {
+                                OutlinedButton(
+                                    onClick = { DentalRepository.updateAppointmentStatus(appt.id, "completed") },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = ThornburySuccess
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = null,
+                                        tint = ThornburySuccess,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Mark Seen",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = { appointmentToCancel = appt },
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = ThornburyError
+                                    ),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = null,
+                                        tint = ThornburyError,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "Cancel",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 4. MODALS & DIALOGS
+    // =========================================================================
+
+    // Modal 1: Select Patient Dialog
+    if (showSelectPatientDialog) {
+        var patientSearchQuery by remember { mutableStateOf("") }
+        val filteredPatients = remember(patients, patientSearchQuery) {
+            patients.filter { p ->
+                if (patientSearchQuery.isBlank()) true
+                else {
+                    val q = patientSearchQuery.trim().lowercase()
+                    p.name.lowercase().contains(q) || p.opNo.lowercase().contains(q)
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showSelectPatientDialog = false },
+            title = {
+                Text(
+                    text = "Select Patient for Booking",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = ThornburyInk
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                ) {
+                    OutlinedTextField(
+                        value = patientSearchQuery,
+                        onValueChange = { patientSearchQuery = it },
+                        placeholder = { Text("Search patient name or OP number...") },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                tint = ThornburyMuted
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (filteredPatients.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No registered patients match your search.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ThornburyMuted
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            items(filteredPatients, key = { it.id }) { patient ->
+                                Surface(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            bookingTargetPatient = patient
+                                            showSelectPatientDialog = false
+                                        },
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = ThornburySurfaceSoft,
+                                    border = BorderStroke(1.dp, ThornburyHairlineSoft)
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(12.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = patient.name,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = ThornburyInk
+                                            )
+                                            Text(
+                                                text = "${patient.opNo} • DOB: ${patient.dob}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = ThornburyMuted
+                                            )
+                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.ChevronRight,
+                                            contentDescription = null,
+                                            tint = ThornburyPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showSelectPatientDialog = false }) {
+                    Text("Close", color = ThornburyInk)
+                }
+            },
+            shape = RoundedCornerShape(18.dp),
+            containerColor = ThornburyCanvas
+        )
+    }
+
+    // Modal 2: Book Appointment Dialog
+    if (bookingTargetPatient != null) {
+        BookAppointmentDialog(
+            patient = bookingTargetPatient!!,
+            onDismiss = { bookingTargetPatient = null },
+            onSave = { proc, clinId, clinName, time, dur, room ->
+                DentalRepository.bookAppointment(
+                    patient = bookingTargetPatient!!,
+                    clinicianId = clinId,
+                    clinicianName = clinName,
+                    time = time,
+                    durationMin = dur,
+                    room = room,
+                    procedure = proc
+                )
+                bookingTargetPatient = null
+            }
+        )
+    }
+
+    // Modal 3: Appointment Cancellation Confirmation Dialog
+    if (appointmentToCancel != null) {
+        AlertDialog(
+            onDismissRequest = { appointmentToCancel = null },
+            title = {
+                Text(
+                    text = "Cancel Surgery Appointment",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to cancel the surgery appointment for ${appointmentToCancel?.patientName} (${appointmentToCancel?.procedure}) scheduled at ${formatTimeWithAmPm(appointmentToCancel?.time ?: "")} in ${appointmentToCancel?.room}?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThornburyBody
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        appointmentToCancel?.let { appt ->
+                            DentalRepository.updateAppointmentStatus(appt.id, "cancelled")
+                        }
+                        appointmentToCancel = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ThornburyError)
+                ) {
+                    Text("Confirm Cancel", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { appointmentToCancel = null }) {
+                    Text("Keep Appointment", color = ThornburyInk)
+                }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = ThornburyCanvas
+        )
+    }
+}

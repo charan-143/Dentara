@@ -2,17 +2,18 @@ package com.example.thornburydental.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
-
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 val LightColorScheme = lightColorScheme(
@@ -60,15 +61,15 @@ val DarkColorScheme = darkColorScheme(
     primaryContainer = ThornburySurfaceDarkElevated,
     onPrimaryContainer = ThornburyOnDark,
     inversePrimary = ThornburyPrimary,
-    secondary = ThornburyAccent,
-    onSecondary = ThornburyOnAccent,
+    secondary = ThornburyPrimaryActiveDark,
+    onSecondary = ThornburyOnPrimaryOnDark,
     secondaryContainer = ThornburySurfaceDarkSoft,
     onSecondaryContainer = ThornburyOnDark,
     tertiary = ThornburyTertiaryDark,
     onTertiary = ThornburyOnTertiaryDark,
     tertiaryContainer = ThornburyTertiaryContainerDark,
     onTertiaryContainer = ThornburyOnTertiaryContainerDark,
-    background = ThornburySurfaceDark,
+    background = ThornburySurfaceDarkLowest,
     onBackground = ThornburyOnDark,
     surface = ThornburySurfaceDark,
     onSurface = ThornburyOnDark,
@@ -93,18 +94,48 @@ val DarkColorScheme = darkColorScheme(
     surfaceTint = ThornburyPrimaryOnDark
 )
 
+// A softer, friendlier rounding scale than stock M3 — modern clinical apps
+// lean into generous corner radii (approachable, non-clinical-cold) while
+// keeping small controls crisp enough to read as precise/clinical.
 val ThornburyShapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small = RoundedCornerShape(8.dp),
-    medium = RoundedCornerShape(12.dp),
-    large = RoundedCornerShape(16.dp),
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(14.dp),
+    large = RoundedCornerShape(20.dp),
     extraLarge = RoundedCornerShape(28.dp)
+)
+
+/**
+ * Standard text field color styling for Thornbury Dental.
+ * Ensures input font color is always legible ThornburyInk (never white-on-white).
+ */
+@Composable
+fun thornburyTextFieldColors(
+    containerColor: Color = ThornburyCanvas,
+    focusedBorderColor: Color = ThornburyPrimary,
+    unfocusedBorderColor: Color = ThornburyHairline,
+    textColor: Color = ThornburyInk,
+    placeholderColor: Color = ThornburyMutedSoft,
+    labelColor: Color = ThornburyMuted,
+    cursorColor: Color = ThornburyPrimary
+): TextFieldColors = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = textColor,
+    unfocusedTextColor = textColor,
+    focusedContainerColor = containerColor,
+    unfocusedContainerColor = containerColor,
+    focusedBorderColor = focusedBorderColor,
+    unfocusedBorderColor = unfocusedBorderColor,
+    focusedPlaceholderColor = placeholderColor,
+    unfocusedPlaceholderColor = placeholderColor,
+    focusedLabelColor = focusedBorderColor,
+    unfocusedLabelColor = labelColor,
+    cursorColor = cursorColor
 )
 
 @Composable
 fun ThornburyDentalTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Preserve Thornbury's intentional modern-teal clinical palette
+    darkTheme: Boolean = false, // Thornbury Clinical anchors on a clean, cool clinical-canvas system
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

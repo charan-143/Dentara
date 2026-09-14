@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -19,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -140,7 +140,7 @@ fun ExaminationQuestionsSection(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Assignment,
+                            imageVector = Icons.AutoMirrored.Filled.Assignment,
                             contentDescription = null,
                             tint = ThornburyPrimary,
                             modifier = Modifier.size(20.dp)
@@ -152,7 +152,6 @@ fun ExaminationQuestionsSection(
                             Text(
                                 text = "Chairside Clinical Questionnaire",
                                 style = MaterialTheme.typography.titleMedium.copy(
-                                    fontFamily = FontFamily.Serif,
                                     fontWeight = FontWeight.Bold
                                 ),
                                 color = ThornburyInk
@@ -417,12 +416,7 @@ private fun ChiefComplaintsSubSection(
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.bodySmall.copy(color = ThornburyInk),
                 shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ThornburyPrimary,
-                    unfocusedBorderColor = ThornburyHairline,
-                    focusedContainerColor = ThornburyCanvas,
-                    unfocusedContainerColor = ThornburyCanvas
-                ),
+                colors = thornburyTextFieldColors(),
                 singleLine = false,
                 maxLines = 3
             )
@@ -1144,12 +1138,7 @@ private fun ClinicianNotesSubSection(
                     .heightIn(min = 100.dp),
                 textStyle = MaterialTheme.typography.bodySmall.copy(color = ThornburyInk),
                 shape = RoundedCornerShape(8.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ThornburyPrimary,
-                    unfocusedBorderColor = ThornburyHairline,
-                    focusedContainerColor = ThornburyCanvas,
-                    unfocusedContainerColor = ThornburyCanvas
-                ),
+                colors = thornburyTextFieldColors(),
                 maxLines = 6
             )
         }
