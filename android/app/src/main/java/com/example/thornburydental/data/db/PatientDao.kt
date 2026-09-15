@@ -6,6 +6,7 @@ import android.database.sqlite.SQLiteDatabase
 import com.example.thornburydental.data.Allergy
 import com.example.thornburydental.data.ExaminationAnswers
 import com.example.thornburydental.data.Patient
+import com.example.thornburydental.data.PatientDiagnosis
 import com.example.thornburydental.data.ToothRecord
 
 /**
@@ -93,6 +94,7 @@ class PatientDao(
                 put(ThornburyDbHelper.COL_PATIENTS_MEDICAL_ALERTS_JSON, patient.medicalAlerts.toStringListDbJson())
                 put(ThornburyDbHelper.COL_PATIENTS_ALLERGIES_JSON, patient.allergies.toDbJson())
                 put(ThornburyDbHelper.COL_PATIENTS_EXAM_ANSWERS_JSON, patient.examAnswers.toDbJson())
+                put(ThornburyDbHelper.COL_PATIENTS_DIAGNOSIS_JSON, patient.diagnosis.toPatientDiagnosisDbJson())
                 put(ThornburyDbHelper.COL_PATIENTS_CREATED_AT, System.currentTimeMillis())
             }
             db.insertWithOnConflict(
@@ -110,6 +112,22 @@ class PatientDao(
         } finally {
             db.endTransaction()
         }
+    }
+
+    /**
+     * Update or record one-time persistent clinical diagnosis for a patient.
+     */
+    fun updateDiagnosis(patientId: String, diagnosis: PatientDiagnosis) {
+        val db = dbHelper.writableDatabase
+        val values = ContentValues().apply {
+            put(ThornburyDbHelper.COL_PATIENTS_DIAGNOSIS_JSON, diagnosis.toPatientDiagnosisDbJson())
+        }
+        db.update(
+            ThornburyDbHelper.TABLE_PATIENTS,
+            values,
+            "${ThornburyDbHelper.COL_PATIENTS_ID} = ?",
+            arrayOf(patientId)
+        )
     }
 
     /**
@@ -364,6 +382,8 @@ class PatientDao(
         val medicalAlertsJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_MEDICAL_ALERTS_JSON))
         val allergiesJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_ALLERGIES_JSON))
         val examAnswersJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_EXAM_ANSWERS_JSON))
+        val diagnosisIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PATIENTS_DIAGNOSIS_JSON)
+        val diagnosisJson = if (diagnosisIndex >= 0) cursor.getString(diagnosisIndex) else null
 
         return Patient(
             id = id,
@@ -380,7 +400,8 @@ class PatientDao(
             medicalAlerts = medicalAlertsJson.toStringList(),
             allergies = allergiesJson.toAllergies(),
             teeth = teeth,
-            examAnswers = examAnswersJson.toExamAnswers()
+            examAnswers = examAnswersJson.toExamAnswers(),
+            diagnosis = diagnosisJson.toPatientDiagnosis()
         )
     }
 }

@@ -279,24 +279,25 @@ fun IssuePrescriptionDialog(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = frequency,
-                        onValueChange = { frequency = it },
-                        label = { Text("Frequency") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
-                    )
-                    OutlinedTextField(
-                        value = duration,
-                        onValueChange = { duration = it },
-                        label = { Text("Duration") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
-                    )
-                }
+                OutlinedTextField(
+                    value = frequency,
+                    onValueChange = { frequency = it },
+                    label = { Text("Frequency (e.g. 1 tablet every 8 hours)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = duration,
+                    onValueChange = { duration = it },
+                    label = { Text("Duration (e.g. 5 days / until finished)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
+                )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -319,8 +320,8 @@ fun IssuePrescriptionDialog(
                     OutlinedButton(
                         onClick = {
                             val shareText = """
-                                THORNBURY DENTAL PRACTICE
-                                18 Thornbury Row, Portland, OR 97210
+                                DENTARA DENTAL PRACTICE
+                                18 Dentara Way, Portland, OR 97210
                                 Tel: +1 (503) 224-7700
                                 ----------------------------------------
                                 PRESCRIPTION FOR: ${patient.name}
@@ -337,11 +338,12 @@ fun IssuePrescriptionDialog(
 
                             val sendIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "Prescription for ${patient.name} - Thornbury Dental")
+                                putExtra(Intent.EXTRA_SUBJECT, "Prescription for ${patient.name} - Dentara Dental Practice")
                                 putExtra(Intent.EXTRA_TEXT, shareText)
                             }
                             context.startActivity(Intent.createChooser(sendIntent, "Share Prescription Slip"))
                         },
+                        enabled = (allergyWarning == null) || (overrideConfirmed && overrideReason.isNotBlank()),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f),
                         border = BorderStroke(1.dp, ThornburyHairline)

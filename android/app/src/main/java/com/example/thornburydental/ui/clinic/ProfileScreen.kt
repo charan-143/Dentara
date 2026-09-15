@@ -1,5 +1,6 @@
 package com.example.thornburydental.ui.clinic
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,10 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.AuthRepository
+import com.example.thornburydental.data.DentalRepository
+import com.example.thornburydental.data.UserRole
 import com.example.thornburydental.theme.*
 
 /**
@@ -32,12 +35,27 @@ fun ProfileScreen(
     onSignOut: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val currentUser by AuthRepository.currentUser.collectAsState()
-    val userName = currentUser?.name ?: "Dr. Ingrid Halvorsen"
+    val displayName = currentUser?.name ?: "Not signed in"
+    val roleLabel = when (currentUser?.role) {
+        UserRole.CLINICIAN -> "Clinician"
+        UserRole.RECEPTIONIST -> "Receptionist"
+        UserRole.PATIENT -> "Patient"
+        null -> "Guest"
+    }
+    val initials = remember(displayName) {
+        val words = displayName.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        when {
+            words.size >= 2 -> "${words.first().first().uppercaseChar()}${words.last().first().uppercaseChar()}"
+            words.isNotEmpty() -> words.first().take(2).uppercase()
+            else -> "?"
+        }
+    }
 
-    var selectedRoom by remember { mutableStateOf("Surgery 1") }
-    var isDarkModeEnabled by remember { mutableStateOf(false) }
-    var areNotificationsEnabled by remember { mutableStateOf(true) }
+    val selectedRoom by DentalRepository.defaultSurgeryRoom.collectAsState()
+    val isDarkModeEnabled by DentalRepository.isDarkModeEnabled.collectAsState()
+    val areNotificationsEnabled by DentalRepository.appointmentRemindersEnabled.collectAsState()
     var showSignOutDialog by remember { mutableStateOf(false) }
 
     val surgeryRooms = listOf("Surgery 1", "Surgery 2", "Surgery 3")
@@ -96,7 +114,7 @@ fun ProfileScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "IH",
+                            text = initials,
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -107,7 +125,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Dr. Ingrid Halvorsen",
+                        text = displayName,
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontWeight = FontWeight.Bold,
                         ),
@@ -115,7 +133,7 @@ fun ProfileScreen(
                     )
 
                     Text(
-                        text = "Principal Endodontist & Dental Surgeon",
+                        text = roleLabel,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                         color = ThornburyPrimaryText
                     )
@@ -128,7 +146,7 @@ fun ProfileScreen(
                         border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
                         Text(
-                            text = "GDC Registration #88204 • Surgery 1",
+                            text = "Default Room: $selectedRoom",
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
                             style = MaterialTheme.typography.labelSmall,
                             color = ThornburyMuted
@@ -164,16 +182,22 @@ fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    ProfileDetailRow(label = "Department", value = "Restorative & Endodontics")
+                    ProfileDetailRow(label = "Role", value = roleLabel)
                     HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 8.dp))
 
-                    ProfileDetailRow(label = "Primary Clinic Room", value = "Surgery 1 - Principal Operatory")
+                    ProfileDetailRow(label = "Primary Clinic Room", value = selectedRoom)
                     HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 8.dp))
 
-                    ProfileDetailRow(label = "Email Address", value = "dr.halvorsen@thornburydental.co.uk")
+                    ProfileDetailRow(
+                        label = "Email Address",
+                        value = currentUser?.email?.takeIf { it.isNotBlank() } ?: "Not on record"
+                    )
                     HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 8.dp))
 
-                    ProfileDetailRow(label = "Contact Phone", value = "+44 20 7946 0912")
+                    ProfileDetailRow(
+                        label = "Contact Phone",
+                        value = currentUser?.phone?.takeIf { it.isNotBlank() } ?: "Not on record"
+                    )
                 }
             }
 
@@ -220,7 +244,7 @@ fun ProfileScreen(
                             val isSelected = room == selectedRoom
                             FilterChip(
                                 selected = isSelected,
-                                onClick = { selectedRoom = room },
+                                onClick = { DentalRepository.setDefaultSurgeryRoom(room) },
                                 label = { Text(room, style = MaterialTheme.typography.labelSmall) },
                                 shape = RoundedCornerShape(12.dp),
                                 colors = FilterChipDefaults.filterChipColors(
@@ -255,7 +279,7 @@ fun ProfileScreen(
                         }
                         Switch(
                             checked = isDarkModeEnabled,
-                            onCheckedChange = { isDarkModeEnabled = it }
+                            onCheckedChange = { DentalRepository.setDarkModeEnabled(it) }
                         )
                     }
 
@@ -283,7 +307,7 @@ fun ProfileScreen(
                         }
                         Switch(
                             checked = areNotificationsEnabled,
-                            onCheckedChange = { areNotificationsEnabled = it }
+                            onCheckedChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
                         )
                     }
                 }
@@ -369,7 +393,9 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedButton(
-                        onClick = { },
+                        onClick = {
+                            Toast.makeText(context, "Editing profile details isn't available yet.", Toast.LENGTH_SHORT).show()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -381,7 +407,9 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     OutlinedButton(
-                        onClick = { },
+                        onClick = {
+                            Toast.makeText(context, "Changing password isn't available yet.", Toast.LENGTH_SHORT).show()
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     ) {
@@ -393,7 +421,7 @@ fun ProfileScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Button(
-                        onClick = onSignOut,
+                        onClick = { showSignOutDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -410,6 +438,46 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    // Sign-out confirmation — a mis-tap on "Return to Brand Page" no longer signs
+    // the user out immediately with no way to cancel.
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = {
+                Text(
+                    text = "Sign Out?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            },
+            text = {
+                Text(
+                    text = "You'll be returned to the welcome screen and will need to sign in again to access patient records.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThornburyBody
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSignOutDialog = false
+                        onSignOut()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White)
+                ) {
+                    Text("Sign Out")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showSignOutDialog = false }) {
+                    Text("Cancel", color = ThornburyInk)
+                }
+            },
+            containerColor = ThornburyCanvas,
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }
 

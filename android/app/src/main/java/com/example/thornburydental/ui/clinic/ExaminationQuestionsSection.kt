@@ -54,8 +54,23 @@ fun ExaminationQuestionsSection(
     var periodontalBleeding by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.periodontalBleeding ?: emptyList())
     }
+    var periodontalPockets by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.periodontalPockets ?: emptyList())
+    }
+    var gingivalRecession by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.gingivalRecession ?: emptyList())
+    }
     var softTissue by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.softTissue ?: emptyList())
+    }
+    var stains by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.stains ?: emptyList())
+    }
+    var calculus by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.calculus ?: emptyList())
+    }
+    var tmjAssessment by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.tmjAssessment ?: emptyList())
     }
     var functionalHabits by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.functionalHabits ?: emptyList())
@@ -68,6 +83,12 @@ fun ExaminationQuestionsSection(
     }
     var cariesRisk by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.cariesRisk ?: "")
+    }
+    var otherDiagnosesConditions by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.otherDiagnosesConditions ?: emptyList())
+    }
+    var otherDiagnosesNotes by remember(patientId, initialAnswers) {
+        mutableStateOf(initialAnswers?.otherDiagnosesNotes ?: "")
     }
     var clinicianNotes by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.clinicianNotes ?: "")
@@ -82,11 +103,18 @@ fun ExaminationQuestionsSection(
         newPainSeverity: String = painSeverity,
         newSensitivityTriggers: List<String> = sensitivityTriggers,
         newPeriodontalBleeding: List<String> = periodontalBleeding,
+        newPeriodontalPockets: List<String> = periodontalPockets,
+        newGingivalRecession: List<String> = gingivalRecession,
         newSoftTissue: List<String> = softTissue,
+        newStains: List<String> = stains,
+        newCalculus: List<String> = calculus,
+        newTmjAssessment: List<String> = tmjAssessment,
         newFunctionalHabits: List<String> = functionalHabits,
         newBrushingFrequency: String = brushingFrequency,
         newFlossingFrequency: String = flossingFrequency,
         newCariesRisk: String = cariesRisk,
+        newOtherDiagnosesConditions: List<String> = otherDiagnosesConditions,
+        newOtherDiagnosesNotes: String = otherDiagnosesNotes,
         newClinicianNotes: String = clinicianNotes
     ) {
         onSaveAnswers(
@@ -96,11 +124,18 @@ fun ExaminationQuestionsSection(
                 painSeverity = newPainSeverity,
                 sensitivityTriggers = newSensitivityTriggers,
                 periodontalBleeding = newPeriodontalBleeding,
+                periodontalPockets = newPeriodontalPockets,
+                gingivalRecession = newGingivalRecession,
                 softTissue = newSoftTissue,
+                stains = newStains,
+                calculus = newCalculus,
+                tmjAssessment = newTmjAssessment,
                 functionalHabits = newFunctionalHabits,
                 brushingFrequency = newBrushingFrequency,
                 flossingFrequency = newFlossingFrequency,
                 cariesRisk = newCariesRisk,
+                otherDiagnosesConditions = newOtherDiagnosesConditions,
+                otherDiagnosesNotes = newOtherDiagnosesNotes,
                 clinicianNotes = newClinicianNotes
             )
         )
@@ -239,9 +274,11 @@ fun ExaminationQuestionsSection(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Section 3: Periodontal & Soft Tissue Findings
-                PeriodontalAndSoftTissueSubSection(
+                // Section 3: Periodontal, Gingival & Soft Tissue Screening
+                PeriodontalScreeningSubSection(
                     periodontal = periodontalBleeding,
+                    pockets = periodontalPockets,
+                    recession = gingivalRecession,
                     softTissue = softTissue,
                     onTogglePeriodontal = { item ->
                         val updated = if (periodontalBleeding.contains(item)) {
@@ -251,6 +288,24 @@ fun ExaminationQuestionsSection(
                         }
                         periodontalBleeding = updated
                         emitChanges(newPeriodontalBleeding = updated)
+                    },
+                    onTogglePocket = { item ->
+                        val updated = if (periodontalPockets.contains(item)) {
+                            periodontalPockets - item
+                        } else {
+                            periodontalPockets + item
+                        }
+                        periodontalPockets = updated
+                        emitChanges(newPeriodontalPockets = updated)
+                    },
+                    onToggleRecession = { item ->
+                        val updated = if (gingivalRecession.contains(item)) {
+                            gingivalRecession - item
+                        } else {
+                            gingivalRecession + item
+                        }
+                        gingivalRecession = updated
+                        emitChanges(newGingivalRecession = updated)
                     },
                     onToggleSoftTissue = { item ->
                         val updated = if (softTissue.contains(item)) {
@@ -265,18 +320,44 @@ fun ExaminationQuestionsSection(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Section 4: Oral Hygiene & Functional Habits
-                OralHygieneAndHabitsSubSection(
-                    brushing = brushingFrequency,
-                    flossing = flossingFrequency,
-                    habits = functionalHabits,
-                    onSelectBrushing = { freq ->
-                        brushingFrequency = freq
-                        emitChanges(newBrushingFrequency = freq)
+                // Section 4: Hard Deposits & Tooth Stains
+                DepositsAndStainsSubSection(
+                    calculus = calculus,
+                    stains = stains,
+                    onToggleCalculus = { item ->
+                        val updated = if (calculus.contains(item)) {
+                            calculus - item
+                        } else {
+                            calculus + item
+                        }
+                        calculus = updated
+                        emitChanges(newCalculus = updated)
                     },
-                    onSelectFlossing = { freq ->
-                        flossingFrequency = freq
-                        emitChanges(newFlossingFrequency = freq)
+                    onToggleStains = { item ->
+                        val updated = if (stains.contains(item)) {
+                            stains - item
+                        } else {
+                            stains + item
+                        }
+                        stains = updated
+                        emitChanges(newStains = updated)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Section 5: TMJ & Functional Occlusal Habits
+                TmjAndHabitsSubSection(
+                    tmj = tmjAssessment,
+                    habits = functionalHabits,
+                    onToggleTmj = { item ->
+                        val updated = if (tmjAssessment.contains(item)) {
+                            tmjAssessment - item
+                        } else {
+                            tmjAssessment + item
+                        }
+                        tmjAssessment = updated
+                        emitChanges(newTmjAssessment = updated)
                     },
                     onToggleHabit = { habit ->
                         val updated = if (functionalHabits.contains(habit)) {
@@ -291,7 +372,23 @@ fun ExaminationQuestionsSection(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Section 5: Caries Risk Level
+                // Section 6: Oral Hygiene & Preventative Practices
+                OralHygieneSubSection(
+                    brushing = brushingFrequency,
+                    flossing = flossingFrequency,
+                    onSelectBrushing = { freq ->
+                        brushingFrequency = freq
+                        emitChanges(newBrushingFrequency = freq)
+                    },
+                    onSelectFlossing = { freq ->
+                        flossingFrequency = freq
+                        emitChanges(newFlossingFrequency = freq)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Section 7: Caries Risk Assessment (CRA)
                 CariesRiskSubSection(
                     selectedRisk = cariesRisk,
                     onSelectRisk = { risk ->
@@ -302,7 +399,28 @@ fun ExaminationQuestionsSection(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Section 6: Clinician Examination Notes
+                // Section 8: Other Diagnoses & Clinical Conditions
+                OtherDiagnosesSubSection(
+                    conditions = otherDiagnosesConditions,
+                    notes = otherDiagnosesNotes,
+                    onToggleCondition = { condition ->
+                        val updated = if (otherDiagnosesConditions.contains(condition)) {
+                            otherDiagnosesConditions - condition
+                        } else {
+                            otherDiagnosesConditions + condition
+                        }
+                        otherDiagnosesConditions = updated
+                        emitChanges(newOtherDiagnosesConditions = updated)
+                    },
+                    onNotesChanged = { newNotes ->
+                        otherDiagnosesNotes = newNotes
+                        emitChanges(newOtherDiagnosesNotes = newNotes)
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Section 9: Clinician Examination Notes & Directives
                 ClinicianNotesSubSection(
                     notes = clinicianNotes,
                     onNotesChanged = { newNotes ->
@@ -602,7 +720,7 @@ private fun PainAndSensitivitySubSection(
 }
 
 // =============================================================================
-// 3. Periodontal & Soft Tissue Findings
+// 3. Periodontal, Gingival & Soft Tissue Screening
 // =============================================================================
 
 private val PERIODONTAL_OPTIONS = listOf(
@@ -610,6 +728,24 @@ private val PERIODONTAL_OPTIONS = listOf(
     "Bleeding on brushing",
     "Spontaneous bleeding",
     "Swollen / tender gums"
+)
+
+private val PERIODONTAL_POCKET_OPTIONS = listOf(
+    "Normal (1 - 3 mm)",
+    "Mild Pockets (4 - 5 mm)",
+    "Deep Pockets (≥ 6 mm)",
+    "Localized Pocketing",
+    "Generalized Pocketing",
+    "Furcation Involvement"
+)
+
+private val GINGIVAL_RECESSION_OPTIONS = listOf(
+    "None",
+    "Mild (< 2 mm)",
+    "Moderate (2 - 4 mm)",
+    "Severe (> 4 mm)",
+    "Localized Cervical",
+    "Generalized Recession"
 )
 
 private val SOFT_TISSUE_OPTIONS = listOf(
@@ -621,10 +757,14 @@ private val SOFT_TISSUE_OPTIONS = listOf(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PeriodontalAndSoftTissueSubSection(
+private fun PeriodontalScreeningSubSection(
     periodontal: List<String>,
+    pockets: List<String>,
+    recession: List<String>,
     softTissue: List<String>,
     onTogglePeriodontal: (String) -> Unit,
+    onTogglePocket: (String) -> Unit,
+    onToggleRecession: (String) -> Unit,
     onToggleSoftTissue: (String) -> Unit
 ) {
     Card(
@@ -643,7 +783,7 @@ private fun PeriodontalAndSoftTissueSubSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "3. Periodontal & Soft Tissue Screening",
+                    text = "3. Periodontal, Gingival & Soft Tissue Screening",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
@@ -651,14 +791,13 @@ private fun PeriodontalAndSoftTissueSubSection(
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            // 1. Bleeding
             Text(
                 text = "Gingival & Periodontal Bleeding",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = ThornburyBodyStrong
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -695,14 +834,125 @@ private fun PeriodontalAndSoftTissueSubSection(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // 2. Periodontal Pockets
+            Text(
+                text = "Periodontal Pocket Depth (Pockets)",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                PERIODONTAL_POCKET_OPTIONS.forEach { item ->
+                    val isSelected = pockets.contains(item)
+                    val isDeep = (item.contains("Deep") || item.contains("Furcation")) && isSelected
+                    val isMild = item.contains("Mild") && isSelected
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onTogglePocket(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = when {
+                                isDeep -> ThornburyErrorWash
+                                isMild -> ThornburyWarningWash
+                                else -> ThornburyPrimaryWash
+                            },
+                            selectedLabelColor = when {
+                                isDeep -> ThornburyError
+                                isMild -> ThornburyWarning
+                                else -> ThornburyPrimaryText
+                            }
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = when {
+                                isDeep -> ThornburyError
+                                isMild -> ThornburyWarning
+                                else -> ThornburyPrimary
+                            }
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 3. Gingival Recession
+            Text(
+                text = "Gingival Recession",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GINGIVAL_RECESSION_OPTIONS.forEach { item ->
+                    val isSelected = recession.contains(item)
+                    val isSevere = item.contains("Severe") && isSelected
+                    val isRecession = item != "None" && isSelected
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onToggleRecession(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = when {
+                                isSevere -> ThornburyErrorWash
+                                isRecession -> ThornburyWarningWash
+                                else -> ThornburyPrimaryWash
+                            },
+                            selectedLabelColor = when {
+                                isSevere -> ThornburyError
+                                isRecession -> ThornburyWarning
+                                else -> ThornburyPrimaryText
+                            }
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = when {
+                                isSevere -> ThornburyError
+                                isRecession -> ThornburyWarning
+                                else -> ThornburyPrimary
+                            }
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 4. Oral Mucosa & Soft Tissue
             Text(
                 text = "Oral Mucosa & Soft Tissue",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                 color = ThornburyBodyStrong
             )
-
             Spacer(modifier = Modifier.height(8.dp))
-
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -741,27 +991,326 @@ private fun PeriodontalAndSoftTissueSubSection(
 }
 
 // =============================================================================
-// 4. Oral Hygiene & Functional Habits
+// 4. Deposits & Tooth Stains Assessment
 // =============================================================================
 
-private val BRUSHING_OPTIONS = listOf("2x/day", "1x/day", "Irregular")
-private val FLOSSING_OPTIONS = listOf("Daily", "Occasional", "Rarely")
-private val HABIT_OPTIONS = listOf(
-    "No clenching/grinding",
-    "Nocturnal bruxism",
-    "Daytime clenching",
-    "TMJ tightness"
+private val CALCULUS_OPTIONS = listOf(
+    "None",
+    "Supragingival - Mild",
+    "Supragingival - Moderate",
+    "Supragingival - Heavy",
+    "Subgingival Calculus",
+    "Localized Anterior",
+    "Generalized Calculus"
+)
+
+private val STAINS_OPTIONS = listOf(
+    "None / Minimal",
+    "Extrinsic (Tea / Coffee / Tobacco)",
+    "Intrinsic (Fluorosis / Tetracycline)",
+    "Chlorhexidine Rinse Staining",
+    "Subgingival / Smokers' Staining"
 )
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun OralHygieneAndHabitsSubSection(
+private fun DepositsAndStainsSubSection(
+    calculus: List<String>,
+    stains: List<String>,
+    onToggleCalculus: (String) -> Unit,
+    onToggleStains: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.MedicalServices,
+                    contentDescription = null,
+                    tint = ThornburyPrimaryText,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "4. Hard Deposits & Tooth Stains Assessment",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Calculus
+            Text(
+                text = "Dental Calculus Deposits",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CALCULUS_OPTIONS.forEach { item ->
+                    val isSelected = calculus.contains(item)
+                    val isHeavy = (item.contains("Heavy") || item.contains("Subgingival")) && isSelected
+                    val isModerate = (item.contains("Moderate") || item.contains("Generalized")) && isSelected
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onToggleCalculus(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = when {
+                                isHeavy -> ThornburyErrorWash
+                                isModerate -> ThornburyWarningWash
+                                else -> ThornburyPrimaryWash
+                            },
+                            selectedLabelColor = when {
+                                isHeavy -> ThornburyError
+                                isModerate -> ThornburyWarning
+                                else -> ThornburyPrimaryText
+                            }
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = when {
+                                isHeavy -> ThornburyError
+                                isModerate -> ThornburyWarning
+                                else -> ThornburyPrimary
+                            }
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Stains
+            Text(
+                text = "Tooth Discoloration & Stains",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                STAINS_OPTIONS.forEach { item ->
+                    val isSelected = stains.contains(item)
+                    val isStained = item != "None / Minimal" && isSelected
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onToggleStains(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = if (isStained) ThornburyWarningWash else ThornburyPrimaryWash,
+                            selectedLabelColor = if (isStained) ThornburyWarning else ThornburyPrimaryText
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = if (isStained) ThornburyWarning else ThornburyPrimary
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// 5. TMJ & Functional Occlusal Habits
+// =============================================================================
+
+private val TMJ_OPTIONS = listOf(
+    "Normal / Asymptomatic",
+    "Clicking / Popping (Right / Left)",
+    "Crepitus",
+    "Pain on Opening / Chewing",
+    "Restricted Opening (< 35 mm)",
+    "Deviation on Opening",
+    "Masticatory Muscle Tenderness"
+)
+
+private val HABIT_OPTIONS = listOf(
+    "No clenching/grinding",
+    "Nocturnal bruxism",
+    "Daytime clenching",
+    "Cheek / lip biting",
+    "Nail biting / foreign object habit"
+)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun TmjAndHabitsSubSection(
+    tmj: List<String>,
+    habits: List<String>,
+    onToggleTmj: (String) -> Unit,
+    onToggleHabit: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Face,
+                    contentDescription = null,
+                    tint = ThornburyPrimaryText,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "5. TMJ & Functional Occlusal Habits",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // TMJ Assessment
+            Text(
+                text = "Temporomandibular Joint (TMJ) Evaluation",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TMJ_OPTIONS.forEach { item ->
+                    val isSelected = tmj.contains(item)
+                    val isPain = (item.contains("Pain") || item.contains("Restricted")) && isSelected
+                    val isSymptom = item != "Normal / Asymptomatic" && isSelected
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onToggleTmj(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = when {
+                                isPain -> ThornburyErrorWash
+                                isSymptom -> ThornburyWarningWash
+                                else -> ThornburySuccessWash
+                            },
+                            selectedLabelColor = when {
+                                isPain -> ThornburyError
+                                isSymptom -> ThornburyWarning
+                                else -> ThornburySuccess
+                            }
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = when {
+                                isPain -> ThornburyError
+                                isSymptom -> ThornburyWarning
+                                else -> ThornburySuccess
+                            }
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Parafunctional Habits
+            Text(
+                text = "Parafunctional Habits",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                HABIT_OPTIONS.forEach { habit ->
+                    val isSelected = habits.contains(habit)
+                    val isHabitPresent = habit != "No clenching/grinding" && isSelected
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onToggleHabit(habit) },
+                        label = {
+                            Text(
+                                text = habit,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = if (isHabitPresent) ThornburyWarningWash else ThornburyPrimaryWash,
+                            selectedLabelColor = if (isHabitPresent) ThornburyWarning else ThornburyPrimaryText
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = if (isHabitPresent) ThornburyWarning else ThornburyPrimary
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+// =============================================================================
+// 6. Oral Hygiene & Preventative Practices
+// =============================================================================
+
+private val BRUSHING_OPTIONS = listOf("2x/day", "1x/day", "Irregular")
+private val FLOSSING_OPTIONS = listOf("Daily", "Occasional", "Rarely")
+
+@Composable
+private fun OralHygieneSubSection(
     brushing: String,
     flossing: String,
-    habits: List<String>,
     onSelectBrushing: (String) -> Unit,
-    onSelectFlossing: (String) -> Unit,
-    onToggleHabit: (String) -> Unit
+    onSelectFlossing: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -779,7 +1328,7 @@ private fun OralHygieneAndHabitsSubSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "4. Oral Hygiene & Functional Habits",
+                    text = "6. Oral Hygiene & Preventative Practices",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
@@ -862,54 +1411,12 @@ private fun OralHygieneAndHabitsSubSection(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            // Parafunctional Habits
-            Text(
-                text = "Parafunctional & Occlusal Habits",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = ThornburyBodyStrong
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                HABIT_OPTIONS.forEach { habit ->
-                    val isSelected = habits.contains(habit)
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onToggleHabit(habit) },
-                        label = {
-                            Text(
-                                text = habit,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                )
-                            )
-                        },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = ThornburyCanvas,
-                            selectedContainerColor = ThornburyPrimaryWash,
-                            selectedLabelColor = ThornburyPrimaryText
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            enabled = true,
-                            selected = isSelected,
-                            borderColor = ThornburyHairline,
-                            selectedBorderColor = ThornburyPrimary
-                        )
-                    )
-                }
-            }
         }
     }
 }
 
 // =============================================================================
-// 5. Caries Risk Level
+// 7. Caries Risk Level
 // =============================================================================
 
 data class CariesRiskOption(
@@ -965,7 +1472,7 @@ private fun CariesRiskSubSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "5. Caries Risk Assessment (CRA)",
+                    text = "7. Caries Risk Assessment (CRA)",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
@@ -1037,19 +1544,124 @@ private fun CariesRiskSubSection(
 }
 
 // =============================================================================
-// 6. Clinician Examination Notes
+// 8. Other Diagnoses & Clinical Conditions
 // =============================================================================
 
-private val PRESET_SUGGESTIONS = listOf(
-    "Good plaque control, no active caries",
-    "Generalized marginal gingivitis",
-    "Active carious lesion, prompt restoration advised",
-    "Localized cervical dentin hypersensitivity",
-    "Mild nocturnal bruxism; occlusal splint discussed",
-    "Routine prophylaxis and 6-month recall recommended"
+private val OTHER_DIAGNOSES_OPTIONS = listOf(
+    "Tooth Wear / Attrition",
+    "Acid Erosion / Abfraction",
+    "Xerostomia (Dry Mouth)",
+    "Cracked Tooth Syndrome",
+    "Enamel Hypoplasia / Fluorosis",
+    "Hypodontia / Missing Teeth",
+    "Supernumerary Teeth",
+    "Halitosis",
+    "Oral Lichen Planus"
 )
 
 @OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun OtherDiagnosesSubSection(
+    conditions: List<String>,
+    notes: String,
+    onToggleCondition: (String) -> Unit,
+    onNotesChanged: (String) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard.copy(alpha = 0.45f)),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.MedicalServices,
+                    contentDescription = null,
+                    tint = ThornburyPrimaryText,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "8. Other Diagnoses & Clinical Conditions",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Prevalent Conditions & Secondary Diagnoses",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OTHER_DIAGNOSES_OPTIONS.forEach { item ->
+                    val isSelected = conditions.contains(item)
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { onToggleCondition(item) },
+                        label = {
+                            Text(
+                                text = item,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                            )
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = ThornburyCanvas,
+                            selectedContainerColor = ThornburyPrimaryWash,
+                            selectedLabelColor = ThornburyPrimaryText
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            enabled = true,
+                            selected = isSelected,
+                            borderColor = ThornburyHairline,
+                            selectedBorderColor = ThornburyPrimary
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = "Additional Diagnoses / Conditions Description",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyBodyStrong
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = notes,
+                onValueChange = onNotesChanged,
+                placeholder = {
+                    Text(
+                        "Enter other diagnoses, mucosal lesions, anomalies, or systemic conditions...",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodySmall.copy(color = ThornburyInk),
+                shape = RoundedCornerShape(8.dp),
+                colors = thornburyTextFieldColors(),
+                singleLine = false,
+                maxLines = 4
+            )
+        }
+    }
+}
+
+// =============================================================================
+// 9. Clinician Examination Notes
+// =============================================================================
+
 @Composable
 private fun ClinicianNotesSubSection(
     notes: String,
@@ -1071,62 +1683,13 @@ private fun ClinicianNotesSubSection(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "6. Clinician Examination Notes & Plan Directives",
+                    text = "9. Clinician Examination Notes & Plan Directives",
                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
-
-            Text(
-                text = "Quick Clinical Suggestions (Tap to append):",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                color = ThornburyMuted
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                PRESET_SUGGESTIONS.forEach { suggestion ->
-                    Surface(
-                        modifier = Modifier.clickable {
-                            val newText = if (notes.isBlank()) {
-                                suggestion
-                            } else {
-                                "$notes. $suggestion"
-                            }
-                            onNotesChanged(newText)
-                        },
-                        shape = RoundedCornerShape(14.dp),
-                        color = ThornburySurfaceSoft,
-                        border = BorderStroke(1.dp, ThornburyHairline)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = null,
-                                tint = ThornburyPrimary,
-                                modifier = Modifier.size(12.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = suggestion,
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                color = ThornburyBodyStrong
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
                 value = notes,

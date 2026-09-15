@@ -88,12 +88,30 @@ data class ExaminationAnswers(
     val painSeverity: String = "",
     val sensitivityTriggers: List<String> = emptyList(),
     val periodontalBleeding: List<String> = emptyList(),
+    val periodontalPockets: List<String> = emptyList(),
+    val gingivalRecession: List<String> = emptyList(),
     val softTissue: List<String> = emptyList(),
+    val stains: List<String> = emptyList(),
+    val calculus: List<String> = emptyList(),
+    val tmjAssessment: List<String> = emptyList(),
     val functionalHabits: List<String> = emptyList(),
     val brushingFrequency: String = "",
     val flossingFrequency: String = "",
     val cariesRisk: String = "",
+    val otherDiagnosesConditions: List<String> = emptyList(),
+    val otherDiagnosesNotes: String = "",
     val clinicianNotes: String = ""
+)
+
+@Serializable
+data class PatientDiagnosis(
+    val primaryDiagnosis: String = "",
+    val clinicalFindings: String = "",
+    val prognosis: String = "Good",
+    val systemicConsiderations: String = "",
+    val dateRecorded: String = "",
+    val lastUpdated: String = "",
+    val clinicianName: String = ""
 )
 
 @Serializable
@@ -112,7 +130,8 @@ data class Patient(
     val medicalAlerts: List<String> = emptyList(),
     val allergies: List<Allergy> = emptyList(),
     val teeth: Map<Int, ToothRecord> = emptyMap(),
-    val examAnswers: ExaminationAnswers? = null
+    val examAnswers: ExaminationAnswers? = null,
+    val diagnosis: PatientDiagnosis? = null
 )
 
 @Serializable
@@ -164,8 +183,9 @@ data class PlanAddendum(
 data class TreatmentPlan(
     val id: String,
     val patientId: String,
+    val title: String = "Comprehensive Treatment Plan",
     val clinicianName: String,
-    val diagnosis: String,
+    val diagnosis: String = "",
     val dateCreated: String,
     val isLocked: Boolean = true, // Immutable once published (tamper-evident)
     val tamperHash: String,
@@ -197,6 +217,7 @@ data class Appointment(
     val patientDob: String,
     val clinicianId: String,
     val clinicianName: String,
+    val date: String = "",        // ISO "yyyy-MM-dd" — which calendar day this appointment falls on
     val time: String,             // E.g. "09:00"
     val durationMin: Int = 45,
     val room: String = "Surgery 1",

@@ -74,8 +74,8 @@ object AuthRepository {
             return Result.failure(IllegalStateException("Database is not initialized"))
         }
         LocalDatabaseManager.userDao.seedDefaultUsersIfEmpty()
-        val user = LocalDatabaseManager.userDao.getUserByEmail("dr.halvorsen@thornburydental.com")
-            ?: LocalDatabaseManager.userDao.authenticate("dr.halvorsen@thornburydental.com", "password123")
+        val user = LocalDatabaseManager.userDao.getUserByEmail("dr.halvorsen@dentara.com")
+            ?: LocalDatabaseManager.userDao.authenticate("dr.halvorsen@dentara.com", "password123")
         return if (user != null) {
             _currentUser.value = user
             Result.success(user)

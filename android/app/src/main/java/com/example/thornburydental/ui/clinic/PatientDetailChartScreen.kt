@@ -42,7 +42,11 @@ fun PatientDetailChartScreen(
     modifier: Modifier = Modifier
 ) {
     val patients by DentalRepository.patients.collectAsState()
-    val patient = patients.find { it.id == patientId } ?: patients.firstOrNull()
+    // Only ever resolve to the requested patient — never silently substitute a
+    // different one just because the roster happens to be non-empty. If
+    // patientId doesn't match anyone, `patient` stays null and the "Patient
+    // not found" branch below renders instead of someone else's chart.
+    val patient = patients.find { it.id == patientId }
     val treatmentPlans by DentalRepository.treatmentPlans.collectAsState()
     val prescriptions by DentalRepository.prescriptions.collectAsState()
 
@@ -52,7 +56,7 @@ fun PatientDetailChartScreen(
     var selectedTabIndex by remember { mutableStateOf(0) }
     var selectedToothForEdit by remember { mutableStateOf<ToothRecord?>(null) }
     var selectedReportForLightbox by remember { mutableStateOf<DiagnosticReport?>(null) }
-    var showAddReportDialog by remember { mutableStateOf(false) }
+    var showEditDiagnosisDialog by remember { mutableStateOf(false) }
     var showCreatePlanDialog by remember { mutableStateOf(false) }
     var showBookAppointmentDialog by remember { mutableStateOf(false) }
 
@@ -110,12 +114,13 @@ fun PatientDetailChartScreen(
             }
         }
 
-        // --- 6 Clinical Tabs Matching Web Structure ---
+        // --- 7 Clinical Tabs with Distinct Diagnosis & Treatment Plans ---
         val chartTabs = listOf(
             "Demographics / Overview" to null,
             "Examination" to null,
             "Reports & Imaging" to patientReports.size,
-            "Diagnosis & Treatment" to patientPlans.size,
+            "Diagnosis" to (if (patient.diagnosis != null) 1 else null),
+            "Treatment Plans" to patientPlans.size,
             "Prescriptions" to patientPrescriptions.size,
             "Visit History" to patientAppointments.size
         )
@@ -177,18 +182,27 @@ fun PatientDetailChartScreen(
                 onReportClick = { report -> selectedReportForLightbox = report },
                 onToggleRelease = { reportId -> DentalRepository.toggleReportRelease(reportId) }
             )
-            3 -> TreatmentPlansView(
+            3 -> PatientDiagnosisTabView(
+                patient = patient,
+                onEditDiagnosisClick = { showEditDiagnosisDialog = true },
+                onCreatePlanClick = {
+                    selectedTabIndex = 4
+                    showCreatePlanDialog = true
+                }
+            )
+            4 -> TreatmentPlansView(
                 plans = patientPlans,
+                patientDiagnosis = patient.diagnosis?.primaryDiagnosis,
                 onCreatePlanClick = { showCreatePlanDialog = true },
                 onToggleLock = { planId -> DentalRepository.togglePlanLock(planId) },
                 onToggleStepCompletion = { planId, stepId -> DentalRepository.togglePlanStepCompletion(planId, stepId) }
             )
-            4 -> PatientPrescriptionsView(
+            5 -> PatientPrescriptionsView(
                 patient = patient,
                 prescriptions = patientPrescriptions,
                 onIssueNew = { onOpenIssuePrescription(patient) }
             )
-            5 -> VisitHistoryView(
+            6 -> VisitHistoryView(
                 patient = patient,
                 appointments = patientAppointments,
                 onBookAppointmentClick = { showBookAppointmentDialog = true },
@@ -221,21 +235,14 @@ fun PatientDetailChartScreen(
         )
     }
 
-    // Add Report Dialog
-    if (showAddReportDialog) {
-        AddReportDialog(
+    // Edit / Record Clinical Diagnosis Dialog
+    if (showEditDiagnosisDialog) {
+        EditDiagnosisDialog(
             patient = patient,
-            onDismiss = { showAddReportDialog = false },
-            onSave = { kind, title, clinician, summary, releasedImmediately ->
-                DentalRepository.addDiagnosticReport(
-                    patientId = patient.id,
-                    clinicianName = clinician,
-                    kind = kind,
-                    title = title,
-                    summary = summary,
-                    releasedImmediately = releasedImmediately
-                )
-                showAddReportDialog = false
+            onDismiss = { showEditDiagnosisDialog = false },
+            onSave = { newDiag ->
+                DentalRepository.updatePatientDiagnosis(patient.id, newDiag)
+                showEditDiagnosisDialog = false
             }
         )
     }
@@ -245,11 +252,12 @@ fun PatientDetailChartScreen(
         CreateTreatmentPlanDialog(
             patient = patient,
             onDismiss = { showCreatePlanDialog = false },
-            onSave = { diagnosis, clinicianName, steps ->
+            onSave = { title, clinicianName, steps ->
                 DentalRepository.createTreatmentPlan(
                     patientId = patient.id,
+                    title = title,
                     clinicianName = clinicianName,
-                    diagnosis = diagnosis,
+                    diagnosis = patient.diagnosis?.primaryDiagnosis ?: "",
                     steps = steps
                 )
                 showCreatePlanDialog = false
@@ -262,11 +270,12 @@ fun PatientDetailChartScreen(
         BookAppointmentDialog(
             patient = patient,
             onDismiss = { showBookAppointmentDialog = false },
-            onSave = { procedure, clinicianId, clinicianName, time, duration, room ->
+            onSave = { procedure, clinicianId, clinicianName, date, time, duration, room ->
                 DentalRepository.scheduleAppointment(
                     patient = patient,
                     clinicianId = clinicianId,
                     clinicianName = clinicianName,
+                    date = date,
                     time = time,
                     durationMin = duration,
                     room = room,
@@ -709,6 +718,7 @@ private fun ToothEditDialog(
 @Composable
 private fun TreatmentPlansView(
     plans: List<TreatmentPlan>,
+    patientDiagnosis: String? = null,
     onCreatePlanClick: () -> Unit,
     onToggleLock: (String) -> Unit,
     onToggleStepCompletion: (String, String) -> Unit
@@ -736,7 +746,7 @@ private fun TreatmentPlansView(
                         color = ThornburyInk
                     )
                     Text(
-                        text = "Tamper-evident cryptographically signed plans",
+                        text = "Multiple care plans with tamper-evident cryptographic hashes",
                         style = MaterialTheme.typography.labelSmall,
                         color = ThornburyMuted
                     )
@@ -758,6 +768,34 @@ private fun TreatmentPlansView(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "New Plan", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                }
+            }
+        }
+
+        if (!patientDiagnosis.isNullOrBlank()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ThornburySurfaceSoft,
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MedicalInformation,
+                        contentDescription = null,
+                        tint = ThornburyPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Chart Diagnosis: $patientDiagnosis",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = ThornburyInk,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
                 }
             }
         }
@@ -808,20 +846,21 @@ private fun TreatmentPlansView(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "Treatment Plan #${plan.id}",
+                                    text = if (plan.title.isNotBlank()) plan.title else "Treatment Plan #${plan.id}",
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                     ),
                                     color = ThornburyInk
                                 )
                                 Text(
-                                    text = "By ${plan.clinicianName} • Created ${plan.dateCreated}",
+                                    text = "Plan #${plan.id} • ${plan.clinicianName} • ${plan.dateCreated}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = ThornburyMuted
                                 )
                             }
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             // Tamper Lock Status Badge
                             Surface(
@@ -1158,7 +1197,7 @@ private fun PatientPrescriptionsView(
                                 OutlinedButton(
                                     onClick = {
                                         val shareText = """
-                                            THORNBURY DENTAL PRACTICE - OFFICIAL PRESCRIPTION
+                                            DENTARA DENTAL PRACTICE - OFFICIAL PRESCRIPTION
                                             Patient: ${patient.name} (OP: ${patient.opNo}, DOB: ${patient.dob})
                                             Medication: ${rx.drugName} ${rx.dosage}
                                             Sig: ${rx.frequency} for ${rx.duration}
@@ -1418,6 +1457,7 @@ private fun VisitHistoryView(
     onUpdateStatus: (String, String) -> Unit
 ) {
     var statusPickerApptId by remember { mutableStateOf<String?>(null) }
+    var pendingCancelAppt by remember { mutableStateOf<Appointment?>(null) }
 
     Column(
         modifier = Modifier
@@ -1575,8 +1615,15 @@ private fun VisitHistoryView(
                                                     )
                                                 },
                                                 onClick = {
-                                                    onUpdateStatus(appt.id, statusOption)
                                                     statusPickerApptId = null
+                                                    // Cancelling needs confirmation, same as everywhere
+                                                    // else in the app a visit gets cancelled — a stray
+                                                    // tap here shouldn't silently cancel a visit.
+                                                    if (statusOption == "cancelled") {
+                                                        pendingCancelAppt = appt
+                                                    } else {
+                                                        onUpdateStatus(appt.id, statusOption)
+                                                    }
                                                 }
                                             )
                                         }
@@ -1615,6 +1662,46 @@ private fun VisitHistoryView(
                 }
             }
         }
+    }
+
+    // Cancellation confirmation — mirrors the Today/Schedule tabs' pattern so a
+    // stray dropdown tap can't silently cancel a visit.
+    pendingCancelAppt?.let { appt ->
+        AlertDialog(
+            onDismissRequest = { pendingCancelAppt = null },
+            title = {
+                Text(
+                    text = "Cancel This Visit?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            },
+            text = {
+                Text(
+                    text = "Are you sure you want to cancel \"${appt.procedure}\" (${appt.time} in ${appt.room})?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThornburyBody
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onUpdateStatus(appt.id, "cancelled")
+                        pendingCancelAppt = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ThornburyError)
+                ) {
+                    Text("Cancel Visit", color = Color.White)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { pendingCancelAppt = null }) {
+                    Text("Keep Visit", color = ThornburyInk)
+                }
+            },
+            containerColor = ThornburyCanvas,
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }
 

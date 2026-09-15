@@ -167,10 +167,10 @@ class UserDao(private val dbHelper: ThornburyDbHelper) {
         val db = dbHelper.writableDatabase
         db.beginTransaction()
         try {
-            if (getUserByEmail("dr.halvorsen@thornburydental.com") == null) {
+            if (getUserByEmail("dr.halvorsen@dentara.com") == null) {
                 val clinicianValues = ContentValues().apply {
                     put(ThornburyDbHelper.COL_USERS_ID, "usr-clinician-halvorsen")
-                    put(ThornburyDbHelper.COL_USERS_EMAIL, "dr.halvorsen@thornburydental.com")
+                    put(ThornburyDbHelper.COL_USERS_EMAIL, "dr.halvorsen@dentara.com")
                     put(ThornburyDbHelper.COL_USERS_PASSWORD_HASH, hashPassword("password123"))
                     put(ThornburyDbHelper.COL_USERS_NAME, "Dr. Ingrid Halvorsen")
                     put(ThornburyDbHelper.COL_USERS_ROLE, UserRole.CLINICIAN.name)

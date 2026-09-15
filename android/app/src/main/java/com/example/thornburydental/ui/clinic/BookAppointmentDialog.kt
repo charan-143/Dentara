@@ -22,6 +22,9 @@ import com.example.thornburydental.data.Clinician
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.ui.components.ThornburyDatePickerField
+import com.example.thornburydental.util.isoDateDisplayLabel
+import com.example.thornburydental.util.todayIsoDate
 
 /**
  * Quick Follow-up Visit & Surgery Booking Dialog.
@@ -33,11 +36,13 @@ import com.example.thornburydental.theme.*
 @Composable
 fun BookAppointmentDialog(
     patient: Patient,
+    initialDate: String = todayIsoDate(),
     onDismiss: () -> Unit,
     onSave: (
         procedure: String,
         clinicianId: String,
         clinicianName: String,
+        date: String,
         time: String,
         duration: Int,
         room: String
@@ -47,20 +52,21 @@ fun BookAppointmentDialog(
     var selectedClinician by remember { mutableStateOf(clinicians.firstOrNull() ?: Clinician("c1", "Dr. Ingrid Halvorsen", "", "", "Surgery 1", "")) }
 
     var procedure by remember { mutableStateOf("Follow-up Review & Examination") }
+    var date by remember { mutableStateOf(initialDate) }
     var time by remember { mutableStateOf("09:30 AM") }
     var durationMin by remember { mutableIntStateOf(45) }
     var room by remember { mutableStateOf(selectedClinician.room) }
 
-    val commonProcedures = listOf(
-        "Follow-up Review & Examination",
-        "Crown Preparation & Impression",
-        "Resin Composite Restoration",
-        "Root Canal Stage 2 / Obturation",
-        "Implant Body Placement (Surgery)",
-        "Periodontal Maintenance Debridement"
-    )
+    val isDateValid = remember(date) {
+        Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(date.trim())
+    }
 
-    val commonTimes = listOf("09:00 AM", "09:30 AM", "10:15 AM", "11:30 AM", "02:00 PM", "03:45 PM", "04:30 PM")
+    // Free-text time entry is only useful if it's actually a parseable time —
+    // an unvalidated string here silently corrupts the schedule's display/sort.
+    val isTimeValid = remember(time) {
+        Regex("^\\d{1,2}:\\d{2}\\s*(AM|PM)$", RegexOption.IGNORE_CASE).matches(time.trim())
+    }
+
     val durationOptions = listOf(30, 45, 60, 90)
     val rooms = listOf("Surgery 1", "Surgery 2", "Surgery 3")
 
@@ -130,32 +136,6 @@ fun BookAppointmentDialog(
                     singleLine = true
                 )
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Common Procedure Quick Chips
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    commonProcedures.forEach { procName ->
-                        Surface(
-                            modifier = Modifier.clickable { procedure = procName },
-                            shape = RoundedCornerShape(12.dp),
-                            color = ThornburySurfaceSoft,
-                            border = BorderStroke(1.dp, ThornburyHairlineSoft)
-                        ) {
-                            Text(
-                                text = procName,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                color = ThornburyPrimaryText
-                            )
-                        }
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // 2. Clinician Selection
@@ -217,95 +197,91 @@ fun BookAppointmentDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 3. Time & Duration Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1.2f)) {
-                        Text(
-                            text = "Time of Visit",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        OutlinedTextField(
-                            value = time,
-                            onValueChange = { time = it },
-                            placeholder = { Text("09:30 AM") },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = thornburyTextFieldColors(containerColor = ThornburySurfaceSoft),
-                            singleLine = true
-                        )
-                    }
+                // 3. Appointment Date
+                Text(
+                    text = "Appointment Date",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                ThornburyDatePickerField(
+                    value = date,
+                    onValueChange = { date = it },
+                    label = "Date",
+                    placeholder = "YYYY-MM-DD",
+                    isOptional = false,
+                    helperText = isoDateDisplayLabel(date).takeIf { isDateValid }
+                )
 
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Duration",
-                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            modifier = Modifier.padding(top = 4.dp)
-                        ) {
-                            durationOptions.take(3).forEach { dur ->
-                                val isSelected = dur == durationMin
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clickable { durationMin = dur },
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (isSelected) ThornburyPrimary else ThornburySurfaceSoft,
-                                    border = BorderStroke(1.dp, if (isSelected) ThornburyPrimary else ThornburyHairline)
-                                ) {
-                                    Box(
-                                        modifier = Modifier.padding(vertical = 10.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "${dur}m",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = if (isSelected) Color.White else ThornburyInk
-                                        )
-                                    }
-                                }
-                            }
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 4. Time of Visit
+                Text(
+                    text = "Time of Visit",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = time,
+                    onValueChange = { time = it },
+                    placeholder = { Text("09:30 AM") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburySurfaceSoft),
+                    singleLine = true,
+                    isError = time.isNotBlank() && !isTimeValid,
+                    supportingText = {
+                        if (time.isNotBlank() && !isTimeValid) {
+                            Text(
+                                text = "Use hh:mm AM/PM, e.g. 09:30 AM",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ThornburyError
+                            )
                         }
                     }
-                }
+                )
 
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 5. Duration Selection
+                Text(
+                    text = "Appointment Duration",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
                 Spacer(modifier = Modifier.height(6.dp))
-
-                // Quick Times Preset Chips
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    commonTimes.forEach { presetTime ->
+                    durationOptions.forEach { dur ->
+                        val isSelected = dur == durationMin
                         Surface(
-                            modifier = Modifier.clickable { time = presetTime },
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { durationMin = dur },
                             shape = RoundedCornerShape(8.dp),
-                            color = ThornburySurfaceSoft,
-                            border = BorderStroke(1.dp, ThornburyHairlineSoft)
+                            color = if (isSelected) ThornburyPrimary else ThornburySurfaceSoft,
+                            border = BorderStroke(1.dp, if (isSelected) ThornburyPrimary else ThornburyHairline)
                         ) {
-                            Text(
-                                text = presetTime,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                color = ThornburyPrimaryText
-                            )
+                            Box(
+                                modifier = Modifier.padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "${dur}m",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isSelected) Color.White else ThornburyInk
+                                )
+                            }
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // 4. Clinical Surgery Room
+                // 5. Clinical Surgery Room
                 Text(
                     text = "Operatory Surgery Room",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
@@ -337,7 +313,7 @@ fun BookAppointmentDialog(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // 5. Actions: Cancel & Confirm Booking
+                // 6. Actions: Cancel & Confirm Booking
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -353,18 +329,19 @@ fun BookAppointmentDialog(
 
                     Button(
                         onClick = {
-                            if (procedure.isNotBlank() && time.isNotBlank()) {
+                            if (procedure.isNotBlank() && isDateValid && isTimeValid) {
                                 onSave(
                                     procedure.trim(),
                                     selectedClinician.id,
                                     selectedClinician.name,
+                                    date.trim(),
                                     time.trim(),
                                     durationMin,
                                     room
                                 )
                             }
                         },
-                        enabled = procedure.isNotBlank() && time.isNotBlank(),
+                        enabled = procedure.isNotBlank() && isDateValid && isTimeValid,
                         modifier = Modifier.weight(1.6f),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(

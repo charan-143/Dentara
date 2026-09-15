@@ -12,11 +12,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.text.input.KeyboardType
+import com.example.thornburydental.util.ValidationUtils
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -98,7 +101,7 @@ fun PatientDemographicsM3View(
                 if (patient.email.isNotBlank()) {
                     val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
                         data = Uri.parse("mailto:${patient.email.trim()}")
-                        putExtra(Intent.EXTRA_SUBJECT, "Thornbury Dental - Patient Care: ${patient.name}")
+                        putExtra(Intent.EXTRA_SUBJECT, "Dentara - Patient Care: ${patient.name}")
                     }
                     launchIntentSafely(context, emailIntent)
                 } else {
@@ -300,7 +303,6 @@ private fun HeroPatientIdCard(
     onEditProfile: () -> Unit
 ) {
     val age = remember(patient.dob) { calculatePatientAge(patient.dob) }
-    val gender = remember(patient.name) { deriveGender(patient.name) }
     val bloodGroup = remember(patient.medicalHistory, patient.medicalAlerts) { deriveBloodGroup(patient) }
 
     ElevatedCard(
@@ -422,12 +424,12 @@ private fun HeroPatientIdCard(
                 )
                 VitalMetricItem(
                     label = "GENDER",
-                    value = gender,
+                    value = "Unknown",
                     icon = Icons.Default.Person
                 )
                 VitalMetricItem(
                     label = "BLOOD GROUP",
-                    value = bloodGroup,
+                    value = bloodGroup ?: "Unknown",
                     icon = Icons.Default.LocalHospital
                 )
                 VitalMetricItem(
@@ -906,6 +908,9 @@ private fun EditContactInfoM3Dialog(
     var email by remember { mutableStateOf(patient.email) }
     var address by remember { mutableStateOf(patient.address) }
 
+    val isPhoneValid = phone.isBlank() || ValidationUtils.isValidPhone(phone)
+    val isEmailValid = email.isBlank() || ValidationUtils.isValidEmail(email)
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
@@ -947,36 +952,42 @@ private fun EditContactInfoM3Dialog(
                     colors = thornburyTextFieldColors()
                 )
 
-                Row(
+                OutlinedTextField(
+                    value = opNo,
+                    onValueChange = { opNo = it },
+                    label = { Text("OP Number") },
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = opNo,
-                        onValueChange = { opNo = it },
-                        label = { Text("OP Number") },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        colors = thornburyTextFieldColors()
-                    )
+                    singleLine = true,
+                    colors = thornburyTextFieldColors()
+                )
 
-                    ThornburyDatePickerField(
-                        value = dob,
-                        onValueChange = { dob = it },
-                        label = "DOB",
-                        placeholder = "YYYY-MM-DD",
-                        modifier = Modifier.weight(1.2f),
-                        isOptional = true,
-                        helperText = null
-                    )
-                }
+                ThornburyDatePickerField(
+                    value = dob,
+                    onValueChange = { dob = it },
+                    label = "Date of Birth",
+                    placeholder = "YYYY-MM-DD",
+                    modifier = Modifier.fillMaxWidth(),
+                    isOptional = true,
+                    helperText = null
+                )
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { phone = it },
+                    onValueChange = { phone = ValidationUtils.filterPhoneInput(it) },
                     label = { Text("Telephone Number") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    isError = phone.isNotBlank() && !ValidationUtils.isValidPhone(phone),
+                    supportingText = {
+                        if (phone.isNotBlank() && !ValidationUtils.isValidPhone(phone)) {
+                            Text(
+                                text = "Invalid phone number (must be 7-15 digits, no letters)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ThornburyError
+                            )
+                        }
+                    },
                     colors = thornburyTextFieldColors()
                 )
 
@@ -986,6 +997,17 @@ private fun EditContactInfoM3Dialog(
                     label = { Text("Email Address") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    isError = email.isNotBlank() && !ValidationUtils.isValidEmail(email),
+                    supportingText = {
+                        if (email.isNotBlank() && !ValidationUtils.isValidEmail(email)) {
+                            Text(
+                                text = "Must be a valid email (e.g. name@example.com with '@' and domain)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ThornburyError
+                            )
+                        }
+                    },
                     colors = thornburyTextFieldColors()
                 )
 
@@ -1011,11 +1033,11 @@ private fun EditContactInfoM3Dialog(
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            if (name.isNotBlank()) {
+                            if (name.isNotBlank() && isPhoneValid && isEmailValid) {
                                 onSave(name.trim(), opNo.trim(), dob.trim(), phone.trim(), email.trim(), address.trim())
                             }
                         },
-                        enabled = name.isNotBlank(),
+                        enabled = name.isNotBlank() && isPhoneValid && isEmailValid,
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ThornburyPrimary,
                             contentColor = Color.White
@@ -1169,20 +1191,23 @@ private fun calculatePatientAge(dob: String): Int? {
     }
 }
 
-private fun deriveGender(name: String): String {
-    val lower = name.lowercase()
-    return when {
-        lower.startsWith("rosalind") || lower.startsWith("kavitha") || lower.startsWith("marisol") ||
-                lower.contains("mrs") || lower.contains("ms") || lower.contains("miss") -> "Female"
-        lower.startsWith("dmitri") || lower.startsWith("owen") || lower.contains("mr") -> "Male"
-        else -> "Adult"
-    }
-}
+// NOTE: `Patient` has no `gender` field today, so there is no real value to
+// show here — a prior version of this function *guessed* gender from a
+// five-name hardcoded list (defaulting to "Adult" otherwise), which is both
+// usually wrong and inappropriate for a medical record. Until a real
+// `gender` field is added to the `Patient` model (a deferred schema change),
+// this vital always reads "Unknown" rather than fabricating a value.
 
-private fun deriveBloodGroup(patient: Patient): String {
+/**
+ * Looks for an explicit blood type (e.g. "O+", "AB-") mentioned in the
+ * patient's free-text medical history/alerts. Returns null — never a
+ * fabricated default — when none is on record; blood type is safety-critical
+ * data and must never be guessed.
+ */
+private fun deriveBloodGroup(patient: Patient): String? {
     val regex = Regex("\\b(A|B|AB|O)[+-]\\b", RegexOption.IGNORE_CASE)
     val match = regex.find(patient.medicalHistory) ?: regex.find(patient.medicalAlerts.joinToString(" "))
-    return match?.value?.uppercase() ?: "O+"
+    return match?.value?.uppercase()
 }
 
 private fun parseClinicalBullets(raw: String): List<String> {

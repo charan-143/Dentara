@@ -2,6 +2,7 @@ package com.example.thornburydental.data.db
 
 import com.example.thornburydental.data.Allergy
 import com.example.thornburydental.data.ExaminationAnswers
+import com.example.thornburydental.data.PatientDiagnosis
 import com.example.thornburydental.data.PlanAddendum
 import com.example.thornburydental.data.PlanStep
 import com.example.thornburydental.data.ReportAttachment
@@ -96,6 +97,19 @@ object DbConverters {
             emptyList()
         }
     }
+
+    // --- PatientDiagnosis? ---
+    fun diagnosisToJson(diagnosis: PatientDiagnosis?): String? =
+        diagnosis?.let { json.encodeToString(it) }
+
+    fun jsonToDiagnosis(raw: String?): PatientDiagnosis? {
+        if (raw.isNullOrBlank()) return null
+        return try {
+            json.decodeFromString(raw)
+        } catch (_: Exception) {
+            null
+        }
+    }
 }
 
 // Extension functions for idiomatic Kotlin usage
@@ -107,6 +121,9 @@ fun String?.toStringList(): List<String> = DbConverters.jsonToStringList(this)
 
 fun ExaminationAnswers?.toDbJson(): String? = DbConverters.examAnswersToJson(this)
 fun String?.toExamAnswers(): ExaminationAnswers? = DbConverters.jsonToExamAnswers(this)
+
+fun PatientDiagnosis?.toPatientDiagnosisDbJson(): String? = DbConverters.diagnosisToJson(this)
+fun String?.toPatientDiagnosis(): PatientDiagnosis? = DbConverters.jsonToDiagnosis(this)
 
 fun List<PlanStep>?.toPlanStepsDbJson(): String = DbConverters.planStepsToJson(this)
 fun String?.toPlanSteps(): List<PlanStep> = DbConverters.jsonToPlanSteps(this)

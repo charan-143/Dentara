@@ -34,25 +34,11 @@ import com.example.thornburydental.theme.*
 fun CreateTreatmentPlanDialog(
     patient: Patient,
     onDismiss: () -> Unit,
-    onSave: (diagnosis: String, clinicianName: String, steps: List<PlanStep>) -> Unit
+    onSave: (title: String, clinicianName: String, steps: List<PlanStep>) -> Unit
 ) {
-    var diagnosis by remember { mutableStateOf("") }
+    var planTitle by remember { mutableStateOf("Phase 1: Comprehensive Treatment") }
     var treatmentPlanDetails by remember { mutableStateOf("") }
-    val clinicianName = "Dr. Ingrid Halvorsen"
-
-    val quickDiagnosisList = listOf(
-        "Class II recurrent caries #30, localized gingivitis",
-        "Symptomatic irreversible pulpitis #19 requiring endodontics",
-        "Generalised Stage III Periodontitis - active deep pockets",
-        "Missing tooth #19; candidate for single dental implant",
-        "Defective restoration #14 with fractured disto-lingual cusp"
-    )
-
-    val quickPlanTemplates = listOf(
-        "Phase 1: Endodontic root canal therapy #19 + Core buildup.\nPhase 2: Full porcelain crown restoration.",
-        "Phase 1: Periodontal scaling & root planing (Quads 1 & 4).\nPhase 2: 6-week re-evaluation & oral hygiene instruction.",
-        "Phase 1: Resin composite restoration (2 surfaces) #30."
-    )
+    var clinicianName by remember { mutableStateOf(DentalRepository.clinicians.firstOrNull()?.name ?: "") }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -80,7 +66,7 @@ fun CreateTreatmentPlanDialog(
                 ) {
                     Column {
                         Text(
-                            text = "Create Treatment Plan",
+                            text = "New Treatment Plan",
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                             ),
@@ -110,70 +96,49 @@ fun CreateTreatmentPlanDialog(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // FIELD 1: DIAGNOSIS
-                    OutlinedCard(
+                    // Patient Clinical Diagnosis Reference Banner
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+                        shape = RoundedCornerShape(12.dp),
+                        color = ThornburySurfaceSoft,
                         border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.MedicalInformation,
-                                    contentDescription = null,
-                                    tint = ThornburyPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "1. Diagnosis *",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = ThornburyInk
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            OutlinedTextField(
-                                value = diagnosis,
-                                onValueChange = { diagnosis = it },
-                                placeholder = { Text("Enter clinical diagnosis (e.g. Irreversible pulpitis #19)...") },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = thornburyTextFieldColors(containerColor = ThornburyCanvas),
-                                minLines = 2
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Quick Suggestions
-                            Text(
-                                text = "Quick Diagnostic Presets:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ThornburyMuted
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MedicalInformation,
+                                contentDescription = null,
+                                tint = ThornburyPrimary,
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                quickDiagnosisList.forEach { diag ->
-                                    Surface(
-                                        modifier = Modifier.clickable { diagnosis = diag },
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = ThornburyCanvas,
-                                        border = BorderStroke(1.dp, ThornburyHairlineSoft)
-                                    ) {
-                                        Text(
-                                            text = "+ ${diag.take(36)}...",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                            color = ThornburyPrimaryText
-                                        )
-                                    }
+                                    .size(20.dp)
+                                    .padding(top = 2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "PATIENT CLINICAL DIAGNOSIS",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    ),
+                                    color = ThornburyMuted
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                val currentDiag = patient.diagnosis?.primaryDiagnosis
+                                Text(
+                                    text = if (!currentDiag.isNullOrBlank()) currentDiag else "No primary diagnosis recorded yet in patient chart.",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (!currentDiag.isNullOrBlank()) ThornburyInk else ThornburyMuted
+                                )
+                                if (patient.diagnosis?.prognosis != null) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Prognosis: ${patient.diagnosis.prognosis}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ThornburyAccentTeal
+                                    )
                                 }
                             }
                         }
@@ -181,7 +146,66 @@ fun CreateTreatmentPlanDialog(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // FIELD 2: TREATMENT PLAN DETAILS
+                    // FIELD 1: PLAN TITLE
+                    Text(
+                        text = "Treatment Plan Title *",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = planTitle,
+                        onValueChange = { planTitle = it },
+                        placeholder = { Text("e.g. Phase 1: Restorative & Scaling, Implant Placement...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Attending Clinician
+                    Text(
+                        text = "Attending Clinician *",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        DentalRepository.clinicians.forEach { c ->
+                            val isSelected = c.name == clinicianName
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { clinicianName = c.name },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) ThornburySurfaceSoft else ThornburyCanvas,
+                                border = BorderStroke(1.dp, if (isSelected) ThornburyPrimary else ThornburyHairline)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isSelected,
+                                        onClick = { clinicianName = c.name },
+                                        colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "${c.name} (${c.room})",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                        color = ThornburyInk
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // FIELD 2: TREATMENT PLAN PROCEDURES
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
@@ -198,11 +222,18 @@ fun CreateTreatmentPlanDialog(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "2. Treatment Plan Details & Clinical Procedures *",
+                                    text = "Procedure Steps & Sequence *",
                                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                     color = ThornburyInk
                                 )
                             }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Enter each clinical procedure on a separate line",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ThornburyMuted
+                            )
 
                             Spacer(modifier = Modifier.height(10.dp))
 
@@ -210,7 +241,7 @@ fun CreateTreatmentPlanDialog(
                                 value = treatmentPlanDetails,
                                 onValueChange = { treatmentPlanDetails = it },
                                 placeholder = {
-                                    Text("Enter detailed clinical treatment plan steps, procedure codes, teeth involved, and sequence...")
+                                    Text("Line 1: Full mouth periodontal probing and charting\nLine 2: Tooth #30 DO composite resin restoration\nLine 3: Tooth #19 core build-up and crown preparation")
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -218,40 +249,6 @@ fun CreateTreatmentPlanDialog(
                                 shape = RoundedCornerShape(10.dp),
                                 colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                             )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Quick Templates
-                            Text(
-                                text = "Sample Plan Templates:",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ThornburyMuted
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                quickPlanTemplates.forEachIndexed { idx, tmpl ->
-                                    Surface(
-                                        modifier = Modifier.clickable {
-                                            treatmentPlanDetails = if (treatmentPlanDetails.isBlank()) tmpl else "$treatmentPlanDetails\n\n$tmpl"
-                                        },
-                                        shape = RoundedCornerShape(10.dp),
-                                        color = ThornburyCanvas,
-                                        border = BorderStroke(1.dp, ThornburyHairlineSoft)
-                                    ) {
-                                        Text(
-                                            text = "+ Staged Plan ${idx + 1}",
-                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                            color = ThornburyPrimaryText
-                                        )
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -274,8 +271,7 @@ fun CreateTreatmentPlanDialog(
 
                     Button(
                         onClick = {
-                            if (diagnosis.isNotBlank() && treatmentPlanDetails.isNotBlank()) {
-                                // Convert lines into clean PlanSteps without fees
+                            if (planTitle.isNotBlank() && treatmentPlanDetails.isNotBlank()) {
                                 val lines = treatmentPlanDetails.lines().filter { it.isNotBlank() }
                                 val planSteps = lines.mapIndexed { idx, line ->
                                     PlanStep(
@@ -287,10 +283,10 @@ fun CreateTreatmentPlanDialog(
                                         completed = false
                                     )
                                 }
-                                onSave(diagnosis.trim(), clinicianName, planSteps)
+                                onSave(planTitle.trim(), clinicianName, planSteps)
                             }
                         },
-                        enabled = diagnosis.isNotBlank() && treatmentPlanDetails.isNotBlank(),
+                        enabled = planTitle.isNotBlank() && treatmentPlanDetails.isNotBlank(),
                         modifier = Modifier.weight(1.5f),
                         shape = RoundedCornerShape(10.dp),
                         colors = ButtonDefaults.buttonColors(
@@ -305,7 +301,7 @@ fun CreateTreatmentPlanDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Save Treatment Plan",
+                            text = "Save Plan",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                         )
                     }

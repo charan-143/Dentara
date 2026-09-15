@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.AuthRepository
 import com.example.thornburydental.data.User
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.util.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,6 +65,10 @@ fun SignInScreen(
 
         if (cleanEmail.isBlank()) {
             errorMessage = "Please enter your email address"
+            return
+        }
+        if (!ValidationUtils.isValidEmail(cleanEmail)) {
+            errorMessage = "Please enter a valid email address with '@' and domain (e.g. name@example.com)"
             return
         }
         if (cleanPassword.isBlank()) {
@@ -144,7 +149,7 @@ fun SignInScreen(
                 modifier = Modifier
                     .size(64.dp)
                     .background(ThornburyPrimary, RoundedCornerShape(16.dp))
-                    .semantics { contentDescription = "Thornbury Dental Brand Emblem" },
+                    .semantics { contentDescription = "Dentara Brand Emblem" },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -159,10 +164,10 @@ fun SignInScreen(
 
             // --- Brand Header ---
             Text(
-                text = "Thornbury Dental",
+                text = "Dentara",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 30.sp
+                    fontSize = 32.sp
                 ),
                 color = ThornburyInk,
                 textAlign = TextAlign.Center
@@ -250,7 +255,7 @@ fun SignInScreen(
                             if (errorMessage != null) errorMessage = null
                         },
                         placeholder = {
-                            Text("e.g. dr.halvorsen@thornburydental.com", color = ThornburyMutedSoft)
+                            Text("e.g. dr.halvorsen@dentara.com", color = ThornburyMutedSoft)
                         },
                         leadingIcon = {
                             Icon(
@@ -267,6 +272,16 @@ fun SignInScreen(
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
+                        isError = email.isNotBlank() && !ValidationUtils.isValidEmail(email),
+                        supportingText = {
+                            if (email.isNotBlank() && !ValidationUtils.isValidEmail(email)) {
+                                Text(
+                                    text = "Must be a valid email (e.g. name@example.com with '@' and domain)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ThornburyError
+                                )
+                            }
+                        },
                         colors = thornburyTextFieldColors(),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()

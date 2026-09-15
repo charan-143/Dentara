@@ -7,7 +7,10 @@ node_modules/
 
 # Installed skill content, reinstallable from skills-lock.json via:
 #   npx skills install
-.agents/
+.agents/**
+!.agents/skills/
+!.agents/skills/android-build-and-launch/
+!.agents/skills/android-build-and-launch/**
 .claude/skills/
 
 # Generated caches. Regenerated on every build, and the impeccable cache

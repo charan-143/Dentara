@@ -16,10 +16,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.ThornburyDatePickerField
+import com.example.thornburydental.util.ValidationUtils
 
 /**
  * Dedicated Full-Page Patient Registration View.
@@ -158,43 +161,40 @@ fun RegisterPatientScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    ThornburyDatePickerField(
+                        value = dob,
+                        onValueChange = { dob = it },
+                        label = "Date of Birth",
+                        placeholder = "YYYY-MM-DD",
+                        isOptional = true,
+                        helperText = "Type or select from calendar"
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Gender",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            ThornburyDatePickerField(
-                                value = dob,
-                                onValueChange = { dob = it },
-                                label = "Date of Birth",
-                                placeholder = "YYYY-MM-DD",
-                                isOptional = true,
-                                helperText = "Type or select"
+                        genders.forEach { gender ->
+                            val isSelected = gender == selectedGender
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { selectedGender = gender },
+                                label = { Text(gender, style = MaterialTheme.typography.labelMedium) },
+                                shape = RoundedCornerShape(12.dp),
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ThornburyPrimary,
+                                    selectedLabelColor = Color.White
+                                ),
+                                modifier = Modifier.weight(1f)
                             )
-                        }
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Gender",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                genders.forEach { gender ->
-                                    val isSelected = gender == selectedGender
-                                    FilterChip(
-                                        selected = isSelected,
-                                        onClick = { selectedGender = gender },
-                                        label = { Text(gender, style = MaterialTheme.typography.labelSmall) },
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = FilterChipDefaults.filterChipColors(
-                                            selectedContainerColor = ThornburyPrimary,
-                                            selectedLabelColor = Color.White
-                                        )
-                                    )
-                                }
-                            }
                         }
                     }
                 }
@@ -271,44 +271,59 @@ fun RegisterPatientScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
+                    Text(
+                        text = "Phone Number (Optional)",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = phone,
+                        onValueChange = { phone = ValidationUtils.filterPhoneInput(it) },
+                        placeholder = { Text("+44 7700 900123") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        isError = phone.isNotBlank() && !ValidationUtils.isValidPhone(phone),
+                        supportingText = {
+                            if (phone.isNotBlank() && !ValidationUtils.isValidPhone(phone)) {
+                                Text(
+                                    text = "Invalid phone number (must be 7-15 digits, no letters)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ThornburyError
+                                )
+                            }
+                        },
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Phone Number (Optional)",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            OutlinedTextField(
-                                value = phone,
-                                onValueChange = { phone = it },
-                                placeholder = { Text("+44 7700 900123") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
+                        shape = RoundedCornerShape(10.dp)
+                    )
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Email Address",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            OutlinedTextField(
-                                value = email,
-                                onValueChange = { email = it },
-                                placeholder = { Text("patient@example.com") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Email Address",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = { email = it },
+                        placeholder = { Text("patient@example.com") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        isError = email.isNotBlank() && !ValidationUtils.isValidEmail(email),
+                        supportingText = {
+                            if (email.isNotBlank() && !ValidationUtils.isValidEmail(email)) {
+                                Text(
+                                    text = "Must be a valid email (e.g. name@example.com with '@' and domain)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ThornburyError
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
@@ -357,44 +372,48 @@ fun RegisterPatientScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(
+                    Text(
+                        text = "Contact Name",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = emergencyName,
+                        onValueChange = { emergencyName = it },
+                        placeholder = { Text("Next of Kin / Relative full name") },
+                        singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Contact Name",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            OutlinedTextField(
-                                value = emergencyName,
-                                onValueChange = { emergencyName = it },
-                                placeholder = { Text("Next of Kin / Relative") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
+                        shape = RoundedCornerShape(10.dp)
+                    )
 
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Contact Phone",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            OutlinedTextField(
-                                value = emergencyPhone,
-                                onValueChange = { emergencyPhone = it },
-                                placeholder = { Text("+44 7700 900999") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                        }
-                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Contact Phone",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = emergencyPhone,
+                        onValueChange = { emergencyPhone = ValidationUtils.filterPhoneInput(it) },
+                        placeholder = { Text("+44 7700 900999") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        isError = emergencyPhone.isNotBlank() && !ValidationUtils.isValidPhone(emergencyPhone),
+                        supportingText = {
+                            if (emergencyPhone.isNotBlank() && !ValidationUtils.isValidPhone(emergencyPhone)) {
+                                Text(
+                                    text = "Invalid phone number (must be 7-15 digits, no letters)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ThornburyError
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
                 }
             }
 
@@ -419,6 +438,18 @@ fun RegisterPatientScreen(
                     onClick = {
                         if (name.isBlank()) {
                             errorMessage = "Please enter patient's full name."
+                            return@Button
+                        }
+                        if (phone.isNotBlank() && !ValidationUtils.isValidPhone(phone)) {
+                            errorMessage = "Please enter a valid phone number (7-15 digits). Letters like 'parrot' are not allowed."
+                            return@Button
+                        }
+                        if (email.isNotBlank() && !ValidationUtils.isValidEmail(email)) {
+                            errorMessage = "Please enter a valid email address with '@' and domain (e.g. name@example.com)."
+                            return@Button
+                        }
+                        if (emergencyPhone.isNotBlank() && !ValidationUtils.isValidPhone(emergencyPhone)) {
+                            errorMessage = "Please enter a valid emergency contact phone number (7-15 digits)."
                             return@Button
                         }
 
