@@ -1,7 +1,10 @@
 package com.example.thornburydental.ui.clinic
 
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,14 +26,18 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,6 +46,19 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.thornburydental.data.DiagnosticReport
 import com.example.thornburydental.theme.*
+
+/**
+ * Standard "photographic negative" color transform, used to give a real
+ * uploaded image the same invert toggle the simulated radiograph supports.
+ */
+private val negativeColorMatrix = ColorMatrix(
+    floatArrayOf(
+        -1f, 0f, 0f, 0f, 255f,
+        0f, -1f, 0f, 0f, 255f,
+        0f, 0f, -1f, 0f, 255f,
+        0f, 0f, 0f, 1f, 0f
+    )
+)
 
 /**
  * Diagnostic Report & Radiographic Imaging Lightbox Dialog.
@@ -70,6 +90,25 @@ fun ReportViewerLightboxDialog(
     var isPanoramicMode by remember { mutableStateOf(isInitiallyPanoramic) }
 
     val isReleased = report.releasedAt != null
+
+    // Prefer the clinician's real uploaded image (see AddReportScreen's file
+    // upload flow, which stores a real local file:// URI on the attachment)
+    // over a simulated illustration, whenever one exists.
+    val realImageAttachment = remember(report) {
+        report.attachments.firstOrNull { it.mimeType.startsWith("image/") && !it.uri.isNullOrBlank() }
+    }
+    val realBitmap = remember(realImageAttachment) {
+        val uriString = realImageAttachment?.uri
+        if (uriString.isNullOrBlank()) {
+            null
+        } else {
+            try {
+                BitmapFactory.decodeFile(Uri.parse(uriString).path)
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -316,117 +355,131 @@ fun ReportViewerLightboxDialog(
                     color = if (isInverted) Color(0xFFE9EEF0) else Color(0xFF0C1014)
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
-                        // The interactive radiographic rendering canvas
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .clipToBounds()
-                                .pointerInput(Unit) {
-                                    detectTransformGestures { _, pan, zoom, _ ->
-                                        zoomScale = (zoomScale * zoom).coerceIn(0.8f, 4.0f)
-                                        panOffsetX += pan.x
-                                        panOffsetY += pan.y
-                                    }
+                        val zoomPanModifier = Modifier
+                            .fillMaxSize()
+                            .clipToBounds()
+                            .pointerInput(Unit) {
+                                detectTransformGestures { _, pan, zoom, _ ->
+                                    zoomScale = (zoomScale * zoom).coerceIn(0.8f, 4.0f)
+                                    panOffsetX += pan.x
+                                    panOffsetY += pan.y
                                 }
-                                .graphicsLayer {
-                                    scaleX = zoomScale
-                                    scaleY = zoomScale
-                                    translationX = panOffsetX
-                                    translationY = panOffsetY
+                            }
+                            .graphicsLayer {
+                                scaleX = zoomScale
+                                scaleY = zoomScale
+                                translationX = panOffsetX
+                                translationY = panOffsetY
+                            }
+
+                        if (realBitmap != null) {
+                            // A real file was uploaded for this report (see AddReportScreen) —
+                            // show it instead of a simulated radiograph.
+                            Image(
+                                bitmap = realBitmap.asImageBitmap(),
+                                contentDescription = report.title,
+                                contentScale = ContentScale.Fit,
+                                modifier = zoomPanModifier,
+                                colorFilter = if (isInverted) ColorFilter.colorMatrix(negativeColorMatrix) else null
+                            )
+                        } else {
+                            // No real attachment on record — fall back to a simulated
+                            // illustrative radiograph rather than a blank viewport.
+                            Canvas(modifier = zoomPanModifier) {
+                                if (isPanoramicMode) {
+                                    drawPanoramicRadiograph(
+                                        isInverted = isInverted,
+                                        hasPathology = report.summary.contains("bone loss", ignoreCase = true) ||
+                                                report.summary.contains("furcation", ignoreCase = true)
+                                    )
+                                } else {
+                                    drawPeriapicalRadiograph(
+                                        isInverted = isInverted,
+                                        hasLesion = report.summary.contains("radiolucency", ignoreCase = true) ||
+                                                report.summary.contains("apical", ignoreCase = true) ||
+                                                report.kind == "CBCT Scan",
+                                        toothNumber = 19
+                                    )
                                 }
-                        ) {
-                            if (isPanoramicMode) {
-                                drawPanoramicRadiograph(
-                                    isInverted = isInverted,
-                                    hasPathology = report.summary.contains("bone loss", ignoreCase = true) ||
-                                            report.summary.contains("furcation", ignoreCase = true)
+                            }
+
+                            // Medical Watermark / Radiographic metadata overlay — only
+                            // meaningful for the simulated illustration above, not a real photo.
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.TopStart)
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    text = "THORNBURY DIGITAL RADIOLOGY (SIMULATED — NO FILE ON RECORD)",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = if (isInverted) Color(0xFF263330) else Color(0xFF6FC6BA)
                                 )
-                            } else {
-                                drawPeriapicalRadiograph(
-                                    isInverted = isInverted,
-                                    hasLesion = report.summary.contains("radiolucency", ignoreCase = true) ||
-                                            report.summary.contains("apical", ignoreCase = true) ||
-                                            report.kind == "CBCT Scan",
-                                    toothNumber = 19
+                                Text(
+                                    text = "70 kVp • 7 mA • 0.16s • High-Res CMOS",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp
+                                    ),
+                                    color = if (isInverted) Color(0xFF5B6E6A) else Color(0xFF9FB4AF)
                                 )
                             }
-                        }
 
-                        // Medical Watermark / Radiographic metadata overlay
-                        Column(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(12.dp)
-                        ) {
-                            Text(
-                                text = "THORNBURY DIGITAL RADIOLOGY",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = if (isInverted) Color(0xFF263330) else Color(0xFF6FC6BA)
-                            )
-                            Text(
-                                text = "70 kVp • 7 mA • 0.16s • High-Res CMOS",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 9.sp
-                                ),
-                                color = if (isInverted) Color(0xFF5B6E6A) else Color(0xFF9FB4AF)
-                            )
-                        }
-
-                        // Orientation marker (R / L)
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(12.dp),
-                            shape = CircleShape,
-                            color = (if (isInverted) Color.Black else Color.White).copy(alpha = 0.2f)
-                        ) {
-                            Text(
-                                text = if (isPanoramicMode) "R / L" else "R",
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontSize = 11.sp
-                                ),
-                                color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
-                            )
-                        }
-
-                        // Millimeter calibration ruler stamp in bottom-left
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                            // Orientation marker (R / L)
                             Surface(
-                                color = (if (isInverted) Color.Black else Color.White).copy(alpha = 0.25f),
-                                shape = RoundedCornerShape(4.dp)
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(12.dp),
+                                shape = CircleShape,
+                                color = (if (isInverted) Color.Black else Color.White).copy(alpha = 0.2f)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Text(
+                                    text = if (isPanoramicMode) "R / L" else "R",
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
+                                )
+                            }
+
+                            // Millimeter calibration ruler stamp in bottom-left
+                            Row(
+                                modifier = Modifier
+                                    .align(Alignment.BottomStart)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    color = (if (isInverted) Color.Black else Color.White).copy(alpha = 0.25f),
+                                    shape = RoundedCornerShape(4.dp)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .width(28.dp)
-                                            .height(2.dp)
-                                            .background(if (isInverted) Color.Black else Color.White)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "10 mm",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 9.sp
-                                        ),
-                                        color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .width(28.dp)
+                                                .height(2.dp)
+                                                .background(if (isInverted) Color.Black else Color.White)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "10 mm",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 9.sp
+                                            ),
+                                            color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
+                                        )
+                                    }
                                 }
                             }
                         }

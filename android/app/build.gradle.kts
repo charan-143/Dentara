@@ -8,7 +8,7 @@ android {
     namespace = "com.example.thornburydental"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.thornburydental"
+        applicationId = "com.dentara.dental"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

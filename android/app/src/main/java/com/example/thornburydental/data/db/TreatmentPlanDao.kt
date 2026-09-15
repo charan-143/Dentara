@@ -86,6 +86,7 @@ class TreatmentPlanDao(private val dbHelper: ThornburyDbHelper) {
         val values = ContentValues().apply {
             put(ThornburyDbHelper.COL_PLANS_ID, plan.id)
             put(ThornburyDbHelper.COL_PLANS_PATIENT_ID, plan.patientId)
+            put(ThornburyDbHelper.COL_PLANS_TITLE, plan.title)
             put(ThornburyDbHelper.COL_PLANS_CLINICIAN_NAME, plan.clinicianName)
             put(ThornburyDbHelper.COL_PLANS_DIAGNOSIS, plan.diagnosis)
             put(ThornburyDbHelper.COL_PLANS_DATE_CREATED, plan.dateCreated)
@@ -174,10 +175,13 @@ class TreatmentPlanDao(private val dbHelper: ThornburyDbHelper) {
         val stepsJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_STEPS_JSON))
         val addendaJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_ADDENDA_JSON))
         val isLockedInt = cursor.getInt(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_IS_LOCKED))
+        val titleIdx = cursor.getColumnIndex(ThornburyDbHelper.COL_PLANS_TITLE)
+        val title = if (titleIdx >= 0) cursor.getString(titleIdx) ?: "Treatment Plan" else "Treatment Plan"
 
         return TreatmentPlan(
             id = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_ID)),
             patientId = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_PATIENT_ID)),
+            title = title,
             clinicianName = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_CLINICIAN_NAME)),
             diagnosis = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_DIAGNOSIS)),
             dateCreated = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PLANS_DATE_CREATED)),

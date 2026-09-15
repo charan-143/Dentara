@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.thornburydental.data.AuthRepository
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.data.ReportAttachment
@@ -67,7 +68,8 @@ fun AddReportScreen(
     var selectedKind by remember { mutableStateOf(kinds[0]) }
 
     var title by remember { mutableStateOf("") }
-    val clinicianName = "Dr. Ingrid Halvorsen"
+    val currentUser by AuthRepository.currentUser.collectAsState()
+    val clinicianName = currentUser?.name ?: "Unknown Clinician"
     var summary by remember { mutableStateOf("") }
     val attachments = remember { mutableStateListOf<ReportAttachment>() }
 
@@ -160,21 +162,6 @@ fun AddReportScreen(
     ) { uri: Uri? ->
         uri?.let { startUpload(it) }
     }
-
-    val quickTitles = listOf(
-        "Periapical Radiograph Tooth #19",
-        "Bite-wing Radiographs (Right & Left)",
-        "OPG Panoramic Radiograph",
-        "CBCT 3D Scan #19 Apical Region",
-        "Full mouth 6-point periodontal chart",
-        "Cold Pulp Vitality Test #18-#20"
-    )
-
-    val quickTemplates = listOf(
-        "No interproximal caries; crestal bone height stable.",
-        "Persistent radiolucency at root apex; non-vital pulp response.",
-        "Generalised 2-3mm probing depths with isolated 5mm bleeding pocket."
-    )
 
     Scaffold(
         topBar = {
@@ -305,31 +292,6 @@ fun AddReportScreen(
                         singleLine = true
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        quickTitles.forEach { quickTitle ->
-                            Surface(
-                                modifier = Modifier.clickable { title = quickTitle },
-                                shape = RoundedCornerShape(12.dp),
-                                color = ThornburyCanvas,
-                                border = BorderStroke(1.dp, ThornburyHairlineSoft)
-                            ) {
-                                Text(
-                                    text = quickTitle,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                    color = ThornburyPrimaryText
-                                )
-                            }
-                        }
-                    }
-
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text(
@@ -347,33 +309,6 @@ fun AddReportScreen(
                             .height(120.dp),
                         shape = RoundedCornerShape(10.dp)
                     )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        quickTemplates.forEach { template ->
-                            Surface(
-                                modifier = Modifier.clickable {
-                                    summary = if (summary.isBlank()) template else "$summary $template"
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                color = ThornburyCanvas,
-                                border = BorderStroke(1.dp, ThornburyHairlineSoft)
-                            ) {
-                                Text(
-                                    text = "+ \"${template.take(34)}...\"",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.5.sp),
-                                    color = ThornburyMuted
-                                )
-                            }
-                        }
-                    }
                 }
             }
 
@@ -387,32 +322,26 @@ fun AddReportScreen(
                 border = BorderStroke(1.dp, ThornburyHairline)
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.AttachFile,
-                                contentDescription = null,
-                                tint = ThornburyPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Report Files & Radiographs (${attachments.size})",
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                        }
-
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.AttachFile,
+                            contentDescription = null,
+                            tint = ThornburyPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Supports DICOM, PNG, PDF",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ThornburyMuted
+                            text = "Report Files & Radiographs (${attachments.size})",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = ThornburyInk
                         )
                     }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Supports DICOM, PNG, JPG, and PDF",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ThornburyMuted
+                    )
 
                     Spacer(modifier = Modifier.height(14.dp))
 

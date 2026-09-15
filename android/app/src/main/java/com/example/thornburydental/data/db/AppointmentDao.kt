@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import com.example.thornburydental.data.Appointment
+import com.example.thornburydental.util.parseTimeToMinutes
 
 /**
  * Data Access Object for Appointments in Thornbury Dental SQLite database.
@@ -24,13 +25,19 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
             null,
             null,
             null,
-            "${ThornburyDbHelper.COL_APPTS_TIME} ASC"
+            null
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 appointments.add(cursorToAppointment(cursor))
             }
         }
-        return appointments
+        // Sort chronologically by (date, parsed time-of-day) rather than a
+        // lexicographic SQL ORDER BY over the free-form "hh:mm AM/PM" TEXT
+        // column, which sorts incorrectly on its own (e.g. "02:00 PM" would
+        // sort before "11:30 AM" as text) and says nothing about which day an
+        // appointment is on. `date` is ISO "yyyy-MM-dd", so plain string
+        // comparison is already chronologically correct for it.
+        return appointments.sortedWith(compareBy({ it.date }, { parseTimeToMinutes(it.time) }))
     }
 
     /**
@@ -46,13 +53,14 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
             arrayOf(patientId),
             null,
             null,
-            "${ThornburyDbHelper.COL_APPTS_TIME} ASC"
+            null
         ).use { cursor ->
             while (cursor.moveToNext()) {
                 appointments.add(cursorToAppointment(cursor))
             }
         }
-        return appointments
+        // See getAllAppointments() — chronological (date, then time) sort.
+        return appointments.sortedWith(compareBy({ it.date }, { parseTimeToMinutes(it.time) }))
     }
 
     /**
@@ -90,6 +98,7 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
             put(ThornburyDbHelper.COL_APPTS_PATIENT_DOB, appointment.patientDob)
             put(ThornburyDbHelper.COL_APPTS_CLINICIAN_ID, appointment.clinicianId)
             put(ThornburyDbHelper.COL_APPTS_CLINICIAN_NAME, appointment.clinicianName)
+            put(ThornburyDbHelper.COL_APPTS_DATE, appointment.date)
             put(ThornburyDbHelper.COL_APPTS_TIME, appointment.time)
             put(ThornburyDbHelper.COL_APPTS_DURATION_MIN, appointment.durationMin)
             put(ThornburyDbHelper.COL_APPTS_ROOM, appointment.room)
@@ -150,6 +159,7 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
             patientDob = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_PATIENT_DOB)),
             clinicianId = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_CLINICIAN_ID)),
             clinicianName = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_CLINICIAN_NAME)),
+            date = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_DATE)) ?: "",
             time = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_TIME)),
             durationMin = cursor.getInt(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_DURATION_MIN)),
             room = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_ROOM)),

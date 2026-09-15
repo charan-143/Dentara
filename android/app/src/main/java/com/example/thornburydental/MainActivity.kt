@@ -7,7 +7,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.theme.ThornburyDentalTheme
 
 class MainActivity : ComponentActivity() {
@@ -24,7 +27,10 @@ class MainActivity : ComponentActivity() {
 
     enableEdgeToEdge()
     setContent {
-      ThornburyDentalTheme { Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { MainNavigation() } }
+      val isDarkModeEnabled by DentalRepository.isDarkModeEnabled.collectAsState()
+      ThornburyDentalTheme(darkTheme = isDarkModeEnabled) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) { MainNavigation() }
+      }
     }
   }
 }

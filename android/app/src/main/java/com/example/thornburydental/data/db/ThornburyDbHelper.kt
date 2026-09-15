@@ -12,7 +12,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 4
 
         // Table Names
         const val TABLE_PATIENTS = "patients"
@@ -67,6 +67,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         const val COL_PATIENTS_MEDICAL_ALERTS_JSON = "medical_alerts_json"
         const val COL_PATIENTS_ALLERGIES_JSON = "allergies_json"
         const val COL_PATIENTS_EXAM_ANSWERS_JSON = "exam_answers_json"
+        const val COL_PATIENTS_DIAGNOSIS_JSON = "diagnosis_json"
         const val COL_PATIENTS_CREATED_AT = "created_at"
 
         // Teeth columns
@@ -87,6 +88,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         const val COL_APPTS_PATIENT_DOB = "patient_dob"
         const val COL_APPTS_CLINICIAN_ID = "clinician_id"
         const val COL_APPTS_CLINICIAN_NAME = "clinician_name"
+        const val COL_APPTS_DATE = "date"
         const val COL_APPTS_TIME = "time"
         const val COL_APPTS_DURATION_MIN = "duration_min"
         const val COL_APPTS_ROOM = "room"
@@ -98,6 +100,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         // Treatment Plans columns
         const val COL_PLANS_ID = "id"
         const val COL_PLANS_PATIENT_ID = "patient_id"
+        const val COL_PLANS_TITLE = "title"
         const val COL_PLANS_CLINICIAN_NAME = "clinician_name"
         const val COL_PLANS_DIAGNOSIS = "diagnosis"
         const val COL_PLANS_DATE_CREATED = "date_created"
@@ -165,6 +168,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 $COL_PATIENTS_MEDICAL_ALERTS_JSON TEXT,
                 $COL_PATIENTS_ALLERGIES_JSON TEXT,
                 $COL_PATIENTS_EXAM_ANSWERS_JSON TEXT,
+                $COL_PATIENTS_DIAGNOSIS_JSON TEXT,
                 $COL_PATIENTS_CREATED_AT INTEGER
             );
             """.trimIndent()
@@ -199,6 +203,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 $COL_APPTS_PATIENT_DOB TEXT NOT NULL,
                 $COL_APPTS_CLINICIAN_ID TEXT NOT NULL,
                 $COL_APPTS_CLINICIAN_NAME TEXT NOT NULL,
+                $COL_APPTS_DATE TEXT NOT NULL DEFAULT '',
                 $COL_APPTS_TIME TEXT NOT NULL,
                 $COL_APPTS_DURATION_MIN INTEGER NOT NULL,
                 $COL_APPTS_ROOM TEXT NOT NULL,
@@ -217,6 +222,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             CREATE TABLE $TABLE_TREATMENT_PLANS (
                 $COL_PLANS_ID TEXT PRIMARY KEY,
                 $COL_PLANS_PATIENT_ID TEXT NOT NULL,
+                $COL_PLANS_TITLE TEXT NOT NULL DEFAULT 'Comprehensive Treatment Plan',
                 $COL_PLANS_CLINICIAN_NAME TEXT NOT NULL,
                 $COL_PLANS_DIAGNOSIS TEXT NOT NULL,
                 $COL_PLANS_DATE_CREATED TEXT NOT NULL,

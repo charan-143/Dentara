@@ -25,44 +25,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.Appointment
+import com.example.thornburydental.data.AuthRepository
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.util.calculateAge
+import com.example.thornburydental.util.formatTimeWithAmPm
+import com.example.thornburydental.util.parseTimeToMinutes
+import com.example.thornburydental.util.todayIsoDate
+import java.text.SimpleDateFormat
 import java.util.Calendar
-
-private fun calculateAge(dobStr: String): Int {
-    return try {
-        val parts = dobStr.split("-").map { it.toInt() }
-        val birthYear = parts[0]
-        val birthMonth = parts[1] - 1
-        val birthDay = parts[2]
-
-        val today = Calendar.getInstance()
-        var age = today.get(Calendar.YEAR) - birthYear
-
-        val currentMonth = today.get(Calendar.MONTH)
-        val currentDay = today.get(Calendar.DAY_OF_MONTH)
-
-        if (currentMonth < birthMonth || (currentMonth == birthMonth && currentDay < birthDay)) {
-            age--
-        }
-        if (age < 0) 0 else age
-    } catch (_: Exception) {
-        38
-    }
-}
-
-private fun formatTimeWithAmPm(timeStr: String): String {
-    return try {
-        val parts = timeStr.trim().split(":")
-        val hour = parts[0].toInt()
-        val minute = parts[1]
-        val amPm = if (hour < 12) "AM" else "PM"
-        val hour12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
-        String.format("%02d:%s %s", hour12, minute, amPm)
-    } catch (_: Exception) {
-        timeStr
-    }
-}
+import java.util.Locale
 
 @Composable
 fun TodayQueueScreen(
@@ -70,19 +42,34 @@ fun TodayQueueScreen(
     modifier: Modifier = Modifier
 ) {
     val appointments by DentalRepository.appointments.collectAsState()
+    val currentUser by AuthRepository.currentUser.collectAsState()
 
     var filterMode by remember { mutableStateOf("all") } // "all", "confirmed", "completed", "cancelled"
     var searchQuery by remember { mutableStateOf("") }
     var appointmentToCancel by remember { mutableStateOf<Appointment?>(null) }
 
-    val confirmedList = remember(appointments) { appointments.filter { it.status == "confirmed" } }
-    val completedList = remember(appointments) { appointments.filter { it.status == "completed" } }
-    val cancelledList = remember(appointments) { appointments.filter { it.status == "cancelled" } }
+    // This tab is specifically "Today" — now that appointments carry a real
+    // date, scope everything below to just today's date rather than every
+    // appointment ever booked (the Schedule tab's calendar covers other days).
+    val todayAppointments = remember(appointments) {
+        val today = todayIsoDate()
+        appointments.filter { it.date == today }
+    }
 
-    val nextAppt = remember(confirmedList) { confirmedList.firstOrNull() }
+    val confirmedList = remember(todayAppointments) { todayAppointments.filter { it.status == "confirmed" } }
+    val completedList = remember(todayAppointments) { todayAppointments.filter { it.status == "completed" } }
+    val cancelledList = remember(todayAppointments) { todayAppointments.filter { it.status == "cancelled" } }
 
-    val filteredAppointments = remember(appointments, filterMode, searchQuery) {
-        appointments.filter { row ->
+    // "Next in chair" = the earliest confirmed appointment at or after the
+    // current time-of-day, falling back to the first confirmed appointment
+    // overall if every confirmed slot has already passed today.
+    val nextAppt = remember(confirmedList) {
+        val nowMinutes = Calendar.getInstance().let { it.get(Calendar.HOUR_OF_DAY) * 60 + it.get(Calendar.MINUTE) }
+        confirmedList.firstOrNull { parseTimeToMinutes(it.time) >= nowMinutes } ?: confirmedList.firstOrNull()
+    }
+
+    val filteredAppointments = remember(todayAppointments, filterMode, searchQuery) {
+        todayAppointments.filter { row ->
             if (filterMode != "all" && row.status != filterMode) return@filter false
             if (searchQuery.isNotBlank()) {
                 val q = searchQuery.trim().lowercase()
@@ -99,6 +86,10 @@ fun TodayQueueScreen(
     // Dynamic greeting
     val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
     val greeting = if (hour < 12) "Good morning" else if (hour < 17) "Good afternoon" else "Good evening"
+    val clinicianName = currentUser?.name ?: "there"
+    val todayDateLabel = remember {
+        SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Calendar.getInstance().time)
+    }
 
     LazyColumn(
         modifier = modifier
@@ -127,7 +118,7 @@ fun TodayQueueScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "$greeting, Dr. Ingrid Halvorsen",
+                                text = "$greeting, $clinicianName",
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
@@ -135,7 +126,7 @@ fun TodayQueueScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Thursday, 10 September • Surgery 1",
+                                text = "$todayDateLabel • Surgery 1",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = ThornburyMuted
                             )
@@ -396,7 +387,7 @@ fun TodayQueueScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     val filterOptions = listOf(
-                        "all" to "All (${appointments.size})",
+                        "all" to "All (${todayAppointments.size})",
                         "confirmed" to "Upcoming (${confirmedList.size})",
                         "completed" to "Seen (${completedList.size})",
                         "cancelled" to "Cancelled (${cancelledList.size})"

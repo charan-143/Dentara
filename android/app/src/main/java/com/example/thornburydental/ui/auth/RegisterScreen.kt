@@ -33,6 +33,7 @@ import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.User
 import com.example.thornburydental.data.UserRole
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.util.ValidationUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -84,13 +85,16 @@ fun RegisterScreen(
             return
         }
         // Valid email validation
-        val emailRegex = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
-        if (!emailRegex.matches(cleanEmail)) {
-            errorMessage = "Please enter a valid email address (e.g. name@example.com)"
+        if (!ValidationUtils.isValidEmail(cleanEmail)) {
+            errorMessage = "Please enter a valid email address with '@' and domain (e.g. name@example.com)"
             return
         }
         if (cleanPhone.isBlank()) {
             errorMessage = "Please enter your phone number"
+            return
+        }
+        if (!ValidationUtils.isValidPhone(cleanPhone)) {
+            errorMessage = "Please enter a valid phone number (7-15 digits). Letters like 'parrot' are not allowed."
             return
         }
         if (cleanPassword.isBlank()) {
@@ -177,7 +181,7 @@ fun RegisterScreen(
                 modifier = Modifier
                     .size(60.dp)
                     .background(ThornburyPrimary, RoundedCornerShape(16.dp))
-                    .semantics { contentDescription = "Thornbury Dental Brand Emblem" },
+                    .semantics { contentDescription = "Dentara Brand Emblem" },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -192,7 +196,7 @@ fun RegisterScreen(
 
             // --- Brand Header ---
             Text(
-                text = "Join Thornbury Dental",
+                text = "Join Dentara",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 28.sp
@@ -441,6 +445,16 @@ fun RegisterScreen(
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
+                        isError = email.isNotBlank() && !ValidationUtils.isValidEmail(email),
+                        supportingText = {
+                            if (email.isNotBlank() && !ValidationUtils.isValidEmail(email)) {
+                                Text(
+                                    text = "Must be a valid email (e.g. name@example.com with '@' and domain)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ThornburyError
+                                )
+                            }
+                        },
                         colors = thornburyTextFieldColors(),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -458,7 +472,7 @@ fun RegisterScreen(
                     OutlinedTextField(
                         value = phone,
                         onValueChange = {
-                            phone = it
+                            phone = ValidationUtils.filterPhoneInput(it)
                             if (errorMessage != null) errorMessage = null
                         },
                         placeholder = {
@@ -479,6 +493,16 @@ fun RegisterScreen(
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
                         ),
+                        isError = phone.isNotBlank() && !ValidationUtils.isValidPhone(phone),
+                        supportingText = {
+                            if (phone.isNotBlank() && !ValidationUtils.isValidPhone(phone)) {
+                                Text(
+                                    text = "Invalid phone number (must be 7-15 digits, no letters)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = ThornburyError
+                                )
+                            }
+                        },
                         colors = thornburyTextFieldColors(),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier.fillMaxWidth()

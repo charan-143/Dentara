@@ -183,7 +183,8 @@ fun MainNavigation() {
                                     onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
                                 )
                                 AppDestination.SCHEDULE -> ScheduleScreen(
-                                    onOpenPatientChart = { patientId -> activePatientId = patientId }
+                                    onOpenPatientChart = { patientId -> activePatientId = patientId },
+                                    onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
                                 )
                                 AppDestination.PROFILE -> ProfileScreen(
                                     onSignOut = { rootDestination = RootDestination.WELCOME }

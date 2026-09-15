@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.example.thornburydental.util.addDaysToIsoDate
+import com.example.thornburydental.util.parseTimeToMinutes
+import com.example.thornburydental.util.todayIsoDate
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -24,6 +27,32 @@ import java.util.Locale
 object DentalRepository {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    // -------------------------------------------------------------------
+    // Lightweight, session-scoped app preferences (not yet persisted to
+    // disk — they reset on process restart, unlike patient/clinical data).
+    // -------------------------------------------------------------------
+    private val _isDarkModeEnabled = MutableStateFlow(false)
+    val isDarkModeEnabled: StateFlow<Boolean> = _isDarkModeEnabled.asStateFlow()
+    fun setDarkModeEnabled(enabled: Boolean) {
+        _isDarkModeEnabled.value = enabled
+    }
+
+    private val _defaultSurgeryRoom = MutableStateFlow("Surgery 1")
+    val defaultSurgeryRoom: StateFlow<String> = _defaultSurgeryRoom.asStateFlow()
+    fun setDefaultSurgeryRoom(room: String) {
+        _defaultSurgeryRoom.value = room
+    }
+
+    // Note: this flag is not yet wired to any real reminder/notification
+    // scheduling (no such system exists in the app yet) — it only makes the
+    // switch stop silently resetting between screens. Building actual
+    // appointment-reminder notifications is a separate feature, not a gap fix.
+    private val _appointmentRemindersEnabled = MutableStateFlow(true)
+    val appointmentRemindersEnabled: StateFlow<Boolean> = _appointmentRemindersEnabled.asStateFlow()
+    fun setAppointmentRemindersEnabled(enabled: Boolean) {
+        _appointmentRemindersEnabled.value = enabled
+    }
 
     init {
         initializeFromDatabase()
@@ -260,12 +289,28 @@ object DentalRepository {
                     painSeverity = "Moderate",
                     sensitivityTriggers = listOf("Cold", "Sweet / Acidic"),
                     periodontalBleeding = listOf("Bleeding on brushing"),
+                    periodontalPockets = listOf("Mild Pockets (4 - 5 mm)"),
+                    gingivalRecession = listOf("Mild (< 2 mm)"),
                     softTissue = listOf("Healthy & intact"),
+                    stains = listOf("Extrinsic (Tea / Coffee)"),
+                    calculus = listOf("Supragingival - Mild"),
+                    tmjAssessment = listOf("Normal / Asymptomatic"),
                     functionalHabits = listOf("No clenching/grinding"),
                     brushingFrequency = "2x/day",
                     flossingFrequency = "Occasional",
                     cariesRisk = "Moderate Risk",
+                    otherDiagnosesConditions = listOf("Localized Gingivitis"),
+                    otherDiagnosesNotes = "Localized marginal gingivitis in lower anterior segment.",
                     clinicianNotes = "Active carious lesion, prompt restoration advised. Generalized marginal gingivitis secondary to plaque accumulation."
+                ),
+                diagnosis = PatientDiagnosis(
+                    primaryDiagnosis = "Generalized Stage III, Grade B Periodontitis; localized deep pockets #3, #14; active occlusal caries #30",
+                    clinicalFindings = "Generalized 4-5mm probing depths, bleeding on probing in anterior quadrant, subgingival calculus. Tooth #30 has active dentinal caries.",
+                    prognosis = "Favourable with periodontal therapy and restorative intervention",
+                    systemicConsiderations = "No contraindicating systemic conditions.",
+                    dateRecorded = "2026-09-02",
+                    lastUpdated = "2026-09-02",
+                    clinicianName = "Dr. Ingrid Halvorsen"
                 )
             ),
             Patient(
@@ -289,12 +334,28 @@ object DentalRepository {
                     painSeverity = "Mild",
                     sensitivityTriggers = listOf("Biting / Mastication Pressure"),
                     periodontalBleeding = listOf("No bleeding"),
+                    periodontalPockets = listOf("Normal (1 - 3 mm)"),
+                    gingivalRecession = listOf("None"),
                     softTissue = listOf("Healthy & intact"),
+                    stains = listOf("None / Minimal"),
+                    calculus = listOf("None"),
+                    tmjAssessment = listOf("Normal / Asymptomatic"),
                     functionalHabits = listOf("No clenching/grinding"),
                     brushingFrequency = "2x/day",
                     flossingFrequency = "Daily",
                     cariesRisk = "Low Risk",
+                    otherDiagnosesConditions = emptyList(),
+                    otherDiagnosesNotes = "Post-surgical healing in progress.",
                     clinicianNotes = "Extraction socket healing uneventfully. Oral hygiene is excellent."
+                ),
+                diagnosis = PatientDiagnosis(
+                    primaryDiagnosis = "Symptomatic apical periodontitis #19 with sub-optimal previous obturation",
+                    clinicalFindings = "Tenderness to percussion #19, persistent periapical radiolucency on CBCT, mesial canals intact, suspected untreated MB2.",
+                    prognosis = "Good following microscope-guided endodontic retreatment",
+                    systemicConsiderations = "Controlled Hypertension (Amlodipine 5mg). Monitor BP.",
+                    dateRecorded = "2026-09-08",
+                    lastUpdated = "2026-09-08",
+                    clinicianName = "Dr. Tomas Ferreira"
                 )
             ),
             Patient(
@@ -311,7 +372,16 @@ object DentalRepository {
                 lastVisit = "2 months ago",
                 medicalAlerts = emptyList(),
                 allergies = emptyList(),
-                teeth = t3
+                teeth = t3,
+                diagnosis = PatientDiagnosis(
+                    primaryDiagnosis = "Incisal composite restoration margin integrity review #8; localized early enamel demineralization #18",
+                    clinicalFindings = "Class IV composite stable. Incipient non-cavitated white spot lesion on occlusal surface of #18.",
+                    prognosis = "Excellent",
+                    systemicConsiderations = "Nil",
+                    dateRecorded = "2026-07-14",
+                    lastUpdated = "2026-07-14",
+                    clinicianName = "Dr. Anaya Krishnamurthy"
+                )
             ),
             Patient(
                 id = "p4",
@@ -360,6 +430,7 @@ object DentalRepository {
             patientDob = "1984-03-11",
             clinicianId = "c1",
             clinicianName = "Dr. Ingrid Halvorsen",
+            date = todayIsoDate(),
             time = "09:00",
             durationMin = 45,
             room = "Surgery 1",
@@ -375,6 +446,7 @@ object DentalRepository {
             patientDob = "1971-11-02",
             clinicianId = "c2",
             clinicianName = "Dr. Tomas Ferreira",
+            date = todayIsoDate(),
             time = "10:15",
             durationMin = 60,
             room = "Surgery 2",
@@ -390,6 +462,7 @@ object DentalRepository {
             patientDob = "1996-06-24",
             clinicianId = "c3",
             clinicianName = "Dr. Anaya Krishnamurthy",
+            date = addDaysToIsoDate(todayIsoDate(), 1),
             time = "11:30",
             durationMin = 45,
             room = "Surgery 3",
@@ -405,6 +478,7 @@ object DentalRepository {
             patientDob = "1958-01-19",
             clinicianId = "c1",
             clinicianName = "Dr. Ingrid Halvorsen",
+            date = todayIsoDate(),
             time = "14:00",
             durationMin = 30,
             room = "Surgery 1",
@@ -420,6 +494,7 @@ object DentalRepository {
             patientDob = "2001-09-30",
             clinicianId = "c3",
             clinicianName = "Dr. Anaya Krishnamurthy",
+            date = addDaysToIsoDate(todayIsoDate(), -1),
             time = "15:45",
             durationMin = 30,
             room = "Surgery 3",
@@ -482,6 +557,7 @@ object DentalRepository {
         TreatmentPlan(
             id = "plan-901",
             patientId = "p1",
+            title = "Phase 1: Periodontal Scaling & Caries Control",
             clinicianName = "Dr. Ingrid Halvorsen",
             diagnosis = "Generalized Stage III, Grade B Periodontitis with localized deep pockets #3, #14",
             dateCreated = "2026-09-02",
@@ -495,8 +571,23 @@ object DentalRepository {
             )
         ),
         TreatmentPlan(
+            id = "plan-903",
+            patientId = "p1",
+            title = "Phase 2: Periodontal Re-evaluation & Maintenance",
+            clinicianName = "Dr. Ingrid Halvorsen",
+            diagnosis = "Generalized Stage III, Grade B Periodontitis",
+            dateCreated = "2026-09-12",
+            isLocked = false,
+            tamperHash = "sha256:4b91f09c8d32e185c7f8a113941a2e8c2049e6f3b7d189c4501a382e79601d3a",
+            steps = listOf(
+                PlanStep("s8", null, "4-6 Week Periodontal Re-evaluation & Probing Depth Review", "D4910", 160.0, false),
+                PlanStep("s9", null, "Supportive Periodontal Therapy & Topical Fluoride Application", "D1206", 85.0, false)
+            )
+        ),
+        TreatmentPlan(
             id = "plan-902",
             patientId = "p2",
+            title = "Endodontic Retreatment & Coronal Restoration",
             clinicianName = "Dr. Tomas Ferreira",
             diagnosis = "Symptomatic apical periodontitis #19 with previous sub-optimal obturation",
             dateCreated = "2026-09-08",
@@ -540,6 +631,7 @@ object DentalRepository {
         patient: Patient,
         clinicianId: String,
         clinicianName: String,
+        date: String = todayIsoDate(),
         time: String,
         durationMin: Int,
         room: String,
@@ -557,6 +649,7 @@ object DentalRepository {
             patientDob = patient.dob,
             clinicianId = clinicianId,
             clinicianName = clinicianName,
+            date = date,
             time = time,
             durationMin = durationMin,
             room = room,
@@ -564,7 +657,10 @@ object DentalRepository {
             allergyList = allergyStr,
             status = "confirmed"
         )
-        _appointments.update { listOf(newAppt) + it }
+        // Insert in chronological (date, then time-of-day) order, not just
+        // prepended — see AppointmentDao's getAllAppointments()/
+        // getAppointmentsForPatient() for the same fix on the DB-backed load path.
+        _appointments.update { (listOf(newAppt) + it).sortedWith(compareBy({ appt -> appt.date }, { appt -> parseTimeToMinutes(appt.time) })) }
         repositoryScope.launch {
             if (LocalDatabaseManager.isInitialized) {
                 LocalDatabaseManager.appointmentDao.insertAppointment(newAppt)
@@ -585,11 +681,21 @@ object DentalRepository {
         patient: Patient,
         clinicianId: String,
         clinicianName: String,
+        date: String = todayIsoDate(),
         time: String,
         durationMin: Int,
         room: String,
         procedure: String
-    ): Appointment = scheduleAppointment(patient, clinicianId, clinicianName, time, durationMin, room, procedure)
+    ): Appointment = scheduleAppointment(
+        patient = patient,
+        clinicianId = clinicianId,
+        clinicianName = clinicianName,
+        date = date,
+        time = time,
+        durationMin = durationMin,
+        room = room,
+        procedure = procedure
+    )
 
     fun updateToothCondition(patientId: String, toothNumber: Int, newCondition: ToothCondition, notes: String) {
         _patients.update { list ->
@@ -712,8 +818,9 @@ object DentalRepository {
 
     fun createTreatmentPlan(
         patientId: String,
+        title: String = "Comprehensive Treatment Plan",
         clinicianName: String,
-        diagnosis: String,
+        diagnosis: String = "",
         steps: List<PlanStep>
     ): TreatmentPlan {
         val planId = "plan-" + System.currentTimeMillis()
@@ -723,6 +830,7 @@ object DentalRepository {
         val newPlan = TreatmentPlan(
             id = planId,
             patientId = patientId,
+            title = title,
             clinicianName = clinicianName,
             diagnosis = diagnosis,
             dateCreated = dateCreated,
@@ -744,6 +852,25 @@ object DentalRepository {
             )
         }
         return newPlan
+    }
+
+    /**
+     * Updates or records the singular, persistent clinical diagnosis for a patient.
+     * Persisted to SQLite and updated in reactive state.
+     */
+    fun updatePatientDiagnosis(patientId: String, diagnosis: PatientDiagnosis) {
+        _patients.update { list ->
+            list.map { p ->
+                if (p.id == patientId) {
+                    p.copy(diagnosis = diagnosis)
+                } else p
+            }
+        }
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.patientDao.updateDiagnosis(patientId, diagnosis)
+            }
+        }
     }
 
     fun addPlanAddendum(planId: String, author: String, note: String) {

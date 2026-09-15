@@ -66,10 +66,10 @@ fun WelcomeBrandScreen(
 
             // Main Practice Title
             Text(
-                text = "Thornbury Dental",
+                text = "Dentara",
                 style = MaterialTheme.typography.headlineLarge.copy(
                     fontWeight = FontWeight.Light,
-                    fontSize = 38.sp,
+                    fontSize = 42.sp,
                     color = ThornburyInk,
                     letterSpacing = 0.5.sp
                 ),
@@ -79,7 +79,7 @@ fun WelcomeBrandScreen(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Clinical Operatory Suite",
+                text = "Dental Practice & Clinical Operatory Suite",
                 style = MaterialTheme.typography.bodyMedium.copy(
                     color = ThornburyBody,
                     fontSize = 15.sp,

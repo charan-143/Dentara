@@ -27,56 +27,28 @@ import com.example.thornburydental.data.Appointment
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
-import java.util.Calendar
-
-private fun calculateAge(dobStr: String): Int {
-    return try {
-        val parts = dobStr.split("-").map { it.toInt() }
-        val birthYear = parts[0]
-        val birthMonth = parts[1] - 1
-        val birthDay = parts[2]
-
-        val today = Calendar.getInstance()
-        var age = today.get(Calendar.YEAR) - birthYear
-
-        val currentMonth = today.get(Calendar.MONTH)
-        val currentDay = today.get(Calendar.DAY_OF_MONTH)
-
-        if (currentMonth < birthMonth || (currentMonth == birthMonth && currentDay < birthDay)) {
-            age--
-        }
-        if (age < 0) 0 else age
-    } catch (_: Exception) {
-        38
-    }
-}
-
-private fun formatTimeWithAmPm(timeStr: String): String {
-    return try {
-        val cleanTime = timeStr.trim()
-        if (cleanTime.uppercase().contains("AM") || cleanTime.uppercase().contains("PM")) {
-            return cleanTime
-        }
-        val parts = cleanTime.split(":")
-        val hour = parts[0].toInt()
-        val minute = parts[1]
-        val amPm = if (hour < 12) "AM" else "PM"
-        val hour12 = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
-        String.format("%02d:%s %s", hour12, minute, amPm)
-    } catch (_: Exception) {
-        timeStr
-    }
-}
+import com.example.thornburydental.util.addDaysToIsoDate
+import com.example.thornburydental.util.calculateAge
+import com.example.thornburydental.util.formatTimeWithAmPm
+import com.example.thornburydental.util.isIsoDateToday
+import com.example.thornburydental.util.isoDateDayOfMonth
+import com.example.thornburydental.util.isoDateDisplayLabel
+import com.example.thornburydental.util.isoDateMonthYearLabel
+import com.example.thornburydental.util.isoDateWeekdayShortLabel
+import com.example.thornburydental.util.todayIsoDate
+import com.example.thornburydental.util.weekDatesContaining
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
     onOpenPatientChart: (String) -> Unit = {},
+    onNavigateToRegisterPatient: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val appointments by DentalRepository.appointments.collectAsState()
     val patients by DentalRepository.patients.collectAsState()
 
+    var selectedDate by remember { mutableStateOf(todayIsoDate()) }
     var roomFilter by remember { mutableStateOf("all") }
     var statusFilter by remember { mutableStateOf("all") }
     var searchQuery by remember { mutableStateOf("") }
@@ -84,8 +56,14 @@ fun ScheduleScreen(
     var bookingTargetPatient by remember { mutableStateOf<Patient?>(null) }
     var appointmentToCancel by remember { mutableStateOf<Appointment?>(null) }
 
-    val filteredAppointments = remember(appointments, roomFilter, statusFilter, searchQuery) {
-        appointments.filter { appt ->
+    // Appointments on the selected calendar day only — everything below this
+    // (filters, counts, the list) is scoped to that one day.
+    val dayAppointments = remember(appointments, selectedDate) {
+        appointments.filter { it.date == selectedDate }
+    }
+
+    val filteredAppointments = remember(dayAppointments, roomFilter, statusFilter, searchQuery) {
+        dayAppointments.filter { appt ->
             if (roomFilter != "all" && appt.room != roomFilter) return@filter false
             if (statusFilter != "all" && appt.status != statusFilter) return@filter false
             if (searchQuery.isNotBlank()) {
@@ -169,7 +147,21 @@ fun ScheduleScreen(
         }
 
         // =====================================================================
-        // 2. SEARCH & FILTER SECTION
+        // 2. WEEK STRIP CALENDAR
+        // =====================================================================
+        item {
+            WeekStripSelector(
+                selectedDate = selectedDate,
+                appointments = appointments,
+                onSelectDate = { selectedDate = it },
+                onPreviousWeek = { selectedDate = addDaysToIsoDate(selectedDate, -7) },
+                onNextWeek = { selectedDate = addDaysToIsoDate(selectedDate, 7) },
+                onJumpToToday = { selectedDate = todayIsoDate() }
+            )
+        }
+
+        // =====================================================================
+        // 3. SEARCH & FILTER SECTION
         // =====================================================================
         item {
             Column(
@@ -218,7 +210,7 @@ fun ScheduleScreen(
                     singleLine = true
                 )
 
-                // Room FilterChips Row
+                // Room FilterChips Row — counts now reflect the selected day only
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = "Surgery Room",
@@ -232,7 +224,7 @@ fun ScheduleScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         val roomOptions = listOf(
-                            "all" to "All Surgeries (${appointments.size})",
+                            "all" to "All Surgeries (${dayAppointments.size})",
                             "Surgery 1" to "Surgery 1",
                             "Surgery 2" to "Surgery 2",
                             "Surgery 3" to "Surgery 3"
@@ -295,7 +287,7 @@ fun ScheduleScreen(
         }
 
         // =====================================================================
-        // 3. APPOINTMENTS SCHEDULE LIST
+        // 4. APPOINTMENTS FOR THE SELECTED DAY
         // =====================================================================
         if (filteredAppointments.isEmpty()) {
             item {
@@ -322,13 +314,17 @@ fun ScheduleScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "No Appointments Found",
+                            text = if (dayAppointments.isEmpty()) "No Appointments This Day" else "No Matching Appointments",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = ThornburyInk
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "No surgery appointments match your active room filter, status filter, or search query.",
+                            text = if (dayAppointments.isEmpty()) {
+                                "Nothing booked for ${isoDateDisplayLabel(selectedDate)} yet."
+                            } else {
+                                "No surgery appointments on ${isoDateDisplayLabel(selectedDate)} match your active room filter, status filter, or search query."
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = ThornburyMuted,
                             modifier = Modifier.padding(horizontal = 16.dp),
@@ -615,7 +611,7 @@ fun ScheduleScreen(
     }
 
     // =========================================================================
-    // 4. MODALS & DIALOGS
+    // 5. MODALS & DIALOGS
     // =========================================================================
 
     // Modal 1: Select Patient Dialog
@@ -667,17 +663,35 @@ fun ScheduleScreen(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     if (filteredPatients.isEmpty()) {
-                        Box(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp),
-                            contentAlignment = Alignment.Center
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
                                 text = "No registered patients match your search.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ThornburyMuted
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    showSelectPatientDialog = false
+                                    onNavigateToRegisterPatient()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, ThornburyPrimary)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PersonAdd,
+                                    contentDescription = null,
+                                    tint = ThornburyPrimary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Register New Patient", color = ThornburyPrimary)
+                            }
                         }
                     } else {
                         LazyColumn(
@@ -737,16 +751,19 @@ fun ScheduleScreen(
         )
     }
 
-    // Modal 2: Book Appointment Dialog
+    // Modal 2: Book Appointment Dialog — defaults to whichever day is selected
+    // on the calendar strip, still editable via the dialog's own date picker.
     if (bookingTargetPatient != null) {
         BookAppointmentDialog(
             patient = bookingTargetPatient!!,
+            initialDate = selectedDate,
             onDismiss = { bookingTargetPatient = null },
-            onSave = { proc, clinId, clinName, time, dur, room ->
+            onSave = { proc, clinId, clinName, date, time, dur, room ->
                 DentalRepository.bookAppointment(
                     patient = bookingTargetPatient!!,
                     clinicianId = clinId,
                     clinicianName = clinName,
+                    date = date,
                     time = time,
                     durationMin = dur,
                     room = room,
@@ -796,5 +813,134 @@ fun ScheduleScreen(
             shape = RoundedCornerShape(16.dp),
             containerColor = ThornburyCanvas
         )
+    }
+}
+
+/**
+ * Horizontal 7-day (Monday-Sunday) week strip: month/year label with
+ * previous/next-week navigation and a "Today" jump button, then one column
+ * per day showing the weekday letters, day-of-month in a circle (filled when
+ * selected, tinted when it's today), and a small dot when that day has at
+ * least one appointment on record (independent of the room/status/search
+ * filters below, so the dot is a reliable "is anything booked here" signal).
+ */
+@Composable
+private fun WeekStripSelector(
+    selectedDate: String,
+    appointments: List<Appointment>,
+    onSelectDate: (String) -> Unit,
+    onPreviousWeek: () -> Unit,
+    onNextWeek: () -> Unit,
+    onJumpToToday: () -> Unit
+) {
+    val weekDates = remember(selectedDate) { weekDatesContaining(selectedDate) }
+    val datesWithAppointments = remember(appointments) { appointments.map { it.date }.toSet() }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ThornburyCanvas,
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = isoDateMonthYearLabel(selectedDate),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (!isIsoDateToday(selectedDate)) {
+                        TextButton(onClick = onJumpToToday, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                            Text(
+                                text = "Today",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyPrimary
+                            )
+                        }
+                    }
+                    IconButton(onClick = onPreviousWeek, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronLeft,
+                            contentDescription = "Previous week",
+                            tint = ThornburyInk
+                        )
+                    }
+                    IconButton(onClick = onNextWeek, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = "Next week",
+                            tint = ThornburyInk
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                weekDates.forEach { date ->
+                    val isSelected = date == selectedDate
+                    val isToday = isIsoDateToday(date)
+                    val hasAppointments = datesWithAppointments.contains(date)
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { onSelectDate(date) }
+                            .padding(vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = isoDateWeekdayShortLabel(date),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            color = if (isSelected) ThornburyPrimary else ThornburyMuted
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    when {
+                                        isSelected -> ThornburyPrimary
+                                        isToday -> ThornburySurfaceSoft
+                                        else -> Color.Transparent
+                                    }
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = isoDateDayOfMonth(date).toString(),
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = when {
+                                    isSelected -> Color.White
+                                    isToday -> ThornburyPrimaryText
+                                    else -> ThornburyInk
+                                }
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(5.dp)
+                                .clip(CircleShape)
+                                .background(if (hasAppointments) ThornburyPrimary else Color.Transparent)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
