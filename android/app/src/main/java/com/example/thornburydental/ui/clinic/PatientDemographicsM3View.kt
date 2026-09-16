@@ -44,8 +44,7 @@ import java.util.Calendar
 /**
  * Modern Material 3 Patient Demographics & Comprehensive Clinical Profile View.
  * Provides high clinical information density, executive patient identification,
- * prominent allergy & medical alert warnings, categorized medical/dental histories,
- * verified contact details, and robust in-place editing.
+ * categorized medical/dental histories, verified contact details, and robust in-place editing.
  */
 @Composable
 fun PatientDemographicsM3View(
@@ -66,21 +65,6 @@ fun PatientDemographicsM3View(
     val dentalBullets = remember(patient.pastDentalHistory) { parseClinicalBullets(patient.pastDentalHistory) }
 
     val age = remember(patient.dob) { calculatePatientAge(patient.dob) }
-
-    // Combined critical alerts & allergies
-    val combinedAlerts = remember(patient.allergies, patient.medicalAlerts) {
-        val list = mutableListOf<String>()
-        patient.allergies.forEach { allergy ->
-            val desc = if (allergy.severity.isNotBlank()) "${allergy.allergen} (${allergy.severity})" else allergy.allergen
-            list.add(desc)
-        }
-        patient.medicalAlerts.forEach { alert ->
-            if (!list.any { it.contains(alert, ignoreCase = true) }) {
-                list.add(alert)
-            }
-        }
-        list
-    }
 
     Column(
         modifier = modifier
@@ -222,69 +206,7 @@ fun PatientDemographicsM3View(
         }
 
         // ---------------------------------------------------------------------
-        // 2. Safety-Critical Clinical Alerts & Allergies Banner
-        // ---------------------------------------------------------------------
-        if (combinedAlerts.isNotEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = ThornburyErrorWash,
-                border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.35f))
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Warning,
-                            contentDescription = "Alert",
-                            tint = ThornburyError,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Safety Alerts & Known Allergies",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyError
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        combinedAlerts.forEach { alert ->
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.4f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(ThornburyError)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = alert,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = ThornburyError
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // 3. Contact & Residency Details Card
+        // 2. Contact & Residency Details Card
         // ---------------------------------------------------------------------
         OutlinedCard(
             modifier = Modifier.fillMaxWidth(),
@@ -386,7 +308,7 @@ fun PatientDemographicsM3View(
         }
 
         // ---------------------------------------------------------------------
-        // 4. Categorized Clinical History Cards
+        // 3. Categorized Clinical History Cards
         // ---------------------------------------------------------------------
 
         // A. Systemic Medical History Card
