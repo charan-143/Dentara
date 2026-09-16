@@ -23,6 +23,17 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         const val TABLE_DIAGNOSTIC_REPORTS = "diagnostic_reports"
         const val TABLE_USERS = "users"
         const val TABLE_USER_PREFERENCES = "user_preferences"
+        const val TABLE_MEDICATION_PRESETS = "medication_presets"
+
+        // Medication Presets columns
+        const val COL_PRESET_ID = "id"
+        const val COL_PRESET_NAME = "name"
+        const val COL_PRESET_DOSAGE = "dosage"
+        const val COL_PRESET_FREQUENCY = "frequency"
+        const val COL_PRESET_DURATION = "duration"
+        const val COL_PRESET_INSTRUCTIONS = "instructions"
+        const val COL_PRESET_CATEGORY = "category"
+        const val COL_PRESET_IS_CUSTOM = "is_custom"
 
         // User Preferences columns
         const val COL_PREF_ID = "id"
@@ -314,10 +325,27 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             );
             """.trimIndent()
         )
+
+        // 9. Medication Presets Table
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS $TABLE_MEDICATION_PRESETS (
+                $COL_PRESET_ID TEXT PRIMARY KEY,
+                $COL_PRESET_NAME TEXT NOT NULL,
+                $COL_PRESET_DOSAGE TEXT NOT NULL,
+                $COL_PRESET_FREQUENCY TEXT NOT NULL,
+                $COL_PRESET_DURATION TEXT NOT NULL,
+                $COL_PRESET_INSTRUCTIONS TEXT NOT NULL,
+                $COL_PRESET_CATEGORY TEXT NOT NULL DEFAULT 'General',
+                $COL_PRESET_IS_CUSTOM INTEGER NOT NULL DEFAULT 0
+            );
+            """.trimIndent()
+        )
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         // Drop existing tables in reverse dependency order
+        db.execSQL("DROP TABLE IF EXISTS $TABLE_MEDICATION_PRESETS")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USER_PREFERENCES")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_DIAGNOSTIC_REPORTS")

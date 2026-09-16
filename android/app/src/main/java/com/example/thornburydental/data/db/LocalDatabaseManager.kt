@@ -49,6 +49,9 @@ object LocalDatabaseManager {
     lateinit var userPreferencesDao: UserPreferencesDao
         private set
 
+    lateinit var medicationPresetDao: MedicationPresetDao
+        private set
+
     @Synchronized
     fun initialize(context: Context) {
         if (isInitialized) return
@@ -62,9 +65,34 @@ object LocalDatabaseManager {
         reportDao = ReportDao(dbHelper)
         userDao = UserDao(dbHelper)
         userPreferencesDao = UserPreferencesDao(dbHelper)
+        medicationPresetDao = MedicationPresetDao(dbHelper)
+        ensureMedicationPresetsTable()
         sanitizeClinicianNames()
         isInitialized = true
         Log.d(TAG, "Thornbury local SQLite database initialized successfully.")
+    }
+
+    private fun ensureMedicationPresetsTable() {
+        try {
+            val db = dbHelper.writableDatabase
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS ${ThornburyDbHelper.TABLE_MEDICATION_PRESETS} (
+                    ${ThornburyDbHelper.COL_PRESET_ID} TEXT PRIMARY KEY,
+                    ${ThornburyDbHelper.COL_PRESET_NAME} TEXT NOT NULL,
+                    ${ThornburyDbHelper.COL_PRESET_DOSAGE} TEXT NOT NULL,
+                    ${ThornburyDbHelper.COL_PRESET_FREQUENCY} TEXT NOT NULL,
+                    ${ThornburyDbHelper.COL_PRESET_DURATION} TEXT NOT NULL,
+                    ${ThornburyDbHelper.COL_PRESET_INSTRUCTIONS} TEXT NOT NULL,
+                    ${ThornburyDbHelper.COL_PRESET_CATEGORY} TEXT NOT NULL DEFAULT 'General',
+                    ${ThornburyDbHelper.COL_PRESET_IS_CUSTOM} INTEGER NOT NULL DEFAULT 0
+                );
+                """.trimIndent()
+            )
+            medicationPresetDao.seedDefaultsIfEmpty(com.example.thornburydental.data.MedicationPreset.defaultPresets)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to ensure medication_presets table", e)
+        }
     }
 
     /**

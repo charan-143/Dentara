@@ -103,6 +103,10 @@ object DentalRepository {
             if (dbPrefs != null) {
                 _userPreferences.value = dbPrefs
             }
+            val dbPresets = LocalDatabaseManager.medicationPresetDao.getAllPresets()
+            if (dbPresets.isNotEmpty()) {
+                _medicationPresets.value = dbPresets
+            }
         } catch (e: Exception) {
             Log.e("DentalRepository", "Error reloading from local database", e)
         }
@@ -551,6 +555,9 @@ object DentalRepository {
     private val _prescriptions = MutableStateFlow(initialPrescriptions)
     val prescriptions: StateFlow<List<Prescription>> = _prescriptions.asStateFlow()
 
+    private val _medicationPresets = MutableStateFlow(MedicationPreset.defaultPresets)
+    val medicationPresets: StateFlow<List<MedicationPreset>> = _medicationPresets.asStateFlow()
+
     private val initialTreatmentPlans = listOf(
         TreatmentPlan(
             id = "plan-901",
@@ -728,8 +735,23 @@ object DentalRepository {
         frequency: String,
         duration: String,
         instructions: String,
-        overrideReason: String? = null
+        overrideReason: String? = null,
+        saveAsPreset: Boolean = false,
+        presetCategory: String = "Custom"
     ): Prescription {
+        if (saveAsPreset && drugName.isNotBlank()) {
+            val exists = _medicationPresets.value.any { it.name.equals(drugName.trim(), ignoreCase = true) }
+            if (!exists) {
+                addMedicationPreset(
+                    name = drugName,
+                    dosage = dosage,
+                    frequency = frequency,
+                    duration = duration,
+                    instructions = instructions,
+                    category = presetCategory
+                )
+            }
+        }
         val finalInstructions = if (overrideReason != null) {
             "$instructions [CLINICAL OVERRIDE: $overrideReason]"
         } else {
@@ -769,6 +791,67 @@ object DentalRepository {
             )
         }
         return rx
+    }
+
+    fun addMedicationPreset(
+        name: String,
+        dosage: String,
+        frequency: String,
+        duration: String,
+        instructions: String,
+        category: String = "Custom"
+    ): MedicationPreset {
+        val newPreset = MedicationPreset(
+            id = "preset-${System.currentTimeMillis()}",
+            name = name.trim(),
+            dosage = dosage.trim(),
+            frequency = frequency.trim(),
+            duration = duration.trim(),
+            instructions = instructions.trim(),
+            category = category.trim().ifBlank { "Custom" },
+            isCustom = true
+        )
+        _medicationPresets.update { current ->
+            current + newPreset
+        }
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.medicationPresetDao.insertPreset(newPreset)
+            }
+        }
+        return newPreset
+    }
+
+    fun updateMedicationPreset(preset: MedicationPreset) {
+        _medicationPresets.update { current ->
+            current.map { if (it.id == preset.id) preset else it }
+        }
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.medicationPresetDao.updatePreset(preset)
+            }
+        }
+    }
+
+    fun deleteMedicationPreset(presetId: String) {
+        _medicationPresets.update { current ->
+            current.filterNot { it.id == presetId }
+        }
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.medicationPresetDao.deletePreset(presetId)
+            }
+        }
+    }
+
+    fun resetMedicationPresetsToDefaults() {
+        val defaults = MedicationPreset.defaultPresets
+        _medicationPresets.value = defaults
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.medicationPresetDao.resetToDefaults(defaults)
+            }
+        }
     }
 
     fun togglePlanLock(planId: String) {
