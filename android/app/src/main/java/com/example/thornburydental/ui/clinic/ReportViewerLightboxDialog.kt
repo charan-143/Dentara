@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,14 +39,18 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.thornburydental.data.DiagnosticReport
+import com.example.thornburydental.data.ReportAttachment
 import com.example.thornburydental.theme.*
+import android.graphics.Bitmap
 
 /**
  * Standard "photographic negative" color transform, used to give a real
@@ -91,24 +96,29 @@ fun ReportViewerLightboxDialog(
 
     val isReleased = report.releasedAt != null
 
-    // Prefer the clinician's real uploaded image (see AddReportScreen's file
-    // upload flow, which stores a real local file:// URI on the attachment)
-    // over a simulated illustration, whenever one exists.
-    val realImageAttachment = remember(report) {
-        report.attachments.firstOrNull { it.mimeType.startsWith("image/") && !it.uri.isNullOrBlank() }
+    val context = LocalContext.current
+    var selectedAttachmentIndex by remember { mutableIntStateOf(0) }
+    val selectedAttachment = report.attachments.getOrNull(selectedAttachmentIndex)
+        ?: report.attachments.firstOrNull()
+
+    val isSelectedPdf = selectedAttachment != null && (
+        selectedAttachment.name.endsWith(".pdf", ignoreCase = true) ||
+        selectedAttachment.mimeType == "application/pdf"
+    )
+
+    val currentImageUri = if (!isSelectedPdf && selectedAttachment != null) {
+        selectedAttachment.uri
+    } else {
+        report.attachments.firstOrNull {
+            it.mimeType.startsWith("image/") || it.name.endsWith(".jpg", ignoreCase = true) || it.name.endsWith(".png", ignoreCase = true)
+        }?.uri ?: report.image
     }
-    val realBitmap = remember(realImageAttachment) {
-        val uriString = realImageAttachment?.uri
-        if (uriString.isNullOrBlank()) {
-            null
-        } else {
-            try {
-                BitmapFactory.decodeFile(Uri.parse(uriString).path)
-            } catch (e: Exception) {
-                null
-            }
-        }
+
+    val realBitmap by produceState<Bitmap?>(initialValue = null, currentImageUri) {
+        value = AttachmentViewerUtils.decodeBitmapSafely(context, currentImageUri, 1600, 1600)
     }
+
+    var showIllustrativeDiagram by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -343,8 +353,34 @@ fun ReportViewerLightboxDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
+                // Multiple attachments selector
+                if (report.attachments.size > 1) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        report.attachments.forEachIndexed { idx, att ->
+                            FilterChip(
+                                selected = selectedAttachmentIndex == idx,
+                                onClick = { selectedAttachmentIndex = idx },
+                                label = { Text(att.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (att.name.endsWith(".pdf", ignoreCase = true)) Icons.Default.PictureAsPdf else Icons.Default.Image,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+
                 // =============================================================
-                // Radiographic Canvas Lightbox Viewport
+                // Radiographic / Document Lightbox Viewport
                 // =============================================================
                 Surface(
                     modifier = Modifier
@@ -372,19 +408,75 @@ fun ReportViewerLightboxDialog(
                                 translationY = panOffsetY
                             }
 
-                        if (realBitmap != null) {
-                            // A real file was uploaded for this report (see AddReportScreen) —
-                            // show it instead of a simulated radiograph.
+                        if (isSelectedPdf && selectedAttachment != null) {
+                            // Dedicated Clinical PDF / Document Inspection Viewport
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Surface(
+                                    shape = CircleShape,
+                                    color = Color(0xFFC0392B).copy(alpha = 0.15f),
+                                    modifier = Modifier.size(64.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.PictureAsPdf,
+                                            contentDescription = null,
+                                            tint = Color(0xFFE74C3C),
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = selectedAttachment.name,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "${selectedAttachment.sizeStr} • Diagnostic Laboratory Report / Document",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF8FA4A0)
+                                )
+                                Spacer(modifier = Modifier.height(18.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Button(
+                                        onClick = { AttachmentViewerUtils.openAttachment(context, selectedAttachment) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary)
+                                    ) {
+                                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Open in PDF Viewer", style = MaterialTheme.typography.labelMedium)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { AttachmentViewerUtils.shareAttachment(context, selectedAttachment) },
+                                        border = BorderStroke(1.dp, Color(0xFF4A635E))
+                                    ) {
+                                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Share", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                }
+                            }
+                        } else if (realBitmap != null) {
+                            // A real image was uploaded for this report (see AddReportScreen / Quick Upload) —
+                            // show the real photo / radiograph instead of a simulated graphic.
                             Image(
-                                bitmap = realBitmap.asImageBitmap(),
+                                bitmap = realBitmap!!.asImageBitmap(),
                                 contentDescription = report.title,
                                 contentScale = ContentScale.Fit,
                                 modifier = zoomPanModifier,
                                 colorFilter = if (isInverted) ColorFilter.colorMatrix(negativeColorMatrix) else null
                             )
-                        } else {
-                            // No real attachment on record — fall back to a simulated
-                            // illustrative radiograph rather than a blank viewport.
+                        } else if (showIllustrativeDiagram) {
+                            // Clinician explicitly toggled the illustrative diagram
                             Canvas(modifier = zoomPanModifier) {
                                 if (isPanoramicMode) {
                                     drawPanoramicRadiograph(
@@ -402,84 +494,42 @@ fun ReportViewerLightboxDialog(
                                     )
                                 }
                             }
-
-                            // Medical Watermark / Radiographic metadata overlay — only
-                            // meaningful for the simulated illustration above, not a real photo.
+                        } else {
+                            // Honest state when no media is attached to this report
                             Column(
                                 modifier = Modifier
-                                    .align(Alignment.TopStart)
-                                    .padding(12.dp)
+                                    .fillMaxSize()
+                                    .padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
                             ) {
-                                Text(
-                                    text = "THORNBURY DIGITAL RADIOLOGY (SIMULATED — NO FILE ON RECORD)",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
-                                    ),
-                                    color = if (isInverted) Color(0xFF263330) else Color(0xFF6FC6BA)
+                                Icon(
+                                    imageVector = Icons.Default.Description,
+                                    contentDescription = null,
+                                    tint = ThornburyMuted,
+                                    modifier = Modifier.size(40.dp)
                                 )
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
-                                    text = "70 kVp • 7 mA • 0.16s • High-Res CMOS",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 9.sp
-                                    ),
-                                    color = if (isInverted) Color(0xFF5B6E6A) else Color(0xFF9FB4AF)
+                                    text = "No Raw Media Attached",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
                                 )
-                            }
-
-                            // Orientation marker (R / L)
-                            Surface(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(12.dp),
-                                shape = CircleShape,
-                                color = (if (isInverted) Color.Black else Color.White).copy(alpha = 0.2f)
-                            ) {
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = if (isPanoramicMode) "R / L" else "R",
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 11.sp
-                                    ),
-                                    color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
+                                    text = "This diagnostic record contains written clinical findings without a raw radiograph file.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF8FA4A0),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                                 )
-                            }
-
-                            // Millimeter calibration ruler stamp in bottom-left
-                            Row(
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Surface(
-                                    color = (if (isInverted) Color.Black else Color.White).copy(alpha = 0.25f),
-                                    shape = RoundedCornerShape(4.dp)
+                                Spacer(modifier = Modifier.height(14.dp))
+                                OutlinedButton(
+                                    onClick = { showIllustrativeDiagram = true },
+                                    border = BorderStroke(1.dp, Color(0xFF4A635E))
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .width(28.dp)
-                                                .height(2.dp)
-                                                .background(if (isInverted) Color.Black else Color.White)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = "10 mm",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontFamily = FontFamily.Monospace,
-                                                fontSize = 9.sp
-                                            ),
-                                            color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
-                                        )
-                                    }
+                                    Icon(Icons.Default.Visibility, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color.White)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("View Reference Illustration", color = Color.White, style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
