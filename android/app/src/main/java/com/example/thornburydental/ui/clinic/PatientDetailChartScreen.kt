@@ -723,6 +723,7 @@ private fun PatientPrescriptionsView(
     onIssueNew: () -> Unit
 ) {
     val context = LocalContext.current
+    var showManagePresets by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -742,17 +743,31 @@ private fun PatientPrescriptionsView(
                 color = ThornburyInk
             )
 
-            Button(
-                onClick = onIssueNew,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ThornburyPrimary,
-                    contentColor = Color.White
-                )
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Issue New Script")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(
+                    onClick = { showManagePresets = true },
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, ThornburyHairline),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Tune, contentDescription = null, modifier = Modifier.size(16.dp), tint = ThornburyPrimary)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Presets", fontSize = 12.sp, color = ThornburyPrimary)
+                }
+
+                Button(
+                    onClick = onIssueNew,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ThornburyPrimary,
+                        contentColor = Color.White
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Issue New Script", fontSize = 12.sp)
+                }
             }
         }
 
@@ -885,6 +900,12 @@ private fun PatientPrescriptionsView(
                 }
             }
         }
+    }
+
+    if (showManagePresets) {
+        ManagePresetsDialog(
+            onDismiss = { showManagePresets = false }
+        )
     }
 }
 

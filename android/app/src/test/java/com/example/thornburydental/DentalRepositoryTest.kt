@@ -416,4 +416,125 @@ class DentalRepositoryTest {
         assertEquals(30, retrieved.steps[1].toothNumber)
         assertNull(retrieved.steps[2].toothNumber)
     }
+
+    // =========================================================================
+    // 7. Medication Presets & Custom Prescribing
+    // =========================================================================
+
+    @Test
+    fun testMedicationPresets_initialDefaults() {
+        val presets = DentalRepository.medicationPresets.value
+        assertTrue("Medication presets must contain initial dental formulary", presets.isNotEmpty())
+        assertTrue("Formulary should contain Amoxicillin", presets.any { it.name.contains("Amoxicillin", ignoreCase = true) })
+        assertTrue("Formulary should contain Ibuprofen", presets.any { it.name.contains("Ibuprofen", ignoreCase = true) })
+        assertTrue("Formulary should contain Paracetamol", presets.any { it.name.contains("Paracetamol", ignoreCase = true) })
+    }
+
+    @Test
+    fun testAddMedicationPreset_customPreset() {
+        val customPreset = DentalRepository.addMedicationPreset(
+            name = "Augmentin",
+            dosage = "625 mg tablets",
+            frequency = "1 tablet every 12 hours",
+            duration = "7 days",
+            instructions = "Take with food to minimize GI discomfort.",
+            category = "Antibiotics"
+        )
+
+        assertNotNull(customPreset.id)
+        assertTrue(customPreset.isCustom)
+        assertEquals("Augmentin", customPreset.name)
+        assertEquals("625 mg tablets", customPreset.dosage)
+
+        val retrieved = DentalRepository.medicationPresets.value.firstOrNull { it.id == customPreset.id }
+        assertNotNull("Newly added custom preset must be in StateFlow", retrieved)
+        assertEquals("Augmentin", retrieved?.name)
+    }
+
+    @Test
+    fun testUpdateMedicationPreset() {
+        val preset = DentalRepository.addMedicationPreset(
+            name = "Azithromycin",
+            dosage = "250 mg tablets",
+            frequency = "1 tablet once daily",
+            duration = "3 days",
+            instructions = "Take 1 hour before food.",
+            category = "Antibiotics"
+        )
+
+        val updated = preset.copy(
+            dosage = "500 mg tablets",
+            instructions = "Take 500mg on day 1, then 250mg daily."
+        )
+        DentalRepository.updateMedicationPreset(updated)
+
+        val retrieved = DentalRepository.medicationPresets.value.first { it.id == preset.id }
+        assertEquals("500 mg tablets", retrieved.dosage)
+        assertEquals("Take 500mg on day 1, then 250mg daily.", retrieved.instructions)
+    }
+
+    @Test
+    fun testDeleteMedicationPreset() {
+        val preset = DentalRepository.addMedicationPreset(
+            name = "Temporary Drug",
+            dosage = "10 mg",
+            frequency = "Once daily",
+            duration = "1 day",
+            instructions = "Temporary",
+            category = "Custom"
+        )
+        assertTrue(DentalRepository.medicationPresets.value.any { it.id == preset.id })
+
+        DentalRepository.deleteMedicationPreset(preset.id)
+        assertFalse(DentalRepository.medicationPresets.value.any { it.id == preset.id })
+    }
+
+    @Test
+    fun testResetMedicationPresetsToDefaults() {
+        DentalRepository.addMedicationPreset(
+            name = "Extra Drug",
+            dosage = "20 mg",
+            frequency = "TDS",
+            duration = "5 days",
+            instructions = "Test",
+            category = "Custom"
+        )
+        DentalRepository.resetMedicationPresetsToDefaults()
+
+        val presets = DentalRepository.medicationPresets.value
+        assertEquals(com.example.thornburydental.data.MedicationPreset.defaultPresets.size, presets.size)
+        assertFalse(presets.any { it.name == "Extra Drug" })
+    }
+
+    @Test
+    fun testIssuePrescription_customMedication_withSaveAsPreset() {
+        val patient = DentalRepository.patients.value.first { it.id == "p2" }
+        val customDrug = "Doxycycline-${System.currentTimeMillis()}"
+
+        val rx = DentalRepository.issuePrescription(
+            patient = patient,
+            clinicianName = "Dr. Ingrid Halvorsen",
+            drugName = customDrug,
+            dosage = "100 mg capsules",
+            frequency = "1 capsule twice daily",
+            duration = "7 days",
+            instructions = "Take with a full glass of water. Avoid lying down for 30 minutes.",
+            saveAsPreset = true,
+            presetCategory = "Antibiotics"
+        )
+
+        assertNotNull(rx.id)
+        assertEquals(customDrug, rx.drugName)
+
+        // Verify prescription is in repository prescriptions StateFlow
+        val storedRx = DentalRepository.prescriptions.value.firstOrNull { it.id == rx.id }
+        assertNotNull(storedRx)
+        assertEquals(customDrug, storedRx?.drugName)
+
+        // Verify preset was created in medicationPresets StateFlow
+        val storedPreset = DentalRepository.medicationPresets.value.firstOrNull { it.name == customDrug }
+        assertNotNull("Custom medication should be automatically saved as a preset", storedPreset)
+        assertEquals("100 mg capsules", storedPreset?.dosage)
+        assertEquals("Antibiotics", storedPreset?.category)
+    }
 }

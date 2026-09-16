@@ -265,3 +265,80 @@ data class UserProfilePreferences(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+@Serializable
+data class MedicationPreset(
+    val id: String,
+    val name: String,
+    val dosage: String,
+    val frequency: String,
+    val duration: String,
+    val instructions: String,
+    val category: String = "General",
+    val isCustom: Boolean = false
+) {
+    companion object {
+        val defaultPresets = listOf(
+            MedicationPreset(
+                id = "preset-amoxicillin",
+                name = "Amoxicillin",
+                dosage = "500 mg capsules",
+                frequency = "1 capsule every 8 hours",
+                duration = "5 days",
+                instructions = "Take with water. Complete the entire course.",
+                category = "Antibiotics",
+                isCustom = false
+            ),
+            MedicationPreset(
+                id = "preset-clindamycin",
+                name = "Clindamycin",
+                dosage = "300 mg capsules",
+                frequency = "1 capsule every 6 hours",
+                duration = "7 days",
+                instructions = "Penicillin-allergic option. Take with plenty of water.",
+                category = "Antibiotics",
+                isCustom = false
+            ),
+            MedicationPreset(
+                id = "preset-metronidazole",
+                name = "Metronidazole",
+                dosage = "400 mg tablets",
+                frequency = "1 tablet every 8 hours",
+                duration = "5 days",
+                instructions = "Avoid all alcohol during treatment and for 48 hours after.",
+                category = "Antibiotics",
+                isCustom = false
+            ),
+            MedicationPreset(
+                id = "preset-ibuprofen",
+                name = "Ibuprofen",
+                dosage = "600 mg tablets",
+                frequency = "1 tablet every 6 to 8 hours PRN",
+                duration = "3 days",
+                instructions = "Take strictly with food or milk. Max 2400mg in 24 hours.",
+                category = "Analgesics",
+                isCustom = false
+            ),
+            MedicationPreset(
+                id = "preset-paracetamol",
+                name = "Paracetamol",
+                dosage = "500 mg tablets",
+                frequency = "2 tablets every 6 hours PRN",
+                duration = "3 days",
+                instructions = "Max 4000mg in 24 hours. Do not take with other acetaminophen.",
+                category = "Analgesics",
+                isCustom = false
+            ),
+            MedicationPreset(
+                id = "preset-chlorhexidine",
+                name = "Chlorhexidine 0.2%",
+                dosage = "300 mL rinse",
+                frequency = "15 mL twice daily",
+                duration = "7 days",
+                instructions = "Rinse for 60 seconds after brushing. Do not swallow.",
+                category = "Antiseptics",
+                isCustom = false
+            )
+        )
+    }
+}
+
