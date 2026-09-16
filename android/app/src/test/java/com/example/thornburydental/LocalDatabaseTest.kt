@@ -120,7 +120,7 @@ class LocalDatabaseTest {
     @Test
     fun testDatabaseSchemaConstants() {
         assertEquals("thornbury_dental.db", ThornburyDbHelper.DATABASE_NAME)
-        assertEquals(2, ThornburyDbHelper.DATABASE_VERSION)
+        assertEquals(4, ThornburyDbHelper.DATABASE_VERSION)
         assertEquals("patients", ThornburyDbHelper.TABLE_PATIENTS)
         assertEquals("teeth", ThornburyDbHelper.TABLE_TEETH)
         assertEquals("appointments", ThornburyDbHelper.TABLE_APPOINTMENTS)

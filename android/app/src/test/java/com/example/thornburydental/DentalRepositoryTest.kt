@@ -388,4 +388,32 @@ class DentalRepositoryTest {
         assertTrue(relockedPlan.isLocked)
         assertTrue(relockedPlan.tamperHash.startsWith("sha256:"))
     }
+
+    @Test
+    fun testCreateTreatmentPlan_withToothNumbers_andZeroFees() {
+        val steps = listOf(
+            PlanStep(id = "step-1", toothNumber = 19, procedure = "Microscope guided root canal therapy", code = "D3330", fee = 0.0, completed = false),
+            PlanStep(id = "step-2", toothNumber = 30, procedure = "Composite resin restoration", code = "D2392", fee = 0.0, completed = false),
+            PlanStep(id = "step-3", toothNumber = null, procedure = "Full mouth prophylaxis", code = "D1110", fee = 0.0, completed = false)
+        )
+        val created = DentalRepository.createTreatmentPlan(
+            patientId = "p1",
+            title = "Endo & Restorative Care",
+            clinicianName = "Dr. Tomas Ferreira",
+            diagnosis = "Deep caries #19, #30",
+            steps = steps
+        )
+
+        assertNotNull(created.id)
+        assertEquals(3, created.steps.size)
+        assertEquals(19, created.steps[0].toothNumber)
+        assertEquals(30, created.steps[1].toothNumber)
+        assertNull(created.steps[2].toothNumber)
+        assertEquals(0.0, created.steps.sumOf { it.fee }, 0.001)
+
+        val retrieved = DentalRepository.treatmentPlans.value.first { it.id == created.id }
+        assertEquals(19, retrieved.steps[0].toothNumber)
+        assertEquals(30, retrieved.steps[1].toothNumber)
+        assertNull(retrieved.steps[2].toothNumber)
+    }
 }

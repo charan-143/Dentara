@@ -295,7 +295,6 @@ private fun TreatmentPlanCard(
     val completedSteps = plan.steps.count { it.completed }
     val isAllCompleted = totalSteps > 0 && completedSteps == totalSteps
     val isInProgress = completedSteps > 0 && !isAllCompleted
-    val totalFees = plan.steps.sumOf { it.fee }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -409,7 +408,7 @@ private fun TreatmentPlanCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Plan Progress & Fee Strip
+            // Plan Progress Strip
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -420,13 +419,12 @@ private fun TreatmentPlanCard(
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
-                if (totalFees > 0) {
-                    Text(
-                        text = "Est. Total: $${"%,.2f".format(totalFees)}",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = ThornburyPrimaryText
-                    )
-                }
+                val percent = if (totalSteps > 0) (completedSteps * 100) / totalSteps else 0
+                Text(
+                    text = "$percent%",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (isAllCompleted) ThornburyAccentTeal else ThornburyPrimaryText
+                )
             }
 
             Spacer(modifier = Modifier.height(6.dp))
@@ -547,22 +545,20 @@ private fun ProcedureStepRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     // Tooth badge
-                    if (step.toothNumber != null) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = ThornburyPrimary.copy(alpha = 0.08f),
-                            border = BorderStroke(0.5.dp, ThornburyPrimary.copy(alpha = 0.25f))
-                        ) {
-                            Text(
-                                text = "Tooth #${step.toothNumber}",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                ),
-                                color = ThornburyPrimaryText,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                            )
-                        }
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.10f) else ThornburySurfaceSoft,
+                        border = BorderStroke(0.5.dp, if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.35f) else ThornburyHairline)
+                    ) {
+                        Text(
+                            text = if (step.toothNumber != null) "Tooth #${step.toothNumber}" else "General",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            ),
+                            color = if (step.toothNumber != null) ThornburyPrimaryText else ThornburyMuted,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
                     }
 
                     // Procedure Code chip
@@ -605,17 +601,6 @@ private fun ProcedureStepRow(
                         color = ThornburySuccess
                     )
                 }
-            }
-
-            if (step.fee > 0) {
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "$${"%,.2f".format(step.fee)}",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = if (step.completed) ThornburyMuted else ThornburyInk
-                )
             }
         }
     }
