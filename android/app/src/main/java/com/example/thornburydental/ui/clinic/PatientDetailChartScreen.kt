@@ -56,9 +56,11 @@ fun PatientDetailChartScreen(
     var selectedTabIndex by remember { mutableStateOf(0) }
     var selectedToothForEdit by remember { mutableStateOf<ToothRecord?>(null) }
     var selectedReportForLightbox by remember { mutableStateOf<DiagnosticReport?>(null) }
+    var selectedAttachmentIndexForLightbox by remember { mutableIntStateOf(0) }
     var showEditDiagnosisDialog by remember { mutableStateOf(false) }
     var showCreatePlanDialog by remember { mutableStateOf(false) }
     var showBookAppointmentDialog by remember { mutableStateOf(false) }
+    var showAddReportDialog by remember { mutableStateOf(false) }
 
     if (patient == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -116,13 +118,13 @@ fun PatientDetailChartScreen(
 
         // --- 7 Clinical Tabs with Distinct Diagnosis & Treatment Plans ---
         val chartTabs = listOf(
-            "Demographics / Overview" to null,
-            "Examination" to null,
-            "Reports & Imaging" to patientReports.size,
-            "Diagnosis" to (if (patient.diagnosis != null) 1 else null),
-            "Treatment Plans" to patientPlans.size,
-            "Prescriptions" to patientPrescriptions.size,
-            "Visit History" to patientAppointments.size
+            "Demographics / Overview",
+            "Examination",
+            "Reports & Imaging",
+            "Diagnosis",
+            "Treatment Plans",
+            "Prescriptions",
+            "Visit History"
         )
 
         PrimaryScrollableTabRow(
@@ -132,34 +134,18 @@ fun PatientDetailChartScreen(
             edgePadding = 12.dp,
             divider = { HorizontalDivider(color = ThornburyHairline) }
         ) {
-            chartTabs.forEachIndexed { index, (title, count) ->
+            chartTabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { selectedTabIndex = index },
                     text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
-                                ),
-                                color = if (selectedTabIndex == index) ThornburyPrimaryText else ThornburyMuted
-                            )
-                            if (count != null && count > 0) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (selectedTabIndex == index) ThornburyPrimary else ThornburySurfaceSoft,
-                                    contentColor = if (selectedTabIndex == index) Color.White else ThornburyInk
-                                ) {
-                                    Text(
-                                        text = count.toString(),
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
+                            ),
+                            color = if (selectedTabIndex == index) ThornburyPrimaryText else ThornburyMuted
+                        )
                     }
                 )
             }
@@ -176,10 +162,18 @@ fun PatientDetailChartScreen(
                     DentalRepository.updateExaminationAnswers(patient.id, newAnswers)
                 }
             )
-            2 -> ReportsAndImagingView(
+            2 -> PatientReportsImagingTabView(
+                patient = patient,
                 reports = patientReports,
-                onAddReportClick = { onOpenAddReportScreen(patient) },
-                onReportClick = { report -> selectedReportForLightbox = report },
+                onAddReportClick = { showAddReportDialog = true },
+                onReportClick = { report ->
+                    selectedReportForLightbox = report
+                    selectedAttachmentIndexForLightbox = 0
+                },
+                onReportAttachmentClick = { report, index ->
+                    selectedReportForLightbox = report
+                    selectedAttachmentIndexForLightbox = index
+                },
                 onToggleRelease = { reportId -> DentalRepository.toggleReportRelease(reportId) }
             )
             3 -> PatientDiagnosisTabView(
@@ -227,6 +221,7 @@ fun PatientDetailChartScreen(
         val currentReport = diagnosticReports.find { it.id == report.id } ?: report
         ReportViewerLightboxDialog(
             report = currentReport,
+            initialAttachmentIndex = selectedAttachmentIndexForLightbox,
             onDismiss = { selectedReportForLightbox = null },
             onToggleRelease = {
                 DentalRepository.toggleReportRelease(currentReport.id)
@@ -281,6 +276,25 @@ fun PatientDetailChartScreen(
                     procedure = procedure
                 )
                 showBookAppointmentDialog = false
+            }
+        )
+    }
+
+    // New Diagnostic Record Dialog
+    if (showAddReportDialog) {
+        AddReportDialog(
+            patient = patient,
+            onDismiss = { showAddReportDialog = false },
+            onSave = { kind, title, clinician, summary, attachments ->
+                DentalRepository.addReport(
+                    patientId = patient.id,
+                    kind = kind,
+                    title = title,
+                    summary = summary,
+                    clinicianName = clinician,
+                    attachments = attachments
+                )
+                showAddReportDialog = false
             }
         )
     }
@@ -909,210 +923,7 @@ private fun PatientPrescriptionsView(
     }
 }
 
-// =============================================================================
-// Reports & Imaging View (Matches reports-and-imaging-view.tsx)
-// =============================================================================
 
-@Composable
-private fun ReportsAndImagingView(
-    reports: List<DiagnosticReport>,
-    onAddReportClick: () -> Unit,
-    onReportClick: (DiagnosticReport) -> Unit,
-    onToggleRelease: (String) -> Unit
-) {
-    var selectedFilter by remember { mutableStateOf("All") }
-    val kinds = listOf("All", "Radiograph", "Charting", "CBCT Scan", "Chairside test", "Lab Report")
-
-    val filtered = remember(reports, selectedFilter) {
-        if (selectedFilter == "All") reports
-        else reports.filter { it.kind.equals(selectedFilter, ignoreCase = true) }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Diagnostic Reports & Imaging",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                    ),
-                    color = ThornburyInk
-                )
-                Text(
-                    text = "${reports.size} Records • Tap card to open high-res lightbox",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = ThornburyMuted
-                )
-            }
-
-            Button(
-                onClick = onAddReportClick,
-                shape = RoundedCornerShape(8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ThornburyPrimary,
-                    contentColor = Color.White
-                ),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-            ) {
-                Icon(imageVector = Icons.Default.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Add Report", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Filter chips
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            kinds.forEach { kind ->
-                val isSelected = selectedFilter == kind
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { selectedFilter = kind },
-                    label = { Text(kind) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ThornburyPrimary,
-                        selectedLabelColor = Color.White,
-                        containerColor = ThornburySurfaceSoft,
-                        labelColor = ThornburyInk
-                    )
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        if (filtered.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "No diagnostic tests or imaging found.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = ThornburyMuted
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = onAddReportClick,
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, ThornburyPrimary)
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add New Test / Radiograph", color = ThornburyPrimary)
-                    }
-                }
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(filtered, key = { it.id }) { item ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onReportClick(item) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
-                        border = BorderStroke(1.dp, ThornburyHairline)
-                    ) {
-                        Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    modifier = Modifier.weight(1f),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = when (item.kind) {
-                                            "Radiograph" -> Icons.Default.Image
-                                            "Charting" -> Icons.Default.FormatListNumbered
-                                            "CBCT Scan" -> Icons.Default.ViewInAr
-                                            else -> Icons.Default.Science
-                                        },
-                                        contentDescription = null,
-                                        tint = ThornburyPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = item.title,
-                                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                        color = ThornburyInk
-                                    )
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(9999.dp),
-                                    color = ThornburySurfaceSoft,
-                                    border = BorderStroke(1.dp, ThornburyHairline)
-                                ) {
-                                    Text(
-                                        text = item.kind,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ThornburyPrimaryText
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = item.summary,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ThornburyBodyStrong
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-                            HorizontalDivider(color = ThornburyHairlineSoft)
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = "By ${item.clinicianName}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ThornburyMuted
-                                    )
-                                    Text(
-                                        text = "Taken: ${item.takenAt}",
-                                        style = ClinicalCodeStyle.copy(fontSize = 10.sp),
-                                        color = ThornburyMuted
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 // =============================================================================
 // Visit History View (Matches appointment history)

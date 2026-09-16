@@ -1080,7 +1080,7 @@ object DentalRepository {
         kind: String,
         title: String,
         summary: String,
-        clinicianName: String = "Dr. Ingrid Halvorsen",
+        clinicianName: String = AuthRepository.currentUser.value?.name ?: "Dr. Ingrid Halvorsen",
         attachments: List<ReportAttachment> = emptyList()
     ): DiagnosticReport {
         val timestamp = "Today, " + SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
@@ -1174,7 +1174,7 @@ object DentalRepository {
                     name = displayName,
                     sizeStr = sizeStr,
                     mimeType = mimeType,
-                    uri = destFile.toURI().toString()
+                    uri = destFile.absolutePath
                 )
             )
         } catch (e: Exception) {
