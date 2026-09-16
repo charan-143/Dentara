@@ -3,9 +3,11 @@ package com.example.thornburydental.ui.clinic
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -24,12 +26,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import com.example.thornburydental.data.AuthRepository
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.data.ReportAttachment
 import com.example.thornburydental.theme.*
 import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.UUID
 
@@ -77,10 +83,18 @@ fun AddReportScreen(
     val scope = rememberCoroutineScope()
     val pendingUploads = remember { mutableStateListOf<PendingUpload>() }
 
-    // Kicks off a real upload for a document/image the user picked via SAF. Tracks progress in
-    // `pendingUploads` (never in the real `attachments` list) and only promotes it to a real
-    // ReportAttachment once DentalRepository.uploadAttachment actually succeeds.
-    fun startUpload(uri: Uri) {
+    var cameraPhotoUri by remember { mutableStateOf<Uri?>(null) }
+    var cameraPhotoFile by remember { mutableStateOf<File?>(null) }
+
+    // Kicks off a real upload for a document/image the user picked via SAF or captured via camera.
+    // Tracks progress in `pendingUploads` (never in the real `attachments` list) and only promotes
+    // it to a real ReportAttachment once DentalRepository.uploadAttachment actually succeeds.
+    fun startUpload(
+        uri: Uri,
+        customDisplayName: String? = null,
+        customMimeType: String? = null,
+        customSizeBytes: Long? = null
+    ) {
         try {
             context.contentResolver.takePersistableUriPermission(
                 uri,
@@ -91,32 +105,34 @@ fun AddReportScreen(
             // grants — the Uri is still readable for this session, so just continue.
         }
 
-        var displayName = uri.lastPathSegment ?: "attachment"
-        var sizeBytes = -1L
-        try {
-            context.contentResolver.query(
-                uri,
-                arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
-                null,
-                null,
-                null
-            )?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex != -1) {
-                        cursor.getString(nameIndex)?.let { name -> displayName = name }
-                    }
-                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                    if (sizeIndex != -1 && !cursor.isNull(sizeIndex)) {
-                        sizeBytes = cursor.getLong(sizeIndex)
+        var displayName = customDisplayName ?: uri.lastPathSegment ?: "attachment"
+        var sizeBytes = customSizeBytes ?: -1L
+        if (customDisplayName == null || customSizeBytes == null) {
+            try {
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1 && customDisplayName == null) {
+                            cursor.getString(nameIndex)?.let { name -> displayName = name }
+                        }
+                        val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                        if (sizeIndex != -1 && !cursor.isNull(sizeIndex) && customSizeBytes == null) {
+                            sizeBytes = cursor.getLong(sizeIndex)
+                        }
                     }
                 }
+            } catch (e: Exception) {
+                // Fall back to the Uri-derived display name and "Unknown size" below.
             }
-        } catch (e: Exception) {
-            // Fall back to the Uri-derived display name and "Unknown size" below.
         }
 
-        val mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+        val mimeType = customMimeType ?: context.contentResolver.getType(uri) ?: "application/octet-stream"
         val sizeStr = if (sizeBytes > 0) {
             String.format(Locale.US, "%.1f MB", sizeBytes / (1024.0 * 1024.0))
         } else {
@@ -154,6 +170,50 @@ fun AddReportScreen(
                     )
                 }
             }
+        }
+    }
+
+    val takePictureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            val uri = cameraPhotoUri
+            val file = cameraPhotoFile
+            if (uri != null && file != null && file.exists() && file.length() > 0) {
+                val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+                val displayName = "Radiograph_$timeStamp.jpg"
+                startUpload(
+                    uri = uri,
+                    customDisplayName = displayName,
+                    customMimeType = "image/jpeg",
+                    customSizeBytes = file.length()
+                )
+            }
+        }
+    }
+
+    fun launchCamera() {
+        try {
+            val photoDir = File(context.cacheDir, "camera_photos").apply { mkdirs() }
+            val photoFile = File.createTempFile(
+                "radiograph_${System.currentTimeMillis()}_",
+                ".jpg",
+                photoDir
+            )
+            val photoUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                photoFile
+            )
+            cameraPhotoFile = photoFile
+            cameraPhotoUri = photoUri
+            takePictureLauncher.launch(photoUri)
+        } catch (e: Exception) {
+            Toast.makeText(
+                context,
+                "Unable to launch camera: ${e.localizedMessage ?: "Unknown error"}",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 
@@ -338,14 +398,59 @@ fun AddReportScreen(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Supports DICOM, PNG, JPG, and PDF",
+                        text = "Take a picture directly or upload files from your device",
                         style = MaterialTheme.typography.bodySmall,
                         color = ThornburyMuted
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Upload Zone Box
+                    // Take Picture Primary Action Box
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { launchCamera() },
+                        shape = RoundedCornerShape(12.dp),
+                        color = ThornburyPrimary.copy(alpha = 0.06f),
+                        border = BorderStroke(1.5.dp, ThornburyPrimary)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(ThornburyPrimary, RoundedCornerShape(12.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PhotoCamera,
+                                    contentDescription = "Take Picture",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Take Picture",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburyInk
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Use device camera to capture and attach radiograph or clinical photo",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ThornburyMuted
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Upload Existing Document / Image Secondary Action Box
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -354,61 +459,39 @@ fun AddReportScreen(
                             },
                         shape = RoundedCornerShape(12.dp),
                         color = ThornburyCanvas,
-                        border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.4f))
+                        border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(18.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.CloudUpload,
-                                contentDescription = null,
-                                tint = ThornburyPrimary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "Tap to Upload Radiograph / Document File",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyPrimaryText
-                            )
-                            Text(
-                                text = "Attach DICOM 3D scans, X-Rays, periodontal charts, or lab PDFs",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ThornburyMuted
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .background(ThornburySurfaceSoft, RoundedCornerShape(10.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudUpload,
+                                    contentDescription = "Upload from device",
+                                    tint = ThornburyPrimary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Upload from Files",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = ThornburyInk
+                                )
+                                Text(
+                                    text = "Select DICOM, saved image, or lab PDF from storage",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = ThornburyMuted
+                                )
+                            }
                         }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Quick attachment shortcuts — each launches the SAME real system picker
-                    // with a narrower mime-type filter. None of these ever fabricate an
-                    // attachment; they only ever start a real pick + upload flow.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        AssistChip(
-                            onClick = { pickerLauncher.launch(arrayOf("image/*")) },
-                            label = { Text("Choose Radiograph (Image)") },
-                            leadingIcon = { Icon(Icons.Default.Image, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
-
-                        AssistChip(
-                            onClick = { pickerLauncher.launch(arrayOf("*/*")) },
-                            label = { Text("Choose CBCT / DICOM") },
-                            leadingIcon = { Icon(Icons.Default.ViewInAr, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
-
-                        AssistChip(
-                            onClick = { pickerLauncher.launch(arrayOf("application/pdf", "*/*")) },
-                            label = { Text("Choose Lab Report (PDF)") },
-                            leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
                     }
 
                     // Pending uploads — real files currently uploading, or ones whose upload
