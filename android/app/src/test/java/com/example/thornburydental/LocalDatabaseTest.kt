@@ -188,7 +188,7 @@ class LocalDatabaseTest {
             kind = "Radiograph",
             title = "Periapical Radiograph Tooth #30",
             summary = "Deep carious involvement approaching pulp chamber.",
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             attachments = listOf(
                 ReportAttachment(id = "att-99", name = "pa_tooth_30.jpg", sizeStr = "2.4 MB", mimeType = "image/jpeg")
             )

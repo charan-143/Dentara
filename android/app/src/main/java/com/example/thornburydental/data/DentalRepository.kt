@@ -181,32 +181,30 @@ object DentalRepository {
         }
     }
 
-    val clinicians = listOf(
-        Clinician(
-            id = "c1",
-            name = "Dr. Ingrid Halvorsen",
-            credentials = "BDS (Hons), MFDS RCSEd, MClinDent (Periodontology)",
-            specialty = "Periodontics and gum health",
-            room = "Surgery 1",
-            bio = "Leads the practice and treats gum disease, bone regeneration, recession and implant maintenance with microscope precision."
-        ),
-        Clinician(
-            id = "c2",
-            name = "Dr. Tomas Ferreira",
-            credentials = "LMD (Lisbon), Dip. Endodontics",
-            specialty = "Root canal treatment",
-            room = "Surgery 2",
-            bio = "Handles complex primary endodontics, retreatment and cracked-tooth cases under the high-magnification surgical operating microscope."
-        ),
-        Clinician(
-            id = "c3",
-            name = "Dr. Anaya Krishnamurthy",
-            credentials = "BDS, MJDF RCS Eng, MSc (Implantology)",
-            specialty = "Restorative and implants",
-            room = "Surgery 3",
-            bio = "Specialises in crowns, precision bridges, biomimetic bonding, and single-tooth implants including immediate temporaries."
-        )
-    )
+    val clinicians: List<Clinician>
+        get() {
+            val current = AuthRepository.currentUser.value
+            val name = if (current != null && current.role == UserRole.CLINICIAN && current.name.isNotBlank()) {
+                current.name
+            } else {
+                "Dr. Ingrid Halvorsen"
+            }
+            val id = if (current != null && current.role == UserRole.CLINICIAN) {
+                current.id
+            } else {
+                "c1"
+            }
+            return listOf(
+                Clinician(
+                    id = id,
+                    name = name,
+                    credentials = "BDS (Hons), MFDS RCSEd, MClinDent (Periodontology)",
+                    specialty = "Comprehensive Dental Care & Surgery",
+                    room = "Surgery 1",
+                    bio = "Lead clinician providing comprehensive dental diagnosis, treatment planning, and surgical care."
+                )
+            )
+        }
 
     fun generateDefaultTeeth(): Map<Int, ToothRecord> {
         val map = mutableMapOf<Int, ToothRecord>()
@@ -355,7 +353,7 @@ object DentalRepository {
                     systemicConsiderations = "Controlled Hypertension (Amlodipine 5mg). Monitor BP.",
                     dateRecorded = "2026-09-08",
                     lastUpdated = "2026-09-08",
-                    clinicianName = "Dr. Tomas Ferreira"
+                    clinicianName = "Dr. Ingrid Halvorsen"
                 )
             ),
             Patient(
@@ -380,7 +378,7 @@ object DentalRepository {
                     systemicConsiderations = "Nil",
                     dateRecorded = "2026-07-14",
                     lastUpdated = "2026-07-14",
-                    clinicianName = "Dr. Anaya Krishnamurthy"
+                    clinicianName = "Dr. Ingrid Halvorsen"
                 )
             ),
             Patient(
@@ -444,12 +442,12 @@ object DentalRepository {
             patientName = "Dmitri Vollmer",
             patientOpNo = "OP-40219",
             patientDob = "1971-11-02",
-            clinicianId = "c2",
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianId = "c1",
+            clinicianName = "Dr. Ingrid Halvorsen",
             date = todayIsoDate(),
             time = "10:15",
             durationMin = 60,
-            room = "Surgery 2",
+            room = "Surgery 1",
             procedure = "Root Canal Retreatment #19",
             allergyList = null,
             status = "confirmed"
@@ -460,12 +458,12 @@ object DentalRepository {
             patientName = "Kavitha Nambiar",
             patientOpNo = "OP-40233",
             patientDob = "1996-06-24",
-            clinicianId = "c3",
-            clinicianName = "Dr. Anaya Krishnamurthy",
+            clinicianId = "c1",
+            clinicianName = "Dr. Ingrid Halvorsen",
             date = addDaysToIsoDate(todayIsoDate(), 1),
             time = "11:30",
             durationMin = 45,
-            room = "Surgery 3",
+            room = "Surgery 1",
             procedure = "Implant Crown Seating #19",
             allergyList = null,
             status = "confirmed"
@@ -492,12 +490,12 @@ object DentalRepository {
             patientName = "Marisol Cabrera-Reyes",
             patientOpNo = "OP-40266",
             patientDob = "2001-09-30",
-            clinicianId = "c3",
-            clinicianName = "Dr. Anaya Krishnamurthy",
+            clinicianId = "c1",
+            clinicianName = "Dr. Ingrid Halvorsen",
             date = addDaysToIsoDate(todayIsoDate(), -1),
             time = "15:45",
             durationMin = 30,
-            room = "Surgery 3",
+            room = "Surgery 1",
             procedure = "Composite Restoration #30",
             allergyList = null,
             status = "completed"
@@ -528,7 +526,7 @@ object DentalRepository {
             id = "rx-8401",
             patientId = "p2",
             patientName = "Dmitri Vollmer",
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             drugName = "Amoxicillin",
             dosage = "500 mg capsules",
             frequency = "1 capsule every 8 hours",
@@ -588,7 +586,7 @@ object DentalRepository {
             id = "plan-902",
             patientId = "p2",
             title = "Endodontic Retreatment & Coronal Restoration",
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             diagnosis = "Symptomatic apical periodontitis #19 with previous sub-optimal obturation",
             dateCreated = "2026-09-08",
             isLocked = true,
@@ -942,7 +940,7 @@ object DentalRepository {
         DiagnosticReport(
             id = "rp3",
             patientId = "p2",
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             kind = "CBCT Scan",
             title = "CBCT 3D Scan #19 Apical Region",
             summary = "Persistent radiolucency at distal root apex of 36/19. Mesial root canals adequately obturated; missed MB2 canal indicated.",

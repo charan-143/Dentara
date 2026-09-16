@@ -540,45 +540,21 @@ private fun ProcedureStepRow(
             Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                // Tooth badge
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.10f) else ThornburySurfaceSoft,
+                    border = BorderStroke(0.5.dp, if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.35f) else ThornburyHairline)
                 ) {
-                    // Tooth badge
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.10f) else ThornburySurfaceSoft,
-                        border = BorderStroke(0.5.dp, if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.35f) else ThornburyHairline)
-                    ) {
-                        Text(
-                            text = if (step.toothNumber != null) "Tooth #${step.toothNumber}" else "General",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            ),
-                            color = if (step.toothNumber != null) ThornburyPrimaryText else ThornburyMuted,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                        )
-                    }
-
-                    // Procedure Code chip
-                    if (step.code.isNotBlank()) {
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = ThornburyCanvas,
-                            border = BorderStroke(0.5.dp, ThornburyHairline)
-                        ) {
-                            Text(
-                                text = step.code,
-                                style = ClinicalCodeStyle.copy(
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                ),
-                                color = ThornburyMuted,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
+                    Text(
+                        text = if (step.toothNumber != null) "Tooth #${step.toothNumber}" else "General",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        ),
+                        color = if (step.toothNumber != null) ThornburyPrimaryText else ThornburyMuted,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(3.dp))
