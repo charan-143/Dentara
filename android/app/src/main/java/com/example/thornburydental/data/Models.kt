@@ -223,7 +223,9 @@ data class Appointment(
     val room: String = "Surgery 1",
     val procedure: String,
     val allergyList: String? = null,
-    val status: String = "confirmed" // "confirmed", "completed", "cancelled"
+    val status: String = "confirmed", // "confirmed", "completed", "cancelled"
+    val reminderEnabled: Boolean = false,
+    val reminderLeadTimeMin: Int = 15
 )
 
 @Serializable
@@ -262,6 +264,9 @@ data class UserProfilePreferences(
     val contactChannel: String = "SMS / WhatsApp",
     val additionalNotes: String = "",
     val isOnboardingCompleted: Boolean = false,
+    val morningReminderEnabled: Boolean = true,
+    val morningReminderTime: String = "08:00",
+    val chairsideReminderDefaultMin: Int = 15,
     val updatedAt: Long = System.currentTimeMillis()
 )
 

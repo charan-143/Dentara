@@ -76,8 +76,7 @@ fun TodayQueueScreen(
                 val matchName = row.patientName.lowercase().contains(q)
                 val matchOpNo = row.patientOpNo.lowercase().contains(q)
                 val matchType = row.procedure.lowercase().contains(q)
-                val matchRoom = row.room.lowercase().contains(q)
-                if (!matchName && !matchOpNo && !matchType && !matchRoom) return@filter false
+                if (!matchName && !matchOpNo && !matchType) return@filter false
             }
             true
         }
@@ -126,7 +125,7 @@ fun TodayQueueScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "$todayDateLabel • Surgery 1",
+                                text = todayDateLabel,
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = ThornburyMuted
                             )
@@ -256,9 +255,9 @@ fun TodayQueueScreen(
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // Procedure and room
+                        // Procedure
                         Text(
-                            text = "${nextAppt.procedure} • ${nextAppt.room}",
+                            text = nextAppt.procedure,
                             style = MaterialTheme.typography.bodyMedium,
                             color = ThornburyBodyStrong
                         )
@@ -338,7 +337,7 @@ fun TodayQueueScreen(
                     shape = RoundedCornerShape(24.dp),
                     placeholder = {
                         Text(
-                            text = "Search patient, OP, type, room...",
+                            text = "Search patient, OP, type...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = ThornburyMuted
                         )
@@ -635,7 +634,7 @@ fun TodayQueueScreen(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
-                            text = "OP: ${row.patientOpNo} • ${row.room}",
+                            text = "OP: ${row.patientOpNo}",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontFamily = FontFamily.Monospace
                             ),
@@ -754,7 +753,7 @@ fun TodayQueueScreen(
             },
             text = {
                 Text(
-                    text = "Are you sure you want to cancel the appointment for ${appt.patientName} (${appt.time} in ${appt.room})? This action will mark it as cancelled.",
+                    text = "Are you sure you want to cancel the appointment for ${appt.patientName} (${appt.time})? This action will mark it as cancelled.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = ThornburyBody
                 )

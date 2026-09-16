@@ -66,7 +66,6 @@ fun PatientDemographicsM3View(
     val dentalBullets = remember(patient.pastDentalHistory) { parseClinicalBullets(patient.pastDentalHistory) }
 
     val age = remember(patient.dob) { calculatePatientAge(patient.dob) }
-    val bloodGroup = remember(patient.medicalHistory, patient.medicalAlerts) { deriveBloodGroup(patient) }
 
     // Combined critical alerts & allergies
     val combinedAlerts = remember(patient.allergies, patient.medicalAlerts) {
@@ -131,34 +130,15 @@ fun PatientDemographicsM3View(
                     Spacer(modifier = Modifier.width(14.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = patient.name,
-                                style = MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = ThornburyInk,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            IconButton(
-                                onClick = { showEditContactDialog = true },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Edit,
-                                    contentDescription = "Edit Profile",
-                                    tint = ThornburyPrimary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
+                        Text(
+                            text = patient.name,
+                            style = MaterialTheme.typography.headlineSmall.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = ThornburyInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
 
                         Spacer(modifier = Modifier.height(4.dp))
 
@@ -217,101 +197,25 @@ fun PatientDemographicsM3View(
                 HorizontalDivider(color = ThornburyHairlineSoft)
 
                 // Key Clinical Vitals Row
+                // Key Clinical Vitals Row (Age / DOB and Last Visit)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    DemographicMetricPill(
-                        label = "AGE / DOB",
-                        value = if (age != null) "$age yrs (${patient.dob})" else if (patient.dob.isNotBlank()) patient.dob else "Not recorded",
-                        icon = Icons.Default.Cake
-                    )
-                    DemographicMetricPill(
-                        label = "BLOOD GROUP",
-                        value = bloodGroup ?: "Not on file",
-                        icon = Icons.Default.LocalHospital
-                    )
-                    DemographicMetricPill(
-                        label = "LAST VISIT",
-                        value = patient.lastVisit,
-                        icon = Icons.Default.History
-                    )
-                }
-
-                HorizontalDivider(color = ThornburyHairlineSoft)
-
-                // Quick Clinical Actions Row (Call, Email, Map, Edit)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilledTonalButton(
-                        onClick = {
-                            if (patient.phone.isNotBlank()) {
-                                launchIntentSafely(context, Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone.trim()}")))
-                            } else {
-                                Toast.makeText(context, "No phone number on record", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = ThornburySurfaceSoft,
-                            contentColor = ThornburyPrimaryText
-                        ),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Call", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                    Box(modifier = Modifier.weight(1f)) {
+                        DemographicMetricPill(
+                            label = "AGE / DOB",
+                            value = if (age != null) "$age yrs (${patient.dob})" else if (patient.dob.isNotBlank()) patient.dob else "Not recorded",
+                            icon = Icons.Default.Cake
+                        )
                     }
-
-                    FilledTonalButton(
-                        onClick = {
-                            if (patient.email.isNotBlank()) {
-                                val emailIntent = Intent(Intent.ACTION_SENDTO).apply {
-                                    data = Uri.parse("mailto:${patient.email.trim()}")
-                                    putExtra(Intent.EXTRA_SUBJECT, "Dentara - Patient Care: ${patient.name}")
-                                }
-                                launchIntentSafely(context, emailIntent)
-                            } else {
-                                Toast.makeText(context, "No email address on record", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = ThornburySurfaceSoft,
-                            contentColor = ThornburyPrimaryText
-                        ),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Email, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Email", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
-                    }
-
-                    FilledTonalButton(
-                        onClick = {
-                            if (patient.address.isNotBlank()) {
-                                val mapIntent = Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(patient.address)}"))
-                                launchIntentSafely(context, mapIntent)
-                            } else {
-                                Toast.makeText(context, "No address on record", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = ThornburySurfaceSoft,
-                            contentColor = ThornburyPrimaryText
-                        ),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 8.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Place, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text("Map", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                    Box(modifier = Modifier.weight(1f)) {
+                        DemographicMetricPill(
+                            label = "LAST VISIT",
+                            value = patient.lastVisit.ifBlank { "Recent" },
+                            icon = Icons.Default.History
+                        )
                     }
                 }
             }
@@ -375,31 +279,6 @@ fun PatientDemographicsM3View(
                             }
                         }
                     }
-                }
-            }
-        } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                color = ThornburySuccessWash,
-                border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.25f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = ThornburySuccess,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "No Known Medical Alerts or Drug Allergies Recorded",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-                        color = ThornburySuccess
-                    )
                 }
             }
         }
@@ -1129,11 +1008,6 @@ private fun calculatePatientAge(dob: String): Int? {
     }
 }
 
-private fun deriveBloodGroup(patient: Patient): String? {
-    val regex = Regex("\\b(A|B|AB|O)[+-]\\b", RegexOption.IGNORE_CASE)
-    val match = regex.find(patient.medicalHistory) ?: regex.find(patient.medicalAlerts.joinToString(" "))
-    return match?.value?.uppercase()
-}
 
 private fun parseClinicalBullets(raw: String): List<String> {
     if (raw.isBlank()) return emptyList()

@@ -264,7 +264,7 @@ fun PatientDetailChartScreen(
         BookAppointmentDialog(
             patient = patient,
             onDismiss = { showBookAppointmentDialog = false },
-            onSave = { procedure, clinicianId, clinicianName, date, time, duration, room ->
+            onSave = { procedure, clinicianId, clinicianName, date, time, duration, room, reminderEnabled, reminderLeadMin ->
                 DentalRepository.scheduleAppointment(
                     patient = patient,
                     clinicianId = clinicianId,
@@ -273,7 +273,9 @@ fun PatientDetailChartScreen(
                     time = time,
                     durationMin = duration,
                     room = room,
-                    procedure = procedure
+                    procedure = procedure,
+                    reminderEnabled = reminderEnabled,
+                    reminderLeadTimeMin = reminderLeadMin
                 )
                 showBookAppointmentDialog = false
             }
@@ -1113,7 +1115,7 @@ private fun VisitHistoryView(
 
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Time: ${appt.time} (${appt.durationMin} mins) • ${appt.room}",
+                                text = "Time: ${appt.time} (${appt.durationMin} mins)",
                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                                 color = ThornburyBodyStrong
                             )
@@ -1158,7 +1160,7 @@ private fun VisitHistoryView(
             },
             text = {
                 Text(
-                    text = "Are you sure you want to cancel \"${appt.procedure}\" (${appt.time} in ${appt.room})?",
+                    text = "Are you sure you want to cancel \"${appt.procedure}\" (${appt.time})?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = ThornburyBody
                 )

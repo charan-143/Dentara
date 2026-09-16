@@ -63,8 +63,16 @@ class UserPreferencesDao(private val dbHelper: ThornburyDbHelper) {
                 val schedule = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_SCHEDULE_PREF)) ?: "Morning (8am - 12pm)"
                 val contactChannel = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_CONTACT_CHANNEL)) ?: "SMS / WhatsApp"
                 val additionalNotes = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_ADDITIONAL_NOTES)) ?: ""
-                val isOnboardingCompleted = cursor.getInt(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_IS_COMPLETED)) == 1
-                val updatedAt = cursor.getLong(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_UPDATED_AT))
+                val isCompletedIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PREF_IS_COMPLETED)
+                val isOnboardingCompleted = if (isCompletedIndex != -1) cursor.getInt(isCompletedIndex) == 1 else false
+                val morningRemEnabledIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PREF_MORNING_REMINDER_ENABLED)
+                val morningRemEnabled = if (morningRemEnabledIndex != -1) cursor.getInt(morningRemEnabledIndex) == 1 else true
+                val morningRemTimeIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PREF_MORNING_REMINDER_TIME)
+                val morningRemTime = if (morningRemTimeIndex != -1) cursor.getString(morningRemTimeIndex) ?: "08:00" else "08:00"
+                val chairsideDefaultMinIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PREF_CHAIRSIDE_REMINDER_DEFAULT_MIN)
+                val chairsideDefaultMin = if (chairsideDefaultMinIndex != -1) cursor.getInt(chairsideDefaultMinIndex) else 15
+                val updatedAtIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PREF_UPDATED_AT)
+                val updatedAt = if (updatedAtIndex != -1) cursor.getLong(updatedAtIndex) else System.currentTimeMillis()
 
                 UserProfilePreferences(
                     id = PRIMARY_PROFILE_ID,
@@ -83,6 +91,9 @@ class UserPreferencesDao(private val dbHelper: ThornburyDbHelper) {
                     contactChannel = contactChannel,
                     additionalNotes = additionalNotes,
                     isOnboardingCompleted = isOnboardingCompleted,
+                    morningReminderEnabled = morningRemEnabled,
+                    morningReminderTime = morningRemTime,
+                    chairsideReminderDefaultMin = chairsideDefaultMin,
                     updatedAt = updatedAt
                 )
             } else {
@@ -113,6 +124,9 @@ class UserPreferencesDao(private val dbHelper: ThornburyDbHelper) {
             put(ThornburyDbHelper.COL_PREF_CONTACT_CHANNEL, prefs.contactChannel)
             put(ThornburyDbHelper.COL_PREF_ADDITIONAL_NOTES, prefs.additionalNotes)
             put(ThornburyDbHelper.COL_PREF_IS_COMPLETED, if (prefs.isOnboardingCompleted) 1 else 0)
+            put(ThornburyDbHelper.COL_PREF_MORNING_REMINDER_ENABLED, if (prefs.morningReminderEnabled) 1 else 0)
+            put(ThornburyDbHelper.COL_PREF_MORNING_REMINDER_TIME, prefs.morningReminderTime)
+            put(ThornburyDbHelper.COL_PREF_CHAIRSIDE_REMINDER_DEFAULT_MIN, prefs.chairsideReminderDefaultMin)
             put(ThornburyDbHelper.COL_PREF_UPDATED_AT, System.currentTimeMillis())
         }
 
