@@ -60,6 +60,7 @@ fun PatientDetailChartScreen(
     var showEditDiagnosisDialog by remember { mutableStateOf(false) }
     var showCreatePlanDialog by remember { mutableStateOf(false) }
     var showBookAppointmentDialog by remember { mutableStateOf(false) }
+    var showAddReportDialog by remember { mutableStateOf(false) }
 
     if (patient == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -164,7 +165,7 @@ fun PatientDetailChartScreen(
             2 -> PatientReportsImagingTabView(
                 patient = patient,
                 reports = patientReports,
-                onAddReportClick = { onOpenAddReportScreen(patient) },
+                onAddReportClick = { showAddReportDialog = true },
                 onReportClick = { report ->
                     selectedReportForLightbox = report
                     selectedAttachmentIndexForLightbox = 0
@@ -275,6 +276,25 @@ fun PatientDetailChartScreen(
                     procedure = procedure
                 )
                 showBookAppointmentDialog = false
+            }
+        )
+    }
+
+    // New Diagnostic Record Dialog
+    if (showAddReportDialog) {
+        AddReportDialog(
+            patient = patient,
+            onDismiss = { showAddReportDialog = false },
+            onSave = { kind, title, clinician, summary, attachments ->
+                DentalRepository.addReport(
+                    patientId = patient.id,
+                    kind = kind,
+                    title = title,
+                    summary = summary,
+                    clinicianName = clinician,
+                    attachments = attachments
+                )
+                showAddReportDialog = false
             }
         )
     }

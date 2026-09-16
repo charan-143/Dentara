@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
-import com.example.thornburydental.ui.clinic.AddReportScreen
+import com.example.thornburydental.ui.clinic.AddReportDialog
 import com.example.thornburydental.ui.clinic.IssuePrescriptionDialog
 import com.example.thornburydental.ui.clinic.PatientDetailChartScreen
 import com.example.thornburydental.ui.clinic.PatientRosterScreen
@@ -70,64 +70,96 @@ fun MainNavigation() {
             )
         }
         RootDestination.CLINIC -> {
-            BackHandler(enabled = !initialOnboardingDone && activePatientId == null && !showRegisterPatientScreen && reportPatientTarget == null) {
-                rootDestination = RootDestination.WELCOME
+            // Centralized tab click handler: handles pop-to-root and seamless branch transitions
+            fun navigateToTab(destination: AppDestination) {
+                if (currentTab == destination) {
+                    // Reselecting active tab -> Pop to root
+                    if (reportPatientTarget != null) {
+                        reportPatientTarget = null
+                    }
+                    if (showRegisterPatientScreen) {
+                        showRegisterPatientScreen = false
+                    }
+                    if (activePatientId != null) {
+                        activePatientId = null
+                    }
+                } else {
+                    // Switching tabs -> Dismiss child screens and switch branch
+                    reportPatientTarget = null
+                    showRegisterPatientScreen = false
+                    activePatientId = null
+                    currentTab = destination
+                }
             }
 
-            // Intercept back button if currently viewing a detailed patient chart or full screens
-            if (showRegisterPatientScreen || reportPatientTarget != null || activePatientId != null) {
-                BackHandler {
-                    when {
-                        showRegisterPatientScreen -> showRegisterPatientScreen = false
-                        reportPatientTarget != null -> reportPatientTarget = null
-                        activePatientId != null -> activePatientId = null
-                    }
-                }
+            // Hierarchical Back Handling
+            // 1. Report modal
+            BackHandler(enabled = reportPatientTarget != null) {
+                reportPatientTarget = null
+            }
+
+            // 2. Register patient form
+            BackHandler(enabled = reportPatientTarget == null && showRegisterPatientScreen) {
+                showRegisterPatientScreen = false
+            }
+
+            // 3. Patient detail chart
+            BackHandler(enabled = reportPatientTarget == null && !showRegisterPatientScreen && activePatientId != null) {
+                activePatientId = null
+            }
+
+            // 4. Tab stack: Back from non-TODAY root tabs navigates to TODAY
+            BackHandler(enabled = reportPatientTarget == null && !showRegisterPatientScreen && activePatientId == null && currentTab != AppDestination.TODAY) {
+                currentTab = AppDestination.TODAY
+            }
+
+            // 5. Initial onboarding exit to welcome
+            BackHandler(enabled = !initialOnboardingDone && reportPatientTarget == null && !showRegisterPatientScreen && activePatientId == null && currentTab == AppDestination.TODAY) {
+                rootDestination = RootDestination.WELCOME
             }
 
             Scaffold(
                 modifier = Modifier.fillMaxSize(),
                 containerColor = ThornburyCanvas,
                 bottomBar = {
-                    if (activePatientId == null && !showRegisterPatientScreen && reportPatientTarget == null) {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            color = ThornburyCanvas,
-                            border = BorderStroke(1.dp, ThornburyHairline)
+                    // Persistent navigation bar across all pages
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = ThornburyCanvas,
+                        border = BorderStroke(1.dp, ThornburyHairline)
+                    ) {
+                        NavigationBar(
+                            containerColor = ThornburyCanvas,
+                            contentColor = ThornburyInk,
+                            tonalElevation = 0.dp
                         ) {
-                            NavigationBar(
-                                containerColor = ThornburyCanvas,
-                                contentColor = ThornburyInk,
-                                tonalElevation = 0.dp
-                            ) {
-                                AppDestination.entries.forEach { destination ->
-                                    val isSelected = currentTab == destination
-                                    NavigationBarItem(
-                                        selected = isSelected,
-                                        onClick = { currentTab = destination },
-                                        icon = {
-                                            Icon(
-                                                imageVector = destination.icon,
-                                                contentDescription = destination.label
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                text = destination.label,
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            selectedIconColor = ThornburyPrimary,
-                                            selectedTextColor = ThornburyPrimary,
-                                            unselectedIconColor = ThornburyMuted,
-                                            unselectedTextColor = ThornburyMuted,
-                                            indicatorColor = ThornburySurfaceSoft
+                            AppDestination.entries.forEach { destination ->
+                                val isSelected = currentTab == destination
+                                NavigationBarItem(
+                                    selected = isSelected,
+                                    onClick = { navigateToTab(destination) },
+                                    icon = {
+                                        Icon(
+                                            imageVector = destination.icon,
+                                            contentDescription = destination.label
                                         )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = destination.label,
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = ThornburyPrimary,
+                                        selectedTextColor = ThornburyPrimary,
+                                        unselectedIconColor = ThornburyMuted,
+                                        unselectedTextColor = ThornburyMuted,
+                                        indicatorColor = ThornburySurfaceSoft
                                     )
-                                }
+                                )
                             }
                         }
                     }
@@ -145,23 +177,6 @@ fun MainNavigation() {
                                 onRegistered = { newPatient ->
                                     showRegisterPatientScreen = false
                                     activePatientId = newPatient.id
-                                }
-                            )
-                        }
-                        reportPatientTarget != null -> {
-                            AddReportScreen(
-                                patient = reportPatientTarget!!,
-                                onBack = { reportPatientTarget = null },
-                                onSave = { kind, title, clinician, summary, attachments ->
-                                    DentalRepository.addReport(
-                                        patientId = reportPatientTarget!!.id,
-                                        kind = kind,
-                                        title = title,
-                                        summary = summary,
-                                        clinicianName = clinician,
-                                        attachments = attachments
-                                    )
-                                    reportPatientTarget = null
                                 }
                             )
                         }
@@ -201,6 +216,25 @@ fun MainNavigation() {
                     patient = patient,
                     onDismiss = { prescriptionTargetPatient = null },
                     onSuccess = { prescriptionTargetPatient = null }
+                )
+            }
+
+            // Modal Add Report Dialog (if ever invoked globally)
+            reportPatientTarget?.let { patient ->
+                AddReportDialog(
+                    patient = patient,
+                    onDismiss = { reportPatientTarget = null },
+                    onSave = { kind, title, clinician, summary, attachments ->
+                        DentalRepository.addReport(
+                            patientId = patient.id,
+                            kind = kind,
+                            title = title,
+                            summary = summary,
+                            clinicianName = clinician,
+                            attachments = attachments
+                        )
+                        reportPatientTarget = null
+                    }
                 )
             }
         }

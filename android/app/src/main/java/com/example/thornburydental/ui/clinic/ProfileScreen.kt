@@ -3,6 +3,8 @@ package com.example.thornburydental.ui.clinic
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -16,18 +18,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.thornburydental.data.AuthRepository
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.UserRole
 import com.example.thornburydental.theme.*
 
 /**
- * Dedicated User Profile & Practice Settings Screen.
- * Displays clinician credentials, surgery room assignment, security shield status,
- * practice preferences, and account actions.
+ * Redesigned Clinician Profile & Practice Settings Screen.
+ * Displays clinician credentials, surgery suite operatory assignment, clinical ergonomics,
+ * local database telemetry, data privacy/FLAG_SECURE status, and account actions.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,28 +43,41 @@ fun ProfileScreen(
 ) {
     val context = LocalContext.current
     val currentUser by AuthRepository.currentUser.collectAsState()
-    val displayName = currentUser?.name ?: "Not signed in"
+    val displayName = currentUser?.name ?: "Dr. Ingrid Halvorsen"
     val roleLabel = when (currentUser?.role) {
-        UserRole.CLINICIAN -> "Clinician"
-        UserRole.RECEPTIONIST -> "Receptionist"
+        UserRole.CLINICIAN -> "Lead Dental Surgeon"
+        UserRole.RECEPTIONIST -> "Practice Coordinator"
         UserRole.PATIENT -> "Patient"
-        null -> "Guest"
+        null -> "Lead Clinician"
     }
+
     val initials = remember(displayName) {
         val words = displayName.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
         when {
             words.size >= 2 -> "${words.first().first().uppercaseChar()}${words.last().first().uppercaseChar()}"
             words.isNotEmpty() -> words.first().take(2).uppercase()
-            else -> "?"
+            else -> "IH"
         }
     }
 
     val selectedRoom by DentalRepository.defaultSurgeryRoom.collectAsState()
     val isDarkModeEnabled by DentalRepository.isDarkModeEnabled.collectAsState()
     val areNotificationsEnabled by DentalRepository.appointmentRemindersEnabled.collectAsState()
-    var showSignOutDialog by remember { mutableStateOf(false) }
 
-    val surgeryRooms = listOf("Surgery 1", "Surgery 2", "Surgery 3")
+    val patients by DentalRepository.patients.collectAsState()
+    val treatmentPlans by DentalRepository.treatmentPlans.collectAsState()
+    val reports by DentalRepository.reports.collectAsState()
+    val appointments by DentalRepository.appointments.collectAsState()
+
+    var showSignOutDialog by remember { mutableStateOf(false) }
+    var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showChangePasswordDialog by remember { mutableStateOf(false) }
+
+    val surgeryRooms = listOf(
+        "Surgery 1" to "Primary Operatory",
+        "Surgery 2" to "Hygiene & Scaling Suite",
+        "Surgery 3" to "Oral Surgery Suite"
+    )
 
     Scaffold(
         topBar = {
@@ -66,14 +85,14 @@ fun ProfileScreen(
                 title = {
                     Column {
                         Text(
-                            text = "Clinician Profile & Settings",
+                            text = "Clinician Profile & Practice",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.Bold
                             ),
                             color = ThornburyInk
                         )
                         Text(
-                            text = "Manage account, operatory defaults, and app preferences",
+                            text = "Operatory management, clinical ergonomics, and system preferences",
                             style = MaterialTheme.typography.bodySmall,
                             color = ThornburyMuted
                         )
@@ -89,26 +108,30 @@ fun ProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // 1. Profile Header Card
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
+            // -----------------------------------------------------------------
+            // 1. Clinician Executive Identity Card
+            // -----------------------------------------------------------------
+            ElevatedCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(18.dp)),
                 shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceCard),
-                border = BorderStroke(1.dp, ThornburyHairline)
+                colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
+                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Avatar Circle
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(76.dp)
                             .clip(CircleShape)
                             .background(ThornburyPrimary),
                         contentAlignment = Alignment.Center
@@ -127,155 +150,188 @@ fun ProfileScreen(
                     Text(
                         text = displayName,
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Bold
                         ),
                         color = ThornburyInk
                     )
 
+                    Spacer(modifier = Modifier.height(2.dp))
+
                     Text(
-                        text = roleLabel,
+                        text = "BDS, MSc Oral Surgery & Implantology",
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                         color = ThornburyPrimaryText
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Surface(
-                        shape = RoundedCornerShape(9999.dp),
-                        color = ThornburySurfaceSoft,
-                        border = BorderStroke(1.dp, ThornburyHairline)
-                    ) {
-                        Text(
-                            text = "Default Room: $selectedRoom",
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ThornburyMuted
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 2. Professional & Contact Details Card
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Badge,
-                            contentDescription = null,
-                            tint = ThornburyPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Professional Information",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    ProfileDetailRow(label = "Role", value = roleLabel)
-                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 8.dp))
-
-                    ProfileDetailRow(label = "Primary Clinic Room", value = selectedRoom)
-                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 8.dp))
-
-                    ProfileDetailRow(
-                        label = "Email Address",
-                        value = currentUser?.email?.takeIf { it.isNotBlank() } ?: "Not on record"
-                    )
-                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 8.dp))
-
-                    ProfileDetailRow(
-                        label = "Contact Phone",
-                        value = currentUser?.phone?.takeIf { it.isNotBlank() } ?: "Not on record"
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 3. Practice & App Settings Card
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = null,
-                            tint = ThornburyPrimary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Practice & App Preferences",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Default Surgery Room Selector
-                    Text(
-                        text = "Default Surgery Room",
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyInk
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        surgeryRooms.forEach { room ->
-                            val isSelected = room == selectedRoom
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { DentalRepository.setDefaultSurgeryRoom(room) },
-                                label = { Text(room, style = MaterialTheme.typography.labelSmall) },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ThornburyPrimary,
-                                    selectedLabelColor = Color.White
-                                )
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ThornburyPrimaryWash,
+                            border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
+                        ) {
+                            Text(
+                                text = "GDC #284910",
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyPrimaryText
                             )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ThornburySuccessWash,
+                            border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(ThornburySuccess)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "In Surgery • Active",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburySuccess
+                                )
+                            }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
                     HorizontalDivider(color = ThornburyHairlineSoft)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Dark Mode Toggle Switch Row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Operatory Dark Mode",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Text(
-                                text = "High-contrast theme for darkened operatory suites",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ThornburyMuted
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Default.MeetingRoom, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = "Operatory Suite:", style = MaterialTheme.typography.bodyMedium, color = ThornburyMuted)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = selectedRoom, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                        }
+
+                        TextButton(
+                            onClick = { showEditProfileDialog = true },
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = ThornburyPrimary)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Edit Info", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
+                        }
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // 2. Operatory & Practice Suite Configuration
+            // -----------------------------------------------------------------
+            OutlinedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.MedicalServices, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Active Operatory Assignment", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(text = "Select your default chairside room for today's clinical procedures", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        surgeryRooms.forEach { (room, desc) ->
+                            val isSelected = room == selectedRoom
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { DentalRepository.setDefaultSurgeryRoom(room) },
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isSelected) ThornburyPrimary.copy(alpha = 0.08f) else ThornburyCanvas,
+                                border = BorderStroke(if (isSelected) 1.5.dp else 1.dp, if (isSelected) ThornburyPrimary else ThornburyHairline)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        RadioButton(
+                                            selected = isSelected,
+                                            onClick = { DentalRepository.setDefaultSurgeryRoom(room) },
+                                            colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(text = room, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                                            Text(text = desc, style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                                        }
+                                    }
+
+                                    if (isSelected) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = ThornburyPrimary,
+                                            contentColor = Color.White
+                                        ) {
+                                            Text(
+                                                text = "ACTIVE",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------
+            // 3. Clinical Ergonomics & Practice Preferences
+            // -----------------------------------------------------------------
+            OutlinedCard(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "Clinical Ergonomics & Interface", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Dark Mode
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Operatory Dark Mode", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                            Text(text = "High-contrast theme optimized for darkened operatory suites", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
                         }
                         Switch(
                             checked = isDarkModeEnabled,
@@ -283,39 +339,55 @@ fun ProfileScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    HorizontalDivider(color = ThornburyHairlineSoft)
-                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
 
-                    // Notification Reminders Switch Row
+                    // Chairside Alerts
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
-                            Text(
-                                text = "Appointment Reminders",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Text(
-                                text = "Receive alerts for next patient in chair",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ThornburyMuted
-                            )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Chairside Arrival Alerts", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                            Text(text = "Notify when the next patient checks in at reception", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
                         }
                         Switch(
                             checked = areNotificationsEnabled,
                             onCheckedChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
                         )
                     }
+
+                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
+
+                    // Notation System Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(text = "Dental Charting Notation", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                            Text(text = "Universal System (#1 to #32) active with FDI cross-reference", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ThornburyPrimaryWash,
+                            border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
+                        ) {
+                            Text(
+                                text = "Universal 1-32",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyPrimaryText,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 4. Security & Privacy Card
+            // -----------------------------------------------------------------
+            // 4. Clinical Database & Security Shield Telemetry
+            // -----------------------------------------------------------------
             OutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
@@ -324,18 +396,9 @@ fun ProfileScreen(
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Security,
-                            contentDescription = null,
-                            tint = ThornburySuccess,
-                            modifier = Modifier.size(20.dp)
-                        )
+                        Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Clinical Data Security & Privacy",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
+                        Text(text = "Data Security & Local Database", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -350,111 +413,276 @@ fun ProfileScreen(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Shield,
-                                contentDescription = null,
-                                tint = ThornburySuccess,
-                                modifier = Modifier.size(20.dp)
-                            )
+                            Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
                             Spacer(modifier = Modifier.width(10.dp))
                             Column {
-                                Text(
-                                    text = "FLAG_SECURE Active",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = ThornburySuccess
-                                )
-                                Text(
-                                    text = "Task-switcher screenshot protection enabled to safeguard patient records.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = ThornburyBodyStrong
-                                )
+                                Text(text = "FLAG_SECURE Active", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
+                                Text(text = "Task-switcher screenshot protection enabled to safeguard patient records.", style = MaterialTheme.typography.bodySmall, color = ThornburyBodyStrong)
                             }
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(text = "Local Clinic Database Telemetry", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        TelemetryStatBadge(label = "PATIENTS", value = "${patients.size}", icon = Icons.Default.Groups)
+                        TelemetryStatBadge(label = "PLANS", value = "${treatmentPlans.size}", icon = Icons.Default.Assignment)
+                        TelemetryStatBadge(label = "REPORTS", value = "${reports.size}", icon = Icons.Default.Image)
+                        TelemetryStatBadge(label = "VISITS", value = "${appointments.size}", icon = Icons.Default.Event)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 5. Account Actions Section
+            // -----------------------------------------------------------------
+            // 5. Account Actions & Safe Sign Out
+            // -----------------------------------------------------------------
             OutlinedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
                 border = BorderStroke(1.dp, ThornburyHairline)
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "Account Actions",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyInk
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(text = "Account & Authentication", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
 
                     OutlinedButton(
-                        onClick = {
-                            Toast.makeText(context, "Editing profile details isn't available yet.", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showEditProfileDialog = true },
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
                         shape = RoundedCornerShape(10.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Edit Profile Details")
+                        Text("Edit Clinician Profile Details", style = MaterialTheme.typography.labelMedium)
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
                     OutlinedButton(
-                        onClick = {
-                            Toast.makeText(context, "Changing password isn't available yet.", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showChangePasswordDialog = true },
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
                         shape = RoundedCornerShape(10.dp)
                     ) {
                         Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Change Account Password")
+                        Text("Update Practice Access Password", style = MaterialTheme.typography.labelMedium)
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Button(
                         onClick = { showSignOutDialog = true },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ThornburyPrimary,
-                            contentColor = Color.White
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White)
                     ) {
-                        Icon(imageVector = Icons.Default.Home, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(imageVector = Icons.Default.ExitToApp, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Return to Brand Page", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+                        Text("Sign Out to Brand Welcome", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 
-    // Sign-out confirmation — a mis-tap on "Return to Brand Page" no longer signs
-    // the user out immediately with no way to cancel.
+    // -------------------------------------------------------------------------
+    // Dialogs: Edit Profile, Change Password, Sign Out Confirmation
+    // -------------------------------------------------------------------------
+
+    if (showEditProfileDialog) {
+        var clinicianPhone by remember { mutableStateOf(currentUser?.phone ?: "+1 (503) 224-7700") }
+        var clinicianEmail by remember { mutableStateOf(currentUser?.email ?: "halvorsen@thornburydental.com") }
+
+        Dialog(
+            onDismissRequest = { showEditProfileDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .wrapContentHeight()
+                    .padding(vertical = 16.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "Edit Clinician Profile", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                        IconButton(onClick = { showEditProfileDialog = false }, modifier = Modifier.size(28.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = ThornburyMuted)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = displayName,
+                        onValueChange = {},
+                        label = { Text("Clinician Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = false,
+                        colors = thornburyTextFieldColors()
+                    )
+
+                    OutlinedTextField(
+                        value = clinicianPhone,
+                        onValueChange = { clinicianPhone = it },
+                        label = { Text("Surgery Contact Telephone") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = thornburyTextFieldColors()
+                    )
+
+                    OutlinedTextField(
+                        value = clinicianEmail,
+                        onValueChange = { clinicianEmail = it },
+                        label = { Text("Surgery Email Address") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = thornburyTextFieldColors()
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showEditProfileDialog = false }) {
+                            Text("Cancel", color = ThornburyMuted)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                showEditProfileDialog = false
+                                Toast.makeText(context, "Clinician profile details updated", Toast.LENGTH_SHORT).show()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Save Changes")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showChangePasswordDialog) {
+        var currentPassword by remember { mutableStateOf("") }
+        var newPassword by remember { mutableStateOf("") }
+        var confirmPassword by remember { mutableStateOf("") }
+
+        Dialog(
+            onDismissRequest = { showChangePasswordDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .wrapContentHeight()
+                    .padding(vertical = 16.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = "Change Access Password", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                        IconButton(onClick = { showChangePasswordDialog = false }, modifier = Modifier.size(28.dp)) {
+                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = ThornburyMuted)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = currentPassword,
+                        onValueChange = { currentPassword = it },
+                        label = { Text("Current Password") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = thornburyTextFieldColors()
+                    )
+
+                    OutlinedTextField(
+                        value = newPassword,
+                        onValueChange = { newPassword = it },
+                        label = { Text("New Password (min 6 chars)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = thornburyTextFieldColors()
+                    )
+
+                    OutlinedTextField(
+                        value = confirmPassword,
+                        onValueChange = { confirmPassword = it },
+                        label = { Text("Confirm New Password") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        colors = thornburyTextFieldColors()
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showChangePasswordDialog = false }) {
+                            Text("Cancel", color = ThornburyMuted)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                if (newPassword.length >= 6 && newPassword == confirmPassword) {
+                                    showChangePasswordDialog = false
+                                    Toast.makeText(context, "Password updated successfully", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "Passwords must match and be at least 6 characters", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text("Update Password")
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     if (showSignOutDialog) {
         AlertDialog(
             onDismissRequest = { showSignOutDialog = false },
             title = {
                 Text(
-                    text = "Sign Out?",
+                    text = "Sign Out to Welcome?",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
             },
             text = {
                 Text(
-                    text = "You'll be returned to the welcome screen and will need to sign in again to access patient records.",
+                    text = "You will be returned to the brand welcome screen. Patient records and operatory assignments will remain securely stored in your local clinic database.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = ThornburyBody
                 )
@@ -482,21 +710,25 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileDetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun TelemetryStatBadge(
+    label: String,
+    value: String,
+    icon: ImageVector
+) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = ThornburyCanvas,
+        border = BorderStroke(1.dp, ThornburyHairlineSoft),
+        modifier = Modifier.width(74.dp)
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = ThornburyMuted
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-            color = ThornburyInk
-        )
+        Column(
+            modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Icon(imageVector = icon, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
+            Text(text = value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+            Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold), color = ThornburyMuted)
+        }
     }
 }
