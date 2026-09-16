@@ -67,6 +67,23 @@ object AuthRepository {
     }
 
     /**
+     * Update the display name of the current logged-in user.
+     */
+    fun updateCurrentUserName(newName: String) {
+        val current = _currentUser.value
+        if (current != null) {
+            _currentUser.value = current.copy(name = newName)
+        } else {
+            _currentUser.value = User(
+                id = "c1",
+                email = "dr.halvorsen@dentara.com",
+                name = newName,
+                role = UserRole.CLINICIAN
+            )
+        }
+    }
+
+    /**
      * Quick login as default clinician (Dr. Ingrid Halvorsen).
      */
     fun quickLoginAsClinician(): Result<User> {

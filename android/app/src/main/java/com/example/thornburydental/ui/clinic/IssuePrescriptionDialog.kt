@@ -227,7 +227,7 @@ fun IssuePrescriptionDialog(
                                 color = ThornburyInk
                             )
                             Text(
-                                text = "${activeClinician?.specialty ?: "Comprehensive Dental Care"} • ${activeClinician?.room ?: "Surgery 1"}",
+                                text = activeClinician?.specialty ?: "Comprehensive Dental Care",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = ThornburyMuted
                             )

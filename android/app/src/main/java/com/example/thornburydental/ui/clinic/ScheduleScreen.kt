@@ -49,7 +49,6 @@ fun ScheduleScreen(
     val patients by DentalRepository.patients.collectAsState()
 
     var selectedDate by remember { mutableStateOf(todayIsoDate()) }
-    var roomFilter by remember { mutableStateOf("all") }
     var statusFilter by remember { mutableStateOf("all") }
     var searchQuery by remember { mutableStateOf("") }
     var showSelectPatientDialog by remember { mutableStateOf(false) }
@@ -62,9 +61,8 @@ fun ScheduleScreen(
         appointments.filter { it.date == selectedDate }
     }
 
-    val filteredAppointments = remember(dayAppointments, roomFilter, statusFilter, searchQuery) {
+    val filteredAppointments = remember(dayAppointments, statusFilter, searchQuery) {
         dayAppointments.filter { appt ->
-            if (roomFilter != "all" && appt.room != roomFilter) return@filter false
             if (statusFilter != "all" && appt.status != statusFilter) return@filter false
             if (searchQuery.isNotBlank()) {
                 val q = searchQuery.trim().lowercase()
@@ -72,8 +70,7 @@ fun ScheduleScreen(
                 val matchOp = appt.patientOpNo.lowercase().contains(q)
                 val matchProc = appt.procedure.lowercase().contains(q)
                 val matchClin = appt.clinicianName.lowercase().contains(q)
-                val matchRoom = appt.room.lowercase().contains(q)
-                if (!matchName && !matchOp && !matchProc && !matchClin && !matchRoom) return@filter false
+                if (!matchName && !matchOp && !matchProc && !matchClin) return@filter false
             }
             true
         }
@@ -176,7 +173,7 @@ fun ScheduleScreen(
                     onValueChange = { searchQuery = it },
                     placeholder = {
                         Text(
-                            text = "Search patient, OP, procedure, room...",
+                            text = "Search patient, OP, procedure...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = ThornburyMuted
                         )
@@ -209,43 +206,6 @@ fun ScheduleScreen(
                     ),
                     singleLine = true
                 )
-
-                // Room FilterChips Row — counts now reflect the selected day only
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Surgery Room",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyMuted
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        val roomOptions = listOf(
-                            "all" to "All Surgeries (${dayAppointments.size})",
-                            "Surgery 1" to "Surgery 1",
-                            "Surgery 2" to "Surgery 2",
-                            "Surgery 3" to "Surgery 3"
-                        )
-                        roomOptions.forEach { (key, label) ->
-                            val isSelected = roomFilter == key
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { roomFilter = key },
-                                label = { Text(label) },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ThornburyPrimary,
-                                    selectedLabelColor = Color.White,
-                                    containerColor = ThornburySurfaceSoft,
-                                    labelColor = ThornburyInk
-                                )
-                            )
-                        }
-                    }
-                }
 
                 // Status FilterChips Row
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -323,7 +283,7 @@ fun ScheduleScreen(
                             text = if (dayAppointments.isEmpty()) {
                                 "Nothing booked for ${isoDateDisplayLabel(selectedDate)} yet."
                             } else {
-                                "No surgery appointments on ${isoDateDisplayLabel(selectedDate)} match your active room filter, status filter, or search query."
+                                "No appointments on ${isoDateDisplayLabel(selectedDate)} match your active status filter or search query."
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = ThornburyMuted,
@@ -348,7 +308,7 @@ fun ScheduleScreen(
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
-                        // 1. Top Row: Time & duration badge on the left, Surgery room badge and Status badge on the right
+                        // 1. Top Row: Time & duration badge on the left, Reminder badge and Status badge on the right
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -379,23 +339,36 @@ fun ScheduleScreen(
                                 }
                             }
 
-                            // Right: Surgery Room Badge & Status Badge
+                            // Right: Reminder Badge & Status Badge
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // Surgery Room Badge
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = ThornburyPrimaryWash,
-                                    border = BorderStroke(1.dp, ThornburyHairline)
-                                ) {
-                                    Text(
-                                        text = appt.room,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = ThornburyPrimaryText
-                                    )
+                                // Reminder Badge
+                                if (appt.reminderEnabled) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = ThornburySurfaceSoft,
+                                        border = BorderStroke(1.dp, ThornburyHairline)
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.NotificationsActive,
+                                                contentDescription = "Reminder enabled",
+                                                tint = ThornburyPrimary,
+                                                modifier = Modifier.size(12.dp)
+                                            )
+                                            Text(
+                                                text = "${appt.reminderLeadTimeMin}m reminder",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                                color = ThornburyInk
+                                            )
+                                        }
+                                    }
                                 }
 
                                 // Status Badge
@@ -758,7 +731,7 @@ fun ScheduleScreen(
             patient = bookingTargetPatient!!,
             initialDate = selectedDate,
             onDismiss = { bookingTargetPatient = null },
-            onSave = { proc, clinId, clinName, date, time, dur, room ->
+            onSave = { proc, clinId, clinName, date, time, dur, room, reminderEnabled, reminderLeadMin ->
                 DentalRepository.bookAppointment(
                     patient = bookingTargetPatient!!,
                     clinicianId = clinId,
@@ -767,7 +740,9 @@ fun ScheduleScreen(
                     time = time,
                     durationMin = dur,
                     room = room,
-                    procedure = proc
+                    procedure = proc,
+                    reminderEnabled = reminderEnabled,
+                    reminderLeadTimeMin = reminderLeadMin
                 )
                 bookingTargetPatient = null
             }
@@ -780,14 +755,14 @@ fun ScheduleScreen(
             onDismissRequest = { appointmentToCancel = null },
             title = {
                 Text(
-                    text = "Cancel Surgery Appointment",
+                    text = "Cancel Appointment",
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
             },
             text = {
                 Text(
-                    text = "Are you sure you want to cancel the surgery appointment for ${appointmentToCancel?.patientName} (${appointmentToCancel?.procedure}) scheduled at ${formatTimeWithAmPm(appointmentToCancel?.time ?: "")} in ${appointmentToCancel?.room}?",
+                    text = "Are you sure you want to cancel the appointment for ${appointmentToCancel?.patientName} (${appointmentToCancel?.procedure}) scheduled at ${formatTimeWithAmPm(appointmentToCancel?.time ?: "")}?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = ThornburyBody
                 )
@@ -821,7 +796,7 @@ fun ScheduleScreen(
  * previous/next-week navigation and a "Today" jump button, then one column
  * per day showing the weekday letters, day-of-month in a circle (filled when
  * selected, tinted when it's today), and a small dot when that day has at
- * least one appointment on record (independent of the room/status/search
+ * least one appointment on record (independent of the status/search
  * filters below, so the dot is a reliable "is anything booked here" signal).
  */
 @Composable

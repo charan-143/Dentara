@@ -44,6 +44,68 @@ object DentalRepository {
         _defaultSurgeryRoom.value = room
     }
 
+    private val _clinicianDisplayName = MutableStateFlow("Dr. Ingrid Halvorsen")
+    val clinicianDisplayName: StateFlow<String> = _clinicianDisplayName.asStateFlow()
+
+    fun updateClinicianName(name: String) {
+        val trimmed = name.trim().ifBlank { "Dr. Ingrid Halvorsen" }
+        _clinicianDisplayName.value = trimmed
+        AuthRepository.updateCurrentUserName(trimmed)
+        val currentPrefs = _userPreferences.value ?: UserProfilePreferences()
+        val updatedPrefs = currentPrefs.copy(fullName = trimmed)
+        _userPreferences.value = updatedPrefs
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.userPreferencesDao.savePreferences(updatedPrefs)
+            }
+        }
+    }
+
+    private val _morningReminderEnabled = MutableStateFlow(true)
+    val morningReminderEnabled: StateFlow<Boolean> = _morningReminderEnabled.asStateFlow()
+
+    private val _morningReminderTime = MutableStateFlow("08:00")
+    val morningReminderTime: StateFlow<String> = _morningReminderTime.asStateFlow()
+
+    private val _chairsideReminderDefaultMin = MutableStateFlow(15)
+    val chairsideReminderDefaultMin: StateFlow<Int> = _chairsideReminderDefaultMin.asStateFlow()
+
+    fun updateMorningReminderSettings(enabled: Boolean, timeString: String) {
+        _morningReminderEnabled.value = enabled
+        _morningReminderTime.value = timeString
+        val currentPrefs = _userPreferences.value ?: UserProfilePreferences()
+        val updated = currentPrefs.copy(
+            morningReminderEnabled = enabled,
+            morningReminderTime = timeString
+        )
+        _userPreferences.value = updated
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.userPreferencesDao.savePreferences(updated)
+            }
+        }
+        val ctx = LocalDatabaseManager.appContext
+        if (ctx != null) {
+            if (enabled) {
+                com.example.thornburydental.reminder.ReminderManager.scheduleDailyMorningBriefing(ctx, timeString)
+            } else {
+                com.example.thornburydental.reminder.ReminderManager.cancelDailyMorningBriefing(ctx)
+            }
+        }
+    }
+
+    fun updateChairsideReminderDefault(leadMin: Int) {
+        _chairsideReminderDefaultMin.value = leadMin
+        val currentPrefs = _userPreferences.value ?: UserProfilePreferences()
+        val updated = currentPrefs.copy(chairsideReminderDefaultMin = leadMin)
+        _userPreferences.value = updated
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.userPreferencesDao.savePreferences(updated)
+            }
+        }
+    }
+
     // Note: this flag is not yet wired to any real reminder/notification
     // scheduling (no such system exists in the app yet) — it only makes the
     // switch stop silently resetting between screens. Building actual
@@ -102,6 +164,13 @@ object DentalRepository {
             val dbPrefs = LocalDatabaseManager.userPreferencesDao.getPreferences()
             if (dbPrefs != null) {
                 _userPreferences.value = dbPrefs
+                if (dbPrefs.fullName.isNotBlank()) {
+                    _clinicianDisplayName.value = dbPrefs.fullName
+                    AuthRepository.updateCurrentUserName(dbPrefs.fullName)
+                }
+                _morningReminderEnabled.value = dbPrefs.morningReminderEnabled
+                _morningReminderTime.value = dbPrefs.morningReminderTime
+                _chairsideReminderDefaultMin.value = dbPrefs.chairsideReminderDefaultMin
             }
             val dbPresets = LocalDatabaseManager.medicationPresetDao.getAllPresets()
             if (dbPresets.isNotEmpty()) {
@@ -187,12 +256,15 @@ object DentalRepository {
 
     val clinicians: List<Clinician>
         get() {
-            val current = AuthRepository.currentUser.value
-            val name = if (current != null && current.role == UserRole.CLINICIAN && current.name.isNotBlank()) {
-                current.name
-            } else {
-                "Dr. Ingrid Halvorsen"
+            val name = _clinicianDisplayName.value.ifBlank {
+                val current = AuthRepository.currentUser.value
+                if (current != null && current.role == UserRole.CLINICIAN && current.name.isNotBlank()) {
+                    current.name
+                } else {
+                    "Dr. Ingrid Halvorsen"
+                }
             }
+            val current = AuthRepository.currentUser.value
             val id = if (current != null && current.role == UserRole.CLINICIAN) {
                 current.id
             } else {
@@ -639,8 +711,10 @@ object DentalRepository {
         date: String = todayIsoDate(),
         time: String,
         durationMin: Int,
-        room: String,
-        procedure: String
+        room: String = "Surgery 1",
+        procedure: String,
+        reminderEnabled: Boolean = false,
+        reminderLeadTimeMin: Int = 15
     ): Appointment {
         val allergyStr = if (patient.allergies.isNotEmpty()) {
             patient.allergies.joinToString(", ") { it.allergen }
@@ -660,7 +734,9 @@ object DentalRepository {
             room = room,
             procedure = procedure,
             allergyList = allergyStr,
-            status = "confirmed"
+            status = "confirmed",
+            reminderEnabled = reminderEnabled,
+            reminderLeadTimeMin = reminderLeadTimeMin
         )
         // Insert in chronological (date, then time-of-day) order, not just
         // prepended — see AppointmentDao's getAllAppointments()/
@@ -679,7 +755,37 @@ object DentalRepository {
                 procedure = procedure
             )
         }
+        val ctx = LocalDatabaseManager.appContext
+        if (ctx != null && reminderEnabled) {
+            com.example.thornburydental.reminder.ReminderManager.schedulePatientArrivalReminder(ctx, newAppt)
+        }
         return newAppt
+    }
+
+    fun updateAppointmentReminder(id: String, enabled: Boolean, leadTimeMin: Int) {
+        var targetAppt: Appointment? = null
+        _appointments.update { list ->
+            list.map { appt ->
+                if (appt.id == id) {
+                    val updated = appt.copy(reminderEnabled = enabled, reminderLeadTimeMin = leadTimeMin)
+                    targetAppt = updated
+                    updated
+                } else appt
+            }
+        }
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.appointmentDao.updateAppointmentReminder(id, enabled, leadTimeMin)
+            }
+        }
+        val ctx = LocalDatabaseManager.appContext
+        if (ctx != null) {
+            if (enabled && targetAppt != null) {
+                com.example.thornburydental.reminder.ReminderManager.schedulePatientArrivalReminder(ctx, targetAppt!!)
+            } else {
+                com.example.thornburydental.reminder.ReminderManager.cancelPatientArrivalReminder(ctx, id)
+            }
+        }
     }
 
     fun bookAppointment(
@@ -689,8 +795,10 @@ object DentalRepository {
         date: String = todayIsoDate(),
         time: String,
         durationMin: Int,
-        room: String,
-        procedure: String
+        room: String = "Surgery 1",
+        procedure: String,
+        reminderEnabled: Boolean = false,
+        reminderLeadTimeMin: Int = 15
     ): Appointment = scheduleAppointment(
         patient = patient,
         clinicianId = clinicianId,
@@ -699,7 +807,9 @@ object DentalRepository {
         time = time,
         durationMin = durationMin,
         room = room,
-        procedure = procedure
+        procedure = procedure,
+        reminderEnabled = reminderEnabled,
+        reminderLeadTimeMin = reminderLeadTimeMin
     )
 
     fun updateToothCondition(patientId: String, toothNumber: Int, newCondition: ToothCondition, notes: String) {
@@ -1386,54 +1496,25 @@ object DentalRepository {
     fun saveUserPreferences(prefs: UserProfilePreferences) {
         _userPreferences.value = prefs
         if (prefs.fullName.isNotBlank()) {
-            val existingPatient = _patients.value.find {
-                it.name.equals(prefs.fullName, ignoreCase = true) ||
-                (prefs.email.isNotBlank() && it.email.equals(prefs.email, ignoreCase = true))
-            }
-            if (existingPatient != null) {
-                val updated = existingPatient.copy(
-                    name = prefs.fullName,
-                    phone = prefs.phone.ifBlank { existingPatient.phone },
-                    email = prefs.email.ifBlank { existingPatient.email },
-                    medicalHistory = "Preferences: ${prefs.dentalGoals.joinToString(", ")}. Anxiety: ${prefs.anxietyLevel}. Amenities: ${prefs.comfortAmenities.joinToString(", ")}.\n${prefs.additionalNotes}".trim(),
-                    pastDentalHistory = "Last visit: ${prefs.lastVisit}. Schedule pref: ${prefs.schedulePreference}",
-                    dob = prefs.dob.ifBlank { existingPatient.dob }
-                )
-                _patients.update { list -> list.map { if (it.id == updated.id) updated else it } }
-                repositoryScope.launch {
-                    if (LocalDatabaseManager.isInitialized) {
-                        LocalDatabaseManager.patientDao.insertPatient(updated)
-                    }
-                }
-            } else {
-                val newPatient = Patient(
-                    id = "p-${System.currentTimeMillis()}",
-                    opNo = "OP-${(40300 + _patients.value.size)}",
-                    name = prefs.fullName,
-                    dob = prefs.dob.ifBlank { "Not specified" },
-                    phone = prefs.phone.ifBlank { "Not provided" },
-                    email = prefs.email.ifBlank { "Not provided" },
-                    address = "Portland, OR",
-                    medicalHistory = "Preferences: ${prefs.dentalGoals.joinToString(", ")}. Anxiety: ${prefs.anxietyLevel}. Amenities: ${prefs.comfortAmenities.joinToString(", ")}.\n${prefs.additionalNotes}".trim(),
-                    familyHistory = "Nil reported",
-                    pastDentalHistory = "Last dental visit: ${prefs.lastVisit}. Preferred schedule: ${prefs.schedulePreference}",
-                    medicalAlerts = prefs.medicalAlerts.filterNot { it.contains("Allergy", ignoreCase = true) },
-                    allergies = prefs.medicalAlerts.filter { it.contains("Allergy", ignoreCase = true) }.map {
-                        Allergy(allergen = it, severity = "Moderate", reaction = "Reported during digital intake")
-                    },
-                    teeth = generateDefaultTeeth()
-                )
-                _patients.update { it + newPatient }
-                repositoryScope.launch {
-                    if (LocalDatabaseManager.isInitialized) {
-                        LocalDatabaseManager.patientDao.insertPatient(newPatient)
-                    }
-                }
-            }
+            _clinicianDisplayName.value = prefs.fullName
+            AuthRepository.updateCurrentUserName(prefs.fullName)
         }
+        _morningReminderEnabled.value = prefs.morningReminderEnabled
+        _morningReminderTime.value = prefs.morningReminderTime
+        _chairsideReminderDefaultMin.value = prefs.chairsideReminderDefaultMin
+
         repositoryScope.launch {
             if (LocalDatabaseManager.isInitialized) {
                 LocalDatabaseManager.userPreferencesDao.savePreferences(prefs)
+            }
+        }
+
+        val ctx = LocalDatabaseManager.appContext
+        if (ctx != null) {
+            if (prefs.morningReminderEnabled) {
+                com.example.thornburydental.reminder.ReminderManager.scheduleDailyMorningBriefing(ctx, prefs.morningReminderTime)
+            } else {
+                com.example.thornburydental.reminder.ReminderManager.cancelDailyMorningBriefing(ctx)
             }
         }
     }

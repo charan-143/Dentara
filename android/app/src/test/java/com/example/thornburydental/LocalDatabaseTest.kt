@@ -120,7 +120,7 @@ class LocalDatabaseTest {
     @Test
     fun testDatabaseSchemaConstants() {
         assertEquals("thornbury_dental.db", ThornburyDbHelper.DATABASE_NAME)
-        assertEquals(4, ThornburyDbHelper.DATABASE_VERSION)
+        assertEquals(5, ThornburyDbHelper.DATABASE_VERSION)
         assertEquals("patients", ThornburyDbHelper.TABLE_PATIENTS)
         assertEquals("teeth", ThornburyDbHelper.TABLE_TEETH)
         assertEquals("appointments", ThornburyDbHelper.TABLE_APPOINTMENTS)
@@ -237,10 +237,7 @@ class LocalDatabaseTest {
         assertEquals("Mild Apprehension", stored.anxietyLevel)
         assertEquals("Latex Allergy", stored.medicalAlerts.first())
 
-        // Verify patient auto-link/registration in clinic roster
-        val patientRecord = DentalRepository.patients.value.find { it.name == "Genevieve Vance" }
-        assertNotNull(patientRecord)
-        assertEquals("+1 (503) 555-0199", patientRecord!!.phone)
-        assertEquals("genevieve.vance@example.com", patientRecord.email)
+        // Verify clinician display name update
+        assertEquals("Genevieve Vance", DentalRepository.clinicianDisplayName.value)
     }
 }

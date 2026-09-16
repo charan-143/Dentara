@@ -109,6 +109,8 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
                 putNull(ThornburyDbHelper.COL_APPTS_ALLERGY_LIST)
             }
             put(ThornburyDbHelper.COL_APPTS_STATUS, appointment.status)
+            put(ThornburyDbHelper.COL_APPTS_REMINDER_ENABLED, if (appointment.reminderEnabled) 1 else 0)
+            put(ThornburyDbHelper.COL_APPTS_REMINDER_LEAD_MIN, appointment.reminderLeadTimeMin)
             put(ThornburyDbHelper.COL_APPTS_CREATED_AT, System.currentTimeMillis())
         }
         db.insertWithOnConflict(
@@ -136,6 +138,67 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
     }
 
     /**
+     * Updates reminder settings for an appointment.
+     */
+    fun updateAppointmentReminder(appointmentId: String, enabled: Boolean, leadMin: Int) {
+        val db = dbHelper.writableDatabase
+        val values = ContentValues().apply {
+            put(ThornburyDbHelper.COL_APPTS_REMINDER_ENABLED, if (enabled) 1 else 0)
+            put(ThornburyDbHelper.COL_APPTS_REMINDER_LEAD_MIN, leadMin)
+        }
+        db.update(
+            ThornburyDbHelper.TABLE_APPOINTMENTS,
+            values,
+            "${ThornburyDbHelper.COL_APPTS_ID} = ?",
+            arrayOf(appointmentId)
+        )
+    }
+
+    /**
+     * Retrieves all appointments for a specific calendar day (ISO "yyyy-MM-dd").
+     */
+    fun getAppointmentsForDate(date: String): List<Appointment> {
+        val db = dbHelper.readableDatabase
+        val appointments = mutableListOf<Appointment>()
+        db.query(
+            ThornburyDbHelper.TABLE_APPOINTMENTS,
+            null,
+            "${ThornburyDbHelper.COL_APPTS_DATE} = ?",
+            arrayOf(date),
+            null,
+            null,
+            null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                appointments.add(cursorToAppointment(cursor))
+            }
+        }
+        return appointments.sortedWith(compareBy({ it.date }, { parseTimeToMinutes(it.time) }))
+    }
+
+    /**
+     * Retrieves all appointments that currently have chairside arrival reminder enabled.
+     */
+    fun getAppointmentsWithActiveReminders(): List<Appointment> {
+        val db = dbHelper.readableDatabase
+        val appointments = mutableListOf<Appointment>()
+        db.query(
+            ThornburyDbHelper.TABLE_APPOINTMENTS,
+            null,
+            "${ThornburyDbHelper.COL_APPTS_REMINDER_ENABLED} = 1",
+            null,
+            null,
+            null,
+            null
+        ).use { cursor ->
+            while (cursor.moveToNext()) {
+                appointments.add(cursorToAppointment(cursor))
+            }
+        }
+        return appointments.sortedWith(compareBy({ it.date }, { parseTimeToMinutes(it.time) }))
+    }
+
+    /**
      * Deletes an appointment by its ID.
      */
     fun deleteAppointment(appointmentId: String) {
@@ -151,6 +214,12 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
         val allergyColIndex = cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_ALLERGY_LIST)
         val allergyList = if (cursor.isNull(allergyColIndex)) null else cursor.getString(allergyColIndex)
 
+        val reminderEnabledIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_APPTS_REMINDER_ENABLED)
+        val reminderEnabled = if (reminderEnabledIndex != -1) cursor.getInt(reminderEnabledIndex) == 1 else false
+
+        val reminderLeadIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_APPTS_REMINDER_LEAD_MIN)
+        val reminderLeadMin = if (reminderLeadIndex != -1) cursor.getInt(reminderLeadIndex) else 15
+
         return Appointment(
             id = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_ID)),
             patientId = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_PATIENT_ID)),
@@ -165,7 +234,9 @@ class AppointmentDao(private val dbHelper: ThornburyDbHelper) {
             room = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_ROOM)),
             procedure = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_PROCEDURE)),
             allergyList = allergyList,
-            status = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_STATUS))
+            status = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_APPTS_STATUS)),
+            reminderEnabled = reminderEnabled,
+            reminderLeadTimeMin = reminderLeadMin
         )
     }
 }

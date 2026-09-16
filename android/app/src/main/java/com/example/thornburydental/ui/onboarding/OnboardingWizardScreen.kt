@@ -29,8 +29,8 @@ import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.ThornburyDatePickerField
 
 /**
- * Minimal Clinician Setup Wizard - Only 4 essential questions (one per page)
- * to quickly configure the clinician's profile and operatory assignment.
+ * Minimal Clinician Setup Wizard - Only 3 essential questions (one per page)
+ * to quickly configure the clinician's profile and credentials.
  */
 @Composable
 fun OnboardingWizardScreen(
@@ -39,13 +39,12 @@ fun OnboardingWizardScreen(
     modifier: Modifier = Modifier
 ) {
     var currentStep by remember { mutableIntStateOf(0) }
-    val totalSteps = 4
+    val totalSteps = 3
 
     // Essential clinician setup states
     var clinicianName by remember { mutableStateOf("Dr. Ingrid Halvorsen") }
     var credentials by remember { mutableStateOf("BDS (Hons), MFDS RCSEd, MClinDent") }
     var specialty by remember { mutableStateOf("Periodontics & Microsurgery") }
-    var surgeryRoom by remember { mutableStateOf("Surgery 1 (Main Surgical Operatory)") }
     var practiceDate by remember { mutableStateOf("") }
 
     // Intercept hardware/system back button
@@ -61,9 +60,10 @@ fun OnboardingWizardScreen(
         if (currentStep < totalSteps - 1) {
             currentStep++
         } else {
+            val resolvedName = clinicianName.trim().ifBlank { "Dr. Dental Clinician" }
             // Save clinician preferences to database
             val prefs = UserProfilePreferences(
-                fullName = clinicianName.trim().ifBlank { "Dr. Dental Clinician" },
+                fullName = resolvedName,
                 pronouns = credentials.trim(),
                 dob = practiceDate.trim(),
                 phone = "",
@@ -72,13 +72,14 @@ fun OnboardingWizardScreen(
                 anxietyLevel = specialty,
                 comfortAmenities = emptyList(),
                 anesthesiaPreference = "Standard Local Anesthetic",
-                medicalAlerts = listOf("Room: $surgeryRoom"),
+                medicalAlerts = emptyList(),
                 lastVisit = practiceDate.trim().ifBlank { "Active" },
                 schedulePreference = "Morning (8am - 12pm)",
                 contactChannel = "Direct In-App Operatory Queue",
-                additionalNotes = "Operatory: $surgeryRoom",
+                additionalNotes = "",
                 isOnboardingCompleted = true
             )
+            DentalRepository.updateClinicianName(clinicianName.trim().ifBlank { "Dr. Dental Clinician" })
             DentalRepository.completeOnboarding(prefs)
             onOnboardingFinished()
         }
@@ -233,21 +234,17 @@ fun OnboardingWizardScreen(
                 label = "MinimalClinicianWizardTransition"
             ) { step ->
                 when (step) {
-                    0 -> StepClinicianIdentity(
+                    0 -> StepClinicianName(
                         name = clinicianName,
-                        onNameChange = { clinicianName = it },
-                        credentials = credentials,
-                        onCredentialsChange = { credentials = it }
+                        onNameChange = { clinicianName = it }
                     )
-                    1 -> StepSpecialty(
+                    1 -> StepCredentialsAndSpecialty(
+                        credentials = credentials,
+                        onCredentialsChange = { credentials = it },
                         selectedSpecialty = specialty,
                         onSelectSpecialty = { specialty = it }
                     )
-                    2 -> StepSurgeryRoom(
-                        selectedRoom = surgeryRoom,
-                        onSelectRoom = { surgeryRoom = it }
-                    )
-                    3 -> StepPracticeDate(
+                    2 -> StepPracticeDate(
                         date = practiceDate,
                         onDateChange = { practiceDate = it }
                     )
@@ -258,7 +255,7 @@ fun OnboardingWizardScreen(
 }
 
 // =============================================================================
-// Minimal Step Composables (Only 4 Questions)
+// Minimal Step Composables (3 Questions)
 // =============================================================================
 
 @Composable
@@ -297,11 +294,9 @@ private fun ClinicianQuestionHeader(
 }
 
 @Composable
-private fun StepClinicianIdentity(
+private fun StepClinicianName(
     name: String,
-    onNameChange: (String) -> Unit,
-    credentials: String,
-    onCredentialsChange: (String) -> Unit
+    onNameChange: (String) -> Unit
 ) {
     Column {
         ClinicianQuestionHeader(
@@ -320,24 +315,13 @@ private fun StepClinicianIdentity(
             colors = thornburyTextFieldColors(),
             shape = RoundedCornerShape(12.dp)
         )
-
-        Spacer(modifier = Modifier.height(18.dp))
-
-        OutlinedTextField(
-            value = credentials,
-            onValueChange = onCredentialsChange,
-            label = { Text("Qualifications & Degrees (Optional)") },
-            placeholder = { Text("e.g. BDS (Hons), MFDS RCSEd, MClinDent") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-            colors = thornburyTextFieldColors(),
-            shape = RoundedCornerShape(12.dp)
-        )
     }
 }
 
 @Composable
-private fun StepSpecialty(
+private fun StepCredentialsAndSpecialty(
+    credentials: String,
+    onCredentialsChange: (String) -> Unit,
     selectedSpecialty: String,
     onSelectSpecialty: (String) -> Unit
 ) {
@@ -351,10 +335,34 @@ private fun StepSpecialty(
 
     Column {
         ClinicianQuestionHeader(
-            tag = "Clinical Discipline",
-            title = "What is your primary clinical discipline?",
-            subtitle = "Customizes diagnostic templates and treatment plan presets."
+            tag = "Credentials & Specialization",
+            title = "Clinical credentials & specialization",
+            subtitle = "Qualifications and primary clinical discipline for your operatory profile."
         )
+
+        OutlinedTextField(
+            value = credentials,
+            onValueChange = onCredentialsChange,
+            label = { Text("Qualifications & Degrees (Optional)") },
+            placeholder = { Text("e.g. BDS (Hons), MFDS RCSEd, MClinDent") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = thornburyTextFieldColors(),
+            shape = RoundedCornerShape(12.dp)
+        )
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        Text(
+            text = "PRIMARY CLINICAL SPECIALIZATION",
+            style = MaterialTheme.typography.labelSmall.copy(
+                color = ThornburyPrimary,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.1.sp
+            )
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         specialties.forEach { (title, description) ->
             SingleSelectCard(
@@ -362,37 +370,6 @@ private fun StepSpecialty(
                 description = description,
                 isSelected = title == selectedSpecialty,
                 onSelect = { onSelectSpecialty(title) }
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-        }
-    }
-}
-
-@Composable
-private fun StepSurgeryRoom(
-    selectedRoom: String,
-    onSelectRoom: (String) -> Unit
-) {
-    val rooms = listOf(
-        "Surgery 1 (Main Surgical Operatory)" to "Equipped with high-magnification surgical ceiling microscope and surgical cart",
-        "Surgery 2 (Endodontic Suite)" to "Specialized for root canal therapy with rotary motor and apex locator",
-        "Surgery 3 (Restorative & Implant Surgery)" to "Designed for biomimetic bonding, intraoral scanning, and implant procedures",
-        "Floating / Multi-Operatory" to "Practicing across multiple chairs and surgeries in the facility"
-    )
-
-    Column {
-        ClinicianQuestionHeader(
-            tag = "Surgery Assignment",
-            title = "Which operatory room do you operate in?",
-            subtitle = "Filters today's chairside queue and patient room callouts."
-        )
-
-        rooms.forEach { (title, description) ->
-            SingleSelectCard(
-                title = title,
-                description = description,
-                isSelected = title == selectedRoom,
-                onSelect = { onSelectRoom(title) }
             )
             Spacer(modifier = Modifier.height(10.dp))
         }

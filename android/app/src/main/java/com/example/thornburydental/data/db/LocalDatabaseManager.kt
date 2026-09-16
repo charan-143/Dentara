@@ -22,6 +22,9 @@ object LocalDatabaseManager {
     var isInitialized = false
         private set
 
+    var appContext: Context? = null
+        private set
+
     lateinit var dbHelper: ThornburyDbHelper
         private set
 
@@ -55,8 +58,9 @@ object LocalDatabaseManager {
     @Synchronized
     fun initialize(context: Context) {
         if (isInitialized) return
-        val appContext = context.applicationContext
-        dbHelper = ThornburyDbHelper.getInstance(appContext)
+        val appCtx = context.applicationContext
+        appContext = appCtx
+        dbHelper = ThornburyDbHelper.getInstance(appCtx)
         toothDao = ToothDao(dbHelper)
         patientDao = PatientDao(dbHelper)
         appointmentDao = AppointmentDao(dbHelper)

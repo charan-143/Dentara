@@ -12,7 +12,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
-        const val DATABASE_VERSION = 4
+        const val DATABASE_VERSION = 5
 
         // Table Names
         const val TABLE_PATIENTS = "patients"
@@ -52,6 +52,9 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         const val COL_PREF_CONTACT_CHANNEL = "contact_channel"
         const val COL_PREF_ADDITIONAL_NOTES = "additional_notes"
         const val COL_PREF_IS_COMPLETED = "is_onboarding_completed"
+        const val COL_PREF_MORNING_REMINDER_ENABLED = "morning_reminder_enabled"
+        const val COL_PREF_MORNING_REMINDER_TIME = "morning_reminder_time"
+        const val COL_PREF_CHAIRSIDE_REMINDER_DEFAULT_MIN = "chairside_reminder_default_min"
         const val COL_PREF_UPDATED_AT = "updated_at"
 
         // Users columns
@@ -106,6 +109,8 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         const val COL_APPTS_PROCEDURE = "procedure"
         const val COL_APPTS_ALLERGY_LIST = "allergy_list"
         const val COL_APPTS_STATUS = "status"
+        const val COL_APPTS_REMINDER_ENABLED = "reminder_enabled"
+        const val COL_APPTS_REMINDER_LEAD_MIN = "reminder_lead_min"
         const val COL_APPTS_CREATED_AT = "created_at"
 
         // Treatment Plans columns
@@ -221,6 +226,8 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 $COL_APPTS_PROCEDURE TEXT NOT NULL,
                 $COL_APPTS_ALLERGY_LIST TEXT,
                 $COL_APPTS_STATUS TEXT NOT NULL,
+                $COL_APPTS_REMINDER_ENABLED INTEGER NOT NULL DEFAULT 0,
+                $COL_APPTS_REMINDER_LEAD_MIN INTEGER NOT NULL DEFAULT 15,
                 $COL_APPTS_CREATED_AT INTEGER
             );
             """.trimIndent()
@@ -321,6 +328,9 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 $COL_PREF_CONTACT_CHANNEL TEXT NOT NULL,
                 $COL_PREF_ADDITIONAL_NOTES TEXT,
                 $COL_PREF_IS_COMPLETED INTEGER NOT NULL DEFAULT 0,
+                $COL_PREF_MORNING_REMINDER_ENABLED INTEGER NOT NULL DEFAULT 1,
+                $COL_PREF_MORNING_REMINDER_TIME TEXT NOT NULL DEFAULT '08:00',
+                $COL_PREF_CHAIRSIDE_REMINDER_DEFAULT_MIN INTEGER NOT NULL DEFAULT 15,
                 $COL_PREF_UPDATED_AT INTEGER NOT NULL
             );
             """.trimIndent()
@@ -344,6 +354,18 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 5) {
+            try {
+                db.execSQL("ALTER TABLE $TABLE_APPOINTMENTS ADD COLUMN $COL_APPTS_REMINDER_ENABLED INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE $TABLE_APPOINTMENTS ADD COLUMN $COL_APPTS_REMINDER_LEAD_MIN INTEGER NOT NULL DEFAULT 15")
+                db.execSQL("ALTER TABLE $TABLE_USER_PREFERENCES ADD COLUMN $COL_PREF_MORNING_REMINDER_ENABLED INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE $TABLE_USER_PREFERENCES ADD COLUMN $COL_PREF_MORNING_REMINDER_TIME TEXT NOT NULL DEFAULT '08:00'")
+                db.execSQL("ALTER TABLE $TABLE_USER_PREFERENCES ADD COLUMN $COL_PREF_CHAIRSIDE_REMINDER_DEFAULT_MIN INTEGER NOT NULL DEFAULT 15")
+                return
+            } catch (e: Exception) {
+                // If migration fails, fall back to recreation
+            }
+        }
         // Drop existing tables in reverse dependency order
         db.execSQL("DROP TABLE IF EXISTS $TABLE_MEDICATION_PRESETS")
         db.execSQL("DROP TABLE IF EXISTS $TABLE_USER_PREFERENCES")
