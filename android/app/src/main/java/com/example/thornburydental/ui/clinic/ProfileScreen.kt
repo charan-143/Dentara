@@ -7,6 +7,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,51 +77,53 @@ fun ProfileScreen(
     val appointments by DentalRepository.appointments.collectAsState()
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
-    var showChangePasswordDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = "Clinician Profile & Practice",
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = ThornburyInk
-                        )
-                        Text(
-                            text = "Operatory management, clinical ergonomics, and system preferences",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ThornburyMuted
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = ThornburyCanvas)
-            )
-        },
-        containerColor = ThornburyCanvas,
+    Column(
         modifier = modifier
-    ) { innerPadding ->
+            .fillMaxSize()
+            .background(ThornburyCanvas)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = ThornburyCanvas,
+            border = BorderStroke(1.dp, ThornburyHairline)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
+            ) {
+                Text(
+                    text = "Clinician Profile & Practice",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold
+                    ),
+                    color = ThornburyInk
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Operatory management, clinical ergonomics, and system preferences",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThornburyMuted
+                )
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Spacer(modifier = Modifier.height(4.dp))
-
             // -----------------------------------------------------------------
             // 1. Clinician Executive Identity Card
             // -----------------------------------------------------------------
             ElevatedCard(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(18.dp)),
-                shape = RoundedCornerShape(18.dp),
+                    .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
                 elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
             ) {
@@ -214,21 +218,49 @@ fun ProfileScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.MedicalServices, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(18.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f, fill = false)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MedicalServices,
+                                contentDescription = null,
+                                tint = ThornburyPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(text = "Clinical Role:", style = MaterialTheme.typography.bodyMedium, color = ThornburyMuted)
+                            Text(
+                                text = "Clinical Role:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = ThornburyMuted
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(text = roleLabel, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                            Text(
+                                text = roleLabel,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyInk,
+                                maxLines = 1
+                            )
                         }
+
+                        Spacer(modifier = Modifier.width(8.dp))
 
                         TextButton(
                             onClick = { showEditProfileDialog = true },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                         ) {
-                            Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = ThornburyPrimary)
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = ThornburyPrimary
+                            )
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Edit Name & Info", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
+                            Text(
+                                text = "Edit Name & Info",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyPrimary
+                            )
                         }
                     }
                 }
@@ -325,11 +357,11 @@ fun ProfileScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
 
                                 // Quick presets
-                                Row(
+                                LazyRow(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    listOf("07:00", "07:30", "08:00", "08:30", "09:00").forEach { presetTime ->
+                                    items(listOf("07:00", "07:30", "08:00", "08:30", "09:00")) { presetTime ->
                                         val isSelected = morningReminderTime == presetTime
                                         FilterChip(
                                             selected = isSelected,
@@ -337,10 +369,13 @@ fun ProfileScreen(
                                             label = {
                                                 Text(
                                                     text = ReminderManager.formatTime12Hour(presetTime),
-                                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp)
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    ),
+                                                    maxLines = 1,
+                                                    softWrap = false
                                                 )
                                             },
-                                            modifier = Modifier.weight(1f),
                                             colors = FilterChipDefaults.filterChipColors(
                                                 selectedContainerColor = ThornburyPrimaryWash,
                                                 selectedLabelColor = ThornburyPrimaryText
@@ -361,17 +396,19 @@ fun ProfileScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        Row(
+                        LazyRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            listOf(
-                                10 to "10 min",
-                                15 to "15 min",
-                                30 to "30 min",
-                                45 to "45 min",
-                                60 to "1 hour"
-                            ).forEach { (leadMin, label) ->
+                            items(
+                                listOf(
+                                    10 to "10 min",
+                                    15 to "15 min",
+                                    30 to "30 min",
+                                    45 to "45 min",
+                                    60 to "1 hour"
+                                )
+                            ) { (leadMin, label) ->
                                 val isSelected = chairsideReminderDefaultMin == leadMin
                                 FilterChip(
                                     selected = isSelected,
@@ -381,10 +418,11 @@ fun ProfileScreen(
                                             text = label,
                                             style = MaterialTheme.typography.labelSmall.copy(
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
+                                            ),
+                                            maxLines = 1,
+                                            softWrap = false
                                         )
                                     },
-                                    modifier = Modifier.weight(1f),
                                     colors = FilterChipDefaults.filterChipColors(
                                         selectedContainerColor = ThornburyPrimaryWash,
                                         selectedLabelColor = ThornburyPrimaryText
@@ -554,16 +592,6 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Edit Clinician Profile Details", style = MaterialTheme.typography.labelMedium)
                     }
-
-                    OutlinedButton(
-                        onClick = { showChangePasswordDialog = true },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Update Practice Access Password", style = MaterialTheme.typography.labelMedium)
-                    }
                 }
             }
 
@@ -589,7 +617,7 @@ fun ProfileScreen(
                     .fillMaxWidth(0.92f)
                     .wrapContentHeight()
                     .padding(vertical = 16.dp),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
                 border = BorderStroke(1.dp, ThornburyHairline)
             ) {
@@ -654,96 +682,6 @@ fun ProfileScreen(
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text("Save Changes")
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    if (showChangePasswordDialog) {
-        var currentPassword by remember { mutableStateOf("") }
-        var newPassword by remember { mutableStateOf("") }
-        var confirmPassword by remember { mutableStateOf("") }
-
-        Dialog(
-            onDismissRequest = { showChangePasswordDialog = false },
-            properties = DialogProperties(usePlatformDefaultWidth = false)
-        ) {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth(0.92f)
-                    .wrapContentHeight()
-                    .padding(vertical = 16.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(text = "Change Access Password", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                        IconButton(onClick = { showChangePasswordDialog = false }, modifier = Modifier.size(28.dp)) {
-                            Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = ThornburyMuted)
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = currentPassword,
-                        onValueChange = { currentPassword = it },
-                        label = { Text("Current Password") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = thornburyTextFieldColors()
-                    )
-
-                    OutlinedTextField(
-                        value = newPassword,
-                        onValueChange = { newPassword = it },
-                        label = { Text("New Password (min 6 chars)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = thornburyTextFieldColors()
-                    )
-
-                    OutlinedTextField(
-                        value = confirmPassword,
-                        onValueChange = { confirmPassword = it },
-                        label = { Text("Confirm New Password") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        colors = thornburyTextFieldColors()
-                    )
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { showChangePasswordDialog = false }) {
-                            Text("Cancel", color = ThornburyMuted)
-                        }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Button(
-                            onClick = {
-                                if (newPassword.length >= 6 && newPassword == confirmPassword) {
-                                    showChangePasswordDialog = false
-                                    Toast.makeText(context, "Password updated successfully", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Passwords must match and be at least 6 characters", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("Update Password")
                         }
                     }
                 }

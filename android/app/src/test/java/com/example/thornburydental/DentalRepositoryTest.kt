@@ -1,16 +1,201 @@
 package com.example.thornburydental
 
+import com.example.thornburydental.data.Allergy
+import com.example.thornburydental.data.Appointment
 import com.example.thornburydental.data.DentalRepository
+import com.example.thornburydental.data.DiagnosticReport
+import com.example.thornburydental.data.Patient
+import com.example.thornburydental.data.PatientDiagnosis
 import com.example.thornburydental.data.PlanStep
+import com.example.thornburydental.data.Prescription
 import com.example.thornburydental.data.ToothCondition
+import com.example.thornburydental.data.TreatmentPlan
+import com.example.thornburydental.util.todayIsoDate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 
 class DentalRepositoryTest {
+
+    @Before
+    fun setUp() {
+        val testTeeth = DentalRepository.generateDefaultTeeth()
+        val testPatients = listOf(
+            Patient(
+                id = "p1",
+                opNo = "OP-40182",
+                name = "Rosalind Achebe",
+                dob = "1984-03-11",
+                phone = "+1 (503) 224-7719",
+                email = "rosalind.achebe@example.org",
+                address = "742 Evergreen Terrace, Portland, OR 97201",
+                medicalHistory = "No significant systemic medical history.",
+                familyHistory = "Maternal history of early severe periodontitis",
+                pastDentalHistory = "Irregular dental attendance due to dental anxiety",
+                lastVisit = "3 weeks ago",
+                medicalAlerts = emptyList(),
+                allergies = emptyList(),
+                teeth = testTeeth
+            ),
+            Patient(
+                id = "p2",
+                opNo = "OP-40219",
+                name = "Dmitri Vollmer",
+                dob = "1971-11-02",
+                phone = "+1 (503) 917-4402",
+                email = "d.vollmer@example.org",
+                address = "1208 NW 23rd Ave, Portland, OR 97210",
+                medicalHistory = "Hypertension",
+                familyHistory = "No known hereditary conditions",
+                pastDentalHistory = "Root canal treatment tooth #19 performed 6 years ago",
+                lastVisit = "3 days ago",
+                medicalAlerts = emptyList(),
+                allergies = emptyList(),
+                teeth = testTeeth
+            ),
+            Patient(
+                id = "p3",
+                opNo = "OP-40233",
+                name = "Kavitha Nambiar",
+                dob = "1996-06-24",
+                phone = "+1 (971) 288-6153",
+                email = "k.nambiar@example.org",
+                address = "3415 SE Division St, Portland, OR 97202",
+                medicalHistory = "No significant systemic history",
+                familyHistory = "Nil",
+                pastDentalHistory = "Regular 6-monthly checkups",
+                lastVisit = "2 months ago",
+                medicalAlerts = emptyList(),
+                allergies = emptyList(),
+                teeth = testTeeth
+            ),
+            Patient(
+                id = "p4",
+                opNo = "OP-40251",
+                name = "Owen Blackwood",
+                dob = "1958-01-19",
+                phone = "+1 (503) 661-2087",
+                email = "o.blackwood@example.org",
+                address = "883 SW Vista Ave, Portland, OR 97205",
+                medicalHistory = "Atrial Fibrillation on Apixaban",
+                familyHistory = "Cardiovascular disease",
+                pastDentalHistory = "Periodontal maintenance recalls",
+                lastVisit = "9 days ago",
+                medicalAlerts = emptyList(),
+                allergies = emptyList(),
+                teeth = testTeeth
+            ),
+            Patient(
+                id = "p5",
+                opNo = "OP-40266",
+                name = "Marisol Cabrera-Reyes",
+                dob = "2001-09-30",
+                phone = "+1 (971) 402-9338",
+                email = "m.cabrera@example.org",
+                address = "1920 NE Alberta St, Portland, OR 97211",
+                medicalHistory = "No known systemic illness.",
+                familyHistory = "Mother has dental fluorosis",
+                pastDentalHistory = "Composite restoration #30",
+                lastVisit = "4 months ago",
+                medicalAlerts = emptyList(),
+                allergies = emptyList(),
+                teeth = testTeeth
+            )
+        )
+
+        val testAppointments = listOf(
+            Appointment(
+                id = "a1",
+                patientId = "p1",
+                patientName = "Rosalind Achebe",
+                patientOpNo = "OP-40182",
+                patientDob = "1984-03-11",
+                clinicianId = "c1",
+                clinicianName = "Dr. Ingrid Halvorsen",
+                date = todayIsoDate(),
+                time = "09:00",
+                durationMin = 45,
+                room = "Surgery 1",
+                procedure = "Subgingival Debridement Quad 1 & 4",
+                allergyList = null,
+                status = "confirmed"
+            ),
+            Appointment(
+                id = "a2",
+                patientId = "p2",
+                patientName = "Dmitri Vollmer",
+                patientOpNo = "OP-40219",
+                patientDob = "1971-11-02",
+                clinicianId = "c1",
+                clinicianName = "Dr. Ingrid Halvorsen",
+                date = todayIsoDate(),
+                time = "10:15",
+                durationMin = 60,
+                room = "Surgery 1",
+                procedure = "Root Canal Retreatment #19",
+                allergyList = null,
+                status = "confirmed"
+            )
+        )
+
+        val testPrescriptions = listOf(
+            Prescription(
+                id = "rx-8401",
+                patientId = "p2",
+                patientName = "Dmitri Vollmer",
+                clinicianName = "Dr. Ingrid Halvorsen",
+                drugName = "Amoxicillin",
+                dosage = "500 mg capsules",
+                frequency = "1 capsule every 8 hours",
+                duration = "5 days",
+                instructions = "Take with water after meals. Finish complete course.",
+                issueDate = "Today, 10:20 AM"
+            )
+        )
+
+        val testPlans = listOf(
+            TreatmentPlan(
+                id = "plan-901",
+                patientId = "p1",
+                title = "Phase 1: Periodontal Scaling & Caries Control",
+                clinicianName = "Dr. Ingrid Halvorsen",
+                diagnosis = "Generalized Stage III, Grade B Periodontitis",
+                dateCreated = "2026-09-02",
+                isLocked = true,
+                tamperHash = "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+                steps = listOf(
+                    PlanStep("s1", null, "Full mouth periodontal charting and OHI", "D0180", 120.0, true),
+                    PlanStep("s2", 3, "Quadrant scaling and root planing", "D4341", 280.0, true),
+                    PlanStep("s3", 30, "Quadrant scaling and root planing", "D4341", 280.0, false)
+                )
+            )
+        )
+
+        val testReports = listOf(
+            DiagnosticReport(
+                id = "rp1",
+                patientId = "p1",
+                clinicianName = "Dr. Ingrid Halvorsen",
+                kind = "Radiograph",
+                title = "OPG Panoramic Radiograph",
+                summary = "Bilateral alveolar bone loss",
+                takenAt = "Today, 08:30",
+                releasedAt = "Today, 09:15"
+            )
+        )
+
+        DentalRepository.seedTestFixturesForUnitTests(
+            testPatients = testPatients,
+            testAppointments = testAppointments,
+            testPrescriptions = testPrescriptions,
+            testTreatmentPlans = testPlans,
+            testReports = testReports
+        )
+    }
 
     // =========================================================================
     // 1. Allergy Conflict Detection & Clinical Override

@@ -124,15 +124,7 @@ object DentalRepository {
     fun initializeFromDatabase() {
         repositoryScope.launch {
             if (LocalDatabaseManager.isInitialized) {
-                if (LocalDatabaseManager.isDatabaseEmpty()) {
-                    LocalDatabaseManager.seedInitialDataIfEmpty(
-                        patients = initialPatients,
-                        appointments = initialAppointments,
-                        prescriptions = initialPrescriptions,
-                        treatmentPlans = initialTreatmentPlans,
-                        reports = initialReports
-                    )
-                }
+                LocalDatabaseManager.purgeDevelopmentSeedData()
                 reloadFromDatabase()
             }
         }
@@ -142,25 +134,15 @@ object DentalRepository {
         if (!LocalDatabaseManager.isInitialized) return@withContext
         try {
             val dbPatients = LocalDatabaseManager.patientDao.getAllPatients()
-            if (dbPatients.isNotEmpty()) {
-                _patients.value = dbPatients
-            }
+            _patients.value = dbPatients
             val dbAppointments = LocalDatabaseManager.appointmentDao.getAllAppointments()
-            if (dbAppointments.isNotEmpty()) {
-                _appointments.value = dbAppointments
-            }
+            _appointments.value = dbAppointments
             val dbPlans = LocalDatabaseManager.treatmentPlanDao.getAllTreatmentPlans()
-            if (dbPlans.isNotEmpty()) {
-                _treatmentPlans.value = dbPlans
-            }
+            _treatmentPlans.value = dbPlans
             val dbPrescriptions = LocalDatabaseManager.prescriptionDao.getAllPrescriptions()
-            if (dbPrescriptions.isNotEmpty()) {
-                _prescriptions.value = dbPrescriptions
-            }
+            _prescriptions.value = dbPrescriptions
             val dbReports = LocalDatabaseManager.reportDao.getAllReports()
-            if (dbReports.isNotEmpty()) {
-                _reports.value = dbReports
-            }
+            _reports.value = dbReports
             val dbPrefs = LocalDatabaseManager.userPreferencesDao.getPreferences()
             if (dbPrefs != null) {
                 _userPreferences.value = dbPrefs
@@ -320,365 +302,26 @@ object DentalRepository {
         return map
     }
 
-    private val initialPatients: List<Patient> = run {
-        val t1 = generateDefaultTeeth().toMutableMap().apply {
-            this[3] = this[3]!!.copy(condition = ToothCondition.FILLED, notes = "Composite DO restoration (2024)")
-            this[14] = this[14]!!.copy(condition = ToothCondition.CROWN, notes = "Zirconia full contour crown")
-            this[19] = this[19]!!.copy(condition = ToothCondition.ROOT_CANAL, notes = "Completed RCT with gutta-percha obturation")
-            this[30] = this[30]!!.copy(condition = ToothCondition.DECAY, notes = "Active occlusal caries into dentin")
-        }
 
-        val t2 = generateDefaultTeeth().toMutableMap().apply {
-            this[1] = this[1]!!.copy(condition = ToothCondition.MISSING, notes = "Surgically extracted 2018")
-            this[16] = this[16]!!.copy(condition = ToothCondition.MISSING, notes = "Congenitally absent")
-            this[19] = this[19]!!.copy(condition = ToothCondition.IMPLANT, notes = "Straumann 4.1mm tissue level implant")
-            this[20] = this[20]!!.copy(condition = ToothCondition.FILLED, notes = "MOD amalgam restoration")
-        }
-
-        val t3 = generateDefaultTeeth().toMutableMap().apply {
-            this[8] = this[8]!!.copy(condition = ToothCondition.FILLED, notes = "Class IV composite incisal edge repair")
-            this[9] = this[9]!!.copy(condition = ToothCondition.SOUND)
-            this[18] = this[18]!!.copy(condition = ToothCondition.DECAY, notes = "Early enamel demineralization")
-        }
-
-        listOf(
-            Patient(
-                id = "p1",
-                opNo = "OP-40182",
-                name = "Rosalind Achebe",
-                dob = "1984-03-11",
-                phone = "+1 (503) 224-7719",
-                email = "rosalind.achebe@example.org",
-                address = "742 Evergreen Terrace, Portland, OR 97201",
-                medicalHistory = "No significant systemic medical history.",
-                familyHistory = "Maternal history of early severe periodontitis with tooth loss by age 50\nFather has hypertension",
-                pastDentalHistory = "Irregular dental attendance due to dental anxiety\nPast composite restoration on #3\nOrthodontic treatment completed age 16",
-                lastVisit = "3 weeks ago",
-                medicalAlerts = emptyList(),
-                allergies = emptyList(),
-                teeth = t1,
-                examAnswers = ExaminationAnswers(
-                    chiefComplaints = listOf("Toothache", "Sensitivity"),
-                    chiefComplaintOther = "Discomfort on lower left quadrant when drinking chilled liquids",
-                    painSeverity = "Moderate",
-                    sensitivityTriggers = listOf("Cold", "Sweet / Acidic"),
-                    periodontalBleeding = listOf("Bleeding on brushing"),
-                    periodontalPockets = listOf("Mild Pockets (4 - 5 mm)"),
-                    gingivalRecession = listOf("Mild (< 2 mm)"),
-                    softTissue = listOf("Healthy & intact"),
-                    stains = listOf("Extrinsic (Tea / Coffee)"),
-                    calculus = listOf("Supragingival - Mild"),
-                    tmjAssessment = listOf("Normal / Asymptomatic"),
-                    functionalHabits = listOf("No clenching/grinding"),
-                    brushingFrequency = "2x/day",
-                    flossingFrequency = "Occasional",
-                    cariesRisk = "Moderate Risk",
-                    otherDiagnosesConditions = listOf("Localized Gingivitis"),
-                    otherDiagnosesNotes = "Localized marginal gingivitis in lower anterior segment.",
-                    clinicianNotes = "Active carious lesion, prompt restoration advised. Generalized marginal gingivitis secondary to plaque accumulation."
-                ),
-                diagnosis = PatientDiagnosis(
-                    primaryDiagnosis = "Generalized Stage III, Grade B Periodontitis; localized deep pockets #3, #14; active occlusal caries #30",
-                    clinicalFindings = "Generalized 4-5mm probing depths, bleeding on probing in anterior quadrant, subgingival calculus. Tooth #30 has active dentinal caries.",
-                    prognosis = "Favourable with periodontal therapy and restorative intervention",
-                    systemicConsiderations = "No contraindicating systemic conditions.",
-                    dateRecorded = "2026-09-02",
-                    lastUpdated = "2026-09-02",
-                    clinicianName = "Dr. Ingrid Halvorsen"
-                )
-            ),
-            Patient(
-                id = "p2",
-                opNo = "OP-40219",
-                name = "Dmitri Vollmer",
-                dob = "1971-11-02",
-                phone = "+1 (503) 917-4402",
-                email = "d.vollmer@example.org",
-                address = "1208 NW 23rd Ave, Portland, OR 97210",
-                medicalHistory = "Stage 1 Essential Hypertension (managed with Amlodipine 5mg daily)",
-                familyHistory = "No known hereditary dental or systemic conditions",
-                pastDentalHistory = "Surgical extraction of tooth #1 in 2018\nStraumann dental implant placed at site #19 in 2021\nRegular 6-monthly recall visits",
-                lastVisit = "3 days ago",
-                medicalAlerts = emptyList(),
-                allergies = emptyList(),
-                teeth = t2,
-                examAnswers = ExaminationAnswers(
-                    chiefComplaints = listOf("Follow-up"),
-                    chiefComplaintOther = "Post-surgical review following tooth extraction",
-                    painSeverity = "Mild",
-                    sensitivityTriggers = listOf("Biting / Mastication Pressure"),
-                    periodontalBleeding = listOf("No bleeding"),
-                    periodontalPockets = listOf("Normal (1 - 3 mm)"),
-                    gingivalRecession = listOf("None"),
-                    softTissue = listOf("Healthy & intact"),
-                    stains = listOf("None / Minimal"),
-                    calculus = listOf("None"),
-                    tmjAssessment = listOf("Normal / Asymptomatic"),
-                    functionalHabits = listOf("No clenching/grinding"),
-                    brushingFrequency = "2x/day",
-                    flossingFrequency = "Daily",
-                    cariesRisk = "Low Risk",
-                    otherDiagnosesConditions = emptyList(),
-                    otherDiagnosesNotes = "Post-surgical healing in progress.",
-                    clinicianNotes = "Extraction socket healing uneventfully. Oral hygiene is excellent."
-                ),
-                diagnosis = PatientDiagnosis(
-                    primaryDiagnosis = "Symptomatic apical periodontitis #19 with sub-optimal previous obturation",
-                    clinicalFindings = "Tenderness to percussion #19, persistent periapical radiolucency on CBCT, mesial canals intact, suspected untreated MB2.",
-                    prognosis = "Good following microscope-guided endodontic retreatment",
-                    systemicConsiderations = "Controlled Hypertension (Amlodipine 5mg). Monitor BP.",
-                    dateRecorded = "2026-09-08",
-                    lastUpdated = "2026-09-08",
-                    clinicianName = "Dr. Ingrid Halvorsen"
-                )
-            ),
-            Patient(
-                id = "p3",
-                opNo = "OP-40233",
-                name = "Kavitha Nambiar",
-                dob = "1996-06-24",
-                phone = "+1 (971) 288-6153",
-                email = "k.nambiar@example.org",
-                address = "3415 SE Division St, Portland, OR 97202",
-                medicalHistory = "No significant systemic medical history. Non-smoker.",
-                familyHistory = "Nil relevant familial dental abnormalities.",
-                pastDentalHistory = "Trauma to #8 restored with Class IV composite in 2022\nEarly enamel caries #18 under topical fluoride monitoring",
-                lastVisit = "2 months ago",
-                medicalAlerts = emptyList(),
-                allergies = emptyList(),
-                teeth = t3,
-                diagnosis = PatientDiagnosis(
-                    primaryDiagnosis = "Incisal composite restoration margin integrity review #8; localized early enamel demineralization #18",
-                    clinicalFindings = "Class IV composite stable. Incipient non-cavitated white spot lesion on occlusal surface of #18.",
-                    prognosis = "Excellent",
-                    systemicConsiderations = "Nil",
-                    dateRecorded = "2026-07-14",
-                    lastUpdated = "2026-07-14",
-                    clinicianName = "Dr. Ingrid Halvorsen"
-                )
-            ),
-            Patient(
-                id = "p4",
-                opNo = "OP-40251",
-                name = "Owen Blackwood",
-                dob = "1958-01-19",
-                phone = "+1 (503) 661-2087",
-                email = "o.blackwood@example.org",
-                address = "883 SW Vista Ave, Portland, OR 97205",
-                medicalHistory = "Type 2 Diabetes Mellitus (HbA1c 6.8%)\nAtrial Fibrillation on Apixaban (Eliquis) 5mg BD",
-                familyHistory = "Cardiovascular disease (father), Type 2 Diabetes (mother)",
-                pastDentalHistory = "Periodontal maintenance recalls every 3-4 months\nNo extractions in past 10 years",
-                lastVisit = "9 days ago",
-                medicalAlerts = emptyList(),
-                allergies = emptyList(),
-                teeth = generateDefaultTeeth()
-            ),
-            Patient(
-                id = "p5",
-                opNo = "OP-40266",
-                name = "Marisol Cabrera-Reyes",
-                dob = "2001-09-30",
-                phone = "+1 (971) 402-9338",
-                email = "m.cabrera@example.org",
-                address = "1920 NE Alberta St, Portland, OR 97211",
-                medicalHistory = "No known systemic illness.",
-                familyHistory = "Mother has dental fluorosis",
-                pastDentalHistory = "Composite restoration #30\nFissure sealants placed on all first molars at age 7",
-                lastVisit = "4 months ago",
-                medicalAlerts = emptyList(),
-                allergies = emptyList(),
-                teeth = generateDefaultTeeth()
-            )
-        )
-    }
-
-    private val _patients = MutableStateFlow(initialPatients)
+    private val _patients = MutableStateFlow<List<Patient>>(emptyList())
     val patients: StateFlow<List<Patient>> = _patients.asStateFlow()
 
-    private val initialAppointments = listOf(
-        Appointment(
-            id = "a1",
-            patientId = "p1",
-            patientName = "Rosalind Achebe",
-            patientOpNo = "OP-40182",
-            patientDob = "1984-03-11",
-            clinicianId = "c1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            date = todayIsoDate(),
-            time = "09:00",
-            durationMin = 45,
-            room = "Surgery 1",
-            procedure = "Subgingival Debridement Quad 1 & 4",
-            allergyList = null,
-            status = "confirmed"
-        ),
-        Appointment(
-            id = "a2",
-            patientId = "p2",
-            patientName = "Dmitri Vollmer",
-            patientOpNo = "OP-40219",
-            patientDob = "1971-11-02",
-            clinicianId = "c1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            date = todayIsoDate(),
-            time = "10:15",
-            durationMin = 60,
-            room = "Surgery 1",
-            procedure = "Root Canal Retreatment #19",
-            allergyList = null,
-            status = "confirmed"
-        ),
-        Appointment(
-            id = "a3",
-            patientId = "p3",
-            patientName = "Kavitha Nambiar",
-            patientOpNo = "OP-40233",
-            patientDob = "1996-06-24",
-            clinicianId = "c1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            date = addDaysToIsoDate(todayIsoDate(), 1),
-            time = "11:30",
-            durationMin = 45,
-            room = "Surgery 1",
-            procedure = "Implant Crown Seating #19",
-            allergyList = null,
-            status = "confirmed"
-        ),
-        Appointment(
-            id = "a4",
-            patientId = "p4",
-            patientName = "Owen Blackwood",
-            patientOpNo = "OP-40251",
-            patientDob = "1958-01-19",
-            clinicianId = "c1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            date = todayIsoDate(),
-            time = "14:00",
-            durationMin = 30,
-            room = "Surgery 1",
-            procedure = "Periodontal Maintenance Recall",
-            allergyList = null,
-            status = "confirmed"
-        ),
-        Appointment(
-            id = "a5",
-            patientId = "p5",
-            patientName = "Marisol Cabrera-Reyes",
-            patientOpNo = "OP-40266",
-            patientDob = "2001-09-30",
-            clinicianId = "c1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            date = addDaysToIsoDate(todayIsoDate(), -1),
-            time = "15:45",
-            durationMin = 30,
-            room = "Surgery 1",
-            procedure = "Composite Restoration #30",
-            allergyList = null,
-            status = "completed"
-        )
-    )
-
-    private val _appointments = MutableStateFlow(initialAppointments)
+    private val _appointments = MutableStateFlow<List<Appointment>>(emptyList())
     val appointments: StateFlow<List<Appointment>> = _appointments.asStateFlow()
 
-    private val _draftPlans = MutableStateFlow(
-        listOf(
-            DraftPlan("dp1", "p2", "Dmitri Vollmer", "Endodontic retreatment under microscope", "post"),
-            DraftPlan("dp2", "p1", "Rosalind Achebe", "Full mouth periodontal debridement phase 2", "pre")
-        )
-    )
+    private val _draftPlans = MutableStateFlow<List<DraftPlan>>(emptyList())
     val draftPlans: StateFlow<List<DraftPlan>> = _draftPlans.asStateFlow()
 
-    private val _heldResults = MutableStateFlow(
-        listOf(
-            HeldResult("hr1", "p4", "Owen Blackwood", "OPG Panoramic Radiograph", "Imaging"),
-            HeldResult("hr2", "p2", "Dmitri Vollmer", "CBCT 3D Scan #19 Apical Region", "Imaging")
-        )
-    )
+    private val _heldResults = MutableStateFlow<List<HeldResult>>(emptyList())
     val heldResults: StateFlow<List<HeldResult>> = _heldResults.asStateFlow()
 
-    private val initialPrescriptions = listOf(
-        Prescription(
-            id = "rx-8401",
-            patientId = "p2",
-            patientName = "Dmitri Vollmer",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            drugName = "Amoxicillin",
-            dosage = "500 mg capsules",
-            frequency = "1 capsule every 8 hours",
-            duration = "5 days",
-            instructions = "Take with water after meals. Finish complete course.",
-            issueDate = "Today, 10:20 AM"
-        ),
-        Prescription(
-            id = "rx-8402",
-            patientId = "p1",
-            patientName = "Rosalind Achebe",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            drugName = "Clindamycin",
-            dosage = "300 mg capsules",
-            frequency = "1 capsule every 6 hours",
-            duration = "7 days",
-            instructions = "Avoid with food. Penicillin-allergic alternative.",
-            issueDate = "Today, 09:35 AM"
-        )
-    )
-
-    private val _prescriptions = MutableStateFlow(initialPrescriptions)
+    private val _prescriptions = MutableStateFlow<List<Prescription>>(emptyList())
     val prescriptions: StateFlow<List<Prescription>> = _prescriptions.asStateFlow()
 
     private val _medicationPresets = MutableStateFlow(MedicationPreset.defaultPresets)
     val medicationPresets: StateFlow<List<MedicationPreset>> = _medicationPresets.asStateFlow()
 
-    private val initialTreatmentPlans = listOf(
-        TreatmentPlan(
-            id = "plan-901",
-            patientId = "p1",
-            title = "Phase 1: Periodontal Scaling & Caries Control",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            diagnosis = "Generalized Stage III, Grade B Periodontitis with localized deep pockets #3, #14",
-            dateCreated = "2026-09-02",
-            isLocked = true,
-            tamperHash = "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
-            steps = listOf(
-                PlanStep("s1", null, "Full mouth periodontal charting and OHI", "D0180", 120.0, true),
-                PlanStep("s2", 3, "Quadrant scaling and root planing (Upper Right)", "D4341", 280.0, true),
-                PlanStep("s3", 30, "Quadrant scaling and root planing (Lower Right)", "D4341", 280.0, false),
-                PlanStep("s4", 30, "Resin restoration - 2 surfaces, posterior", "D2392", 240.0, false)
-            )
-        ),
-        TreatmentPlan(
-            id = "plan-903",
-            patientId = "p1",
-            title = "Phase 2: Periodontal Re-evaluation & Maintenance",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            diagnosis = "Generalized Stage III, Grade B Periodontitis",
-            dateCreated = "2026-09-12",
-            isLocked = false,
-            tamperHash = "sha256:4b91f09c8d32e185c7f8a113941a2e8c2049e6f3b7d189c4501a382e79601d3a",
-            steps = listOf(
-                PlanStep("s8", null, "4-6 Week Periodontal Re-evaluation & Probing Depth Review", "D4910", 160.0, false),
-                PlanStep("s9", null, "Supportive Periodontal Therapy & Topical Fluoride Application", "D1206", 85.0, false)
-            )
-        ),
-        TreatmentPlan(
-            id = "plan-902",
-            patientId = "p2",
-            title = "Endodontic Retreatment & Coronal Restoration",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            diagnosis = "Symptomatic apical periodontitis #19 with previous sub-optimal obturation",
-            dateCreated = "2026-09-08",
-            isLocked = true,
-            tamperHash = "sha256:3a7bd3e2360a3d29eea436fcfb7e44c735d117c42d1c1835420b6b9942dd4f1b",
-            steps = listOf(
-                PlanStep("s5", 19, "Endodontic retreatment - molar under microscope", "D3348", 1250.0, false),
-                PlanStep("s6", 19, "Core build-up including any pins", "D2950", 295.0, false),
-                PlanStep("s7", 19, "Crown - porcelain fused to high noble metal", "D2750", 1150.0, false)
-            )
-        )
-    )
-
-    private val _treatmentPlans = MutableStateFlow(initialTreatmentPlans)
+    private val _treatmentPlans = MutableStateFlow<List<TreatmentPlan>>(emptyList())
     val treatmentPlans: StateFlow<List<TreatmentPlan>> = _treatmentPlans.asStateFlow()
 
     fun computeCanonicalPlanHash(planId: String, patientId: String, diagnosis: String, steps: List<PlanStep>): String {
@@ -781,7 +424,7 @@ object DentalRepository {
         val ctx = LocalDatabaseManager.appContext
         if (ctx != null) {
             if (enabled && targetAppt != null) {
-                com.example.thornburydental.reminder.ReminderManager.schedulePatientArrivalReminder(ctx, targetAppt!!)
+                com.example.thornburydental.reminder.ReminderManager.schedulePatientArrivalReminder(ctx, targetAppt)
             } else {
                 com.example.thornburydental.reminder.ReminderManager.cancelPatientArrivalReminder(ctx, id)
             }
@@ -1109,50 +752,7 @@ object DentalRepository {
     // =========================================================================
     // Diagnostic Reports & Imaging
     // =========================================================================
-    private val initialReports = listOf(
-        DiagnosticReport(
-            id = "rp1",
-            patientId = "p1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            kind = "Radiograph",
-            title = "OPG Panoramic Radiograph",
-            summary = "Bilateral alveolar bone loss consistent with generalised stage III grade B periodontitis. Furcation involvement tooth 46.",
-            takenAt = "Today, 08:30",
-            releasedAt = "Today, 09:15"
-        ),
-        DiagnosticReport(
-            id = "rp2",
-            patientId = "p1",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            kind = "Charting",
-            title = "Six point periodontal chart",
-            summary = "Generalised probing depths of 2mm to 3mm. Isolated 5mm pocket distal to tooth 36 with bleeding on probing.",
-            takenAt = "3 weeks ago",
-            releasedAt = "3 weeks ago"
-        ),
-        DiagnosticReport(
-            id = "rp3",
-            patientId = "p2",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            kind = "CBCT Scan",
-            title = "CBCT 3D Scan #19 Apical Region",
-            summary = "Persistent radiolucency at distal root apex of 36/19. Mesial root canals adequately obturated; missed MB2 canal indicated.",
-            takenAt = "Yesterday, 14:15",
-            releasedAt = "Today, 08:45"
-        ),
-        DiagnosticReport(
-            id = "rp4",
-            patientId = "p4",
-            clinicianName = "Dr. Ingrid Halvorsen",
-            kind = "Radiograph",
-            title = "Bite-wing Radiographs (Right & Left)",
-            summary = "No new interproximal caries detected. Stable crestal bone levels under regular maintenance.",
-            takenAt = "9 days ago",
-            releasedAt = "9 days ago"
-        )
-    )
-
-    private val _reports = MutableStateFlow(initialReports)
+    private val _reports = MutableStateFlow<List<DiagnosticReport>>(emptyList())
     val reports: StateFlow<List<DiagnosticReport>> = _reports.asStateFlow()
 
     fun addDiagnosticReport(
@@ -1531,6 +1131,20 @@ object DentalRepository {
     fun completeOnboarding(prefs: UserProfilePreferences) {
         val completed = prefs.copy(isOnboardingCompleted = true)
         saveUserPreferences(completed)
+    }
+
+    internal fun seedTestFixturesForUnitTests(
+        testPatients: List<Patient> = emptyList(),
+        testAppointments: List<Appointment> = emptyList(),
+        testPrescriptions: List<Prescription> = emptyList(),
+        testTreatmentPlans: List<TreatmentPlan> = emptyList(),
+        testReports: List<DiagnosticReport> = emptyList()
+    ) {
+        _patients.value = testPatients
+        _appointments.value = testAppointments
+        _prescriptions.value = testPrescriptions
+        _treatmentPlans.value = testTreatmentPlans
+        _reports.value = testReports
     }
 }
 

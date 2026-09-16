@@ -12,86 +12,87 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 val LightColorScheme = lightColorScheme(
-    primary = ThornburyPrimary,
-    onPrimary = ThornburyOnPrimary,
-    primaryContainer = ThornburySurfaceSoft,
-    onPrimaryContainer = ThornburyPrimaryText,
-    inversePrimary = ThornburyPrimaryOnDark,
-    secondary = ThornburyPrimaryActive,
-    onSecondary = ThornburyOnPrimary,
-    secondaryContainer = ThornburySurfaceCard,
-    onSecondaryContainer = ThornburyInk,
-    tertiary = ThornburyAccentTeal,
+    primary = LightThornburyPrimary,
+    onPrimary = LightThornburyOnPrimary,
+    primaryContainer = LightThornburySurfaceSoft,
+    onPrimaryContainer = LightThornburyPrimaryText,
+    inversePrimary = DarkThornburyPrimary,
+    secondary = LightThornburyPrimaryActive,
+    onSecondary = LightThornburyOnPrimary,
+    secondaryContainer = LightThornburySurfaceCard,
+    onSecondaryContainer = LightThornburyInk,
+    tertiary = LightThornburyAccentTeal,
     onTertiary = Color.White,
-    tertiaryContainer = ThornburyInfoWash,
-    onTertiaryContainer = ThornburyTertiaryText,
-    background = ThornburyCanvas,
-    onBackground = ThornburyInk,
-    surface = ThornburyCanvas,
-    onSurface = ThornburyInk,
-    surfaceVariant = ThornburySurfaceCard,
-    onSurfaceVariant = ThornburyBody,
+    tertiaryContainer = LightThornburyInfoWash,
+    onTertiaryContainer = LightThornburyTertiaryText,
+    background = LightThornburyCanvas,
+    onBackground = LightThornburyInk,
+    surface = LightThornburyCanvas,
+    onSurface = LightThornburyInk,
+    surfaceVariant = LightThornburySurfaceCard,
+    onSurfaceVariant = LightThornburyBody,
     surfaceContainerLowest = Color.White,
-    surfaceContainerLow = ThornburyCanvas,
-    surfaceContainer = ThornburySurfaceSoft,
-    surfaceContainerHigh = ThornburySurfaceCard,
-    surfaceContainerHighest = ThornburySurfaceCreamStrong,
-    surfaceDim = ThornburySurfaceCard,
+    surfaceContainerLow = LightThornburyCanvas,
+    surfaceContainer = LightThornburySurfaceSoft,
+    surfaceContainerHigh = LightThornburySurfaceCard,
+    surfaceContainerHighest = LightThornburySurfaceCreamStrong,
+    surfaceDim = LightThornburySurfaceCard,
     surfaceBright = Color.White,
-    outline = ThornburyHairline,
-    outlineVariant = ThornburyHairlineSoft,
+    outline = LightThornburyHairline,
+    outlineVariant = LightThornburyHairlineSoft,
     scrim = ThornburyScrim,
-    error = ThornburyError,
+    error = LightThornburyError,
     onError = Color.White,
-    errorContainer = ThornburyErrorWash,
-    onErrorContainer = ThornburyError,
-    inverseSurface = ThornburySurfaceDark,
-    inverseOnSurface = ThornburyOnDark,
-    surfaceTint = ThornburyPrimary
+    errorContainer = LightThornburyErrorWash,
+    onErrorContainer = LightThornburyError,
+    inverseSurface = DarkThornburyCanvas,
+    inverseOnSurface = DarkThornburyInk,
+    surfaceTint = LightThornburyPrimary
 )
 
 val DarkColorScheme = darkColorScheme(
-    primary = ThornburyPrimaryOnDark,
-    onPrimary = ThornburyOnPrimaryOnDark,
-    primaryContainer = ThornburySurfaceDarkElevated,
-    onPrimaryContainer = ThornburyOnDark,
-    inversePrimary = ThornburyPrimary,
-    secondary = ThornburyPrimaryActiveDark,
-    onSecondary = ThornburyOnPrimaryOnDark,
-    secondaryContainer = ThornburySurfaceDarkSoft,
-    onSecondaryContainer = ThornburyOnDark,
-    tertiary = ThornburyTertiaryDark,
-    onTertiary = ThornburyOnTertiaryDark,
-    tertiaryContainer = ThornburyTertiaryContainerDark,
-    onTertiaryContainer = ThornburyOnTertiaryContainerDark,
-    background = ThornburySurfaceDarkLowest,
-    onBackground = ThornburyOnDark,
-    surface = ThornburySurfaceDark,
-    onSurface = ThornburyOnDark,
-    surfaceVariant = ThornburySurfaceDarkElevated,
-    onSurfaceVariant = ThornburyOnDarkSoft,
+    primary = DarkThornburyPrimary,
+    onPrimary = DarkThornburyOnPrimary,
+    primaryContainer = DarkThornburySurfaceCard,
+    onPrimaryContainer = DarkThornburyInk,
+    inversePrimary = LightThornburyPrimary,
+    secondary = DarkThornburyPrimaryActive,
+    onSecondary = DarkThornburyOnPrimary,
+    secondaryContainer = DarkThornburySurfaceSoft,
+    onSecondaryContainer = DarkThornburyInk,
+    tertiary = DarkThornburyAccentTeal,
+    onTertiary = DarkThornburyOnPrimary,
+    tertiaryContainer = DarkThornburyInfoWash,
+    onTertiaryContainer = DarkThornburyTertiaryText,
+    background = DarkThornburyCanvas,
+    onBackground = DarkThornburyInk,
+    surface = DarkThornburyCanvas,
+    onSurface = DarkThornburyInk,
+    surfaceVariant = DarkThornburySurfaceCard,
+    onSurfaceVariant = DarkThornburyBody,
     surfaceContainerLowest = ThornburySurfaceDarkLowest,
-    surfaceContainerLow = ThornburySurfaceDark,
-    surfaceContainer = ThornburySurfaceDarkSoft,
-    surfaceContainerHigh = ThornburySurfaceDarkElevated,
-    surfaceContainerHighest = ThornburySurfaceDarkHighest,
-    surfaceDim = ThornburySurfaceDark,
-    surfaceBright = ThornburySurfaceDarkHighest,
-    outline = ThornburyHairlineDark,
-    outlineVariant = ThornburyHairlineDarkSoft,
+    surfaceContainerLow = DarkThornburyCanvas,
+    surfaceContainer = DarkThornburySurfaceSoft,
+    surfaceContainerHigh = DarkThornburySurfaceCard,
+    surfaceContainerHighest = DarkThornburySurfaceCreamStrong,
+    surfaceDim = DarkThornburyCanvas,
+    surfaceBright = DarkThornburySurfaceCreamStrong,
+    outline = DarkThornburyHairline,
+    outlineVariant = DarkThornburyHairlineSoft,
     scrim = ThornburyScrim,
-    error = ThornburyErrorDark,
-    onError = ThornburyOnErrorDark,
-    errorContainer = ThornburyErrorContainerDark,
-    onErrorContainer = ThornburyOnErrorContainerDark,
-    inverseSurface = ThornburyCanvas,
-    inverseOnSurface = ThornburyInk,
-    surfaceTint = ThornburyPrimaryOnDark
+    error = DarkThornburyError,
+    onError = DarkThornburyOnPrimary,
+    errorContainer = DarkThornburyErrorWash,
+    onErrorContainer = DarkThornburyError,
+    inverseSurface = LightThornburyCanvas,
+    inverseOnSurface = LightThornburyInk,
+    surfaceTint = DarkThornburyPrimary
 )
 
 // A softer, friendlier rounding scale than stock M3 — modern clinical apps
@@ -134,16 +135,19 @@ fun thornburyTextFieldColors(
 
 @Composable
 fun ThornburyDentalTheme(
-    darkTheme: Boolean = false, // Thornbury Clinical anchors on a clean, cool clinical-canvas system
+    darkTheme: Boolean = false,
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val palette = if (darkTheme) DarkThornburyPalette else LightThornburyPalette
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = ThornburyTypography,
-        shapes = ThornburyShapes,
-        content = content
-    )
+    CompositionLocalProvider(LocalThornburyPalette provides palette) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = ThornburyTypography,
+            shapes = ThornburyShapes,
+            content = content
+        )
+    }
 }
