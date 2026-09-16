@@ -43,7 +43,7 @@ $LocalProps = Join-Path $AndroidDir "local.properties"
 if (Test-Path $LocalProps) {
     $SdkLine = Get-Content $LocalProps | Where-Object { $_ -match "^sdk\.dir\s*=" }
     if ($SdkLine) {
-        $RawSdk = ($SdkLine -replace "^sdk\.dir\s*=", "").Trim().Replace("\\", "\")
+        $RawSdk = ($SdkLine -replace "^sdk\.dir\s*=", "").Trim().Replace("\:", ":").Replace("\\", "\").Replace("/", "\")
         $CandidateAdb = Join-Path $RawSdk "platform-tools\adb.exe"
         if (Test-Path $CandidateAdb) {
             $AdbPath = $CandidateAdb

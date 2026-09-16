@@ -38,13 +38,28 @@ fun EditDiagnosisDialog(
 
     var primaryDiagnosis by remember { mutableStateOf(existing?.primaryDiagnosis ?: "") }
     var clinicalFindings by remember { mutableStateOf(existing?.clinicalFindings ?: "") }
-    var prognosis by remember { mutableStateOf(existing?.prognosis ?: "Favourable") }
     var systemicConsiderations by remember { mutableStateOf(existing?.systemicConsiderations ?: patient.medicalHistory) }
     var clinicianName by remember {
         mutableStateOf(existing?.clinicianName ?: DentalRepository.clinicians.firstOrNull()?.name ?: "")
     }
 
-    val prognosisOptions = listOf("Favourable", "Good", "Guarded", "Poor", "Questionable")
+    val prognosisOptions = listOf("Good", "Favourable", "Guarded", "Poor", "Questionable")
+    val initialTier = remember(existing?.prognosis) {
+        val p = existing?.prognosis ?: "Good"
+        prognosisOptions.firstOrNull { p.startsWith(it, ignoreCase = true) } ?: "Good"
+    }
+    val initialNotes = remember(existing?.prognosis) {
+        val p = existing?.prognosis ?: ""
+        val matched = prognosisOptions.firstOrNull { p.startsWith(it, ignoreCase = true) }
+        if (matched != null) {
+            p.removePrefix(matched).trim()
+        } else {
+            p
+        }
+    }
+
+    var selectedTier by remember { mutableStateOf(initialTier) }
+    var prognosisNotes by remember { mutableStateOf(initialNotes) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -72,7 +87,7 @@ fun EditDiagnosisDialog(
                 ) {
                     Column {
                         Text(
-                            text = if (existing != null) "Update Clinical Diagnosis" else "Record Clinical Diagnosis",
+                            text = if (existing != null) "Edit Clinical Diagnosis" else "Create Clinical Diagnosis",
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = ThornburyInk
                         )
@@ -117,7 +132,10 @@ fun EditDiagnosisDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "A patient has a single primary diagnosis that can be reviewed and updated as clinical evidence evolves over treatment.",
+                                text = if (existing == null)
+                                    "Create the patient's initial primary diagnosis. You can review and edit these clinical details at any time as treatment progresses."
+                                else
+                                    "Updating this clinical diagnosis will save your edits with a new revision timestamp while preserving patient history.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ThornburyMuted
                             )
@@ -163,10 +181,10 @@ fun EditDiagnosisDialog(
                         )
                     }
 
-                    // Prognosis Selector
+                    // Prognosis Selector & Qualifying Notes
                     Column {
                         Text(
-                            text = "Clinical Prognosis",
+                            text = "Clinical Prognosis *",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                             color = ThornburyInk
                         )
@@ -176,10 +194,10 @@ fun EditDiagnosisDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             prognosisOptions.forEach { opt ->
-                                val isSelected = opt == prognosis
+                                val isSelected = opt.equals(selectedTier, ignoreCase = true)
                                 FilterChip(
                                     selected = isSelected,
-                                    onClick = { prognosis = opt },
+                                    onClick = { selectedTier = opt },
                                     label = {
                                         Text(
                                             text = opt,
@@ -194,6 +212,18 @@ fun EditDiagnosisDialog(
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = prognosisNotes,
+                            onValueChange = { prognosisNotes = it },
+                            placeholder = { Text("Qualifying factors (e.g. following endodontic retreatment)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = thornburyTextFieldColors(containerColor = ThornburyCanvas),
+                            singleLine = true
+                        )
                     }
 
                     // Systemic Considerations Field
@@ -275,12 +305,17 @@ fun EditDiagnosisDialog(
                     Button(
                         onClick = {
                             if (primaryDiagnosis.isNotBlank()) {
+                                val finalPrognosis = if (prognosisNotes.isNotBlank()) {
+                                    "$selectedTier ${prognosisNotes.trim()}"
+                                } else {
+                                    selectedTier
+                                }
                                 val updated = PatientDiagnosis(
                                     primaryDiagnosis = primaryDiagnosis.trim(),
                                     clinicalFindings = clinicalFindings.trim(),
-                                    prognosis = prognosis,
+                                    prognosis = finalPrognosis,
                                     systemicConsiderations = systemicConsiderations.trim(),
-                                    dateRecorded = existing?.dateRecorded ?: todayIsoDate(),
+                                    dateRecorded = existing?.dateRecorded?.ifBlank { todayIsoDate() } ?: todayIsoDate(),
                                     lastUpdated = todayIsoDate(),
                                     clinicianName = clinicianName
                                 )
@@ -302,7 +337,7 @@ fun EditDiagnosisDialog(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (existing != null) "Update Diagnosis" else "Save Diagnosis",
+                            text = if (existing != null) "Save Changes" else "Create Diagnosis",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                         )
                     }
