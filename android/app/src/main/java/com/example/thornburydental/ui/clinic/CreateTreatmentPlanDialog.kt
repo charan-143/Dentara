@@ -463,7 +463,7 @@ fun CreateTreatmentPlanDialog(
                                         id = "step-${idx + 1}",
                                         toothNumber = toothNum,
                                         procedure = s.procedure.trim(),
-                                        code = "D${1000 + idx}",
+                                        code = "",
                                         fee = 0.0,
                                         completed = false
                                     )
