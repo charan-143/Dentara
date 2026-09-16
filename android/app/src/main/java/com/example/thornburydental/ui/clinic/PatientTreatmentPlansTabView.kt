@@ -227,50 +227,67 @@ fun PatientTreatmentPlansTabView(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Overall Clinical Progress Header Card
+            // Overall Clinical Progress Header Card with Circular Progress Bar
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = ThornburySurfaceSoft),
                     border = BorderStroke(1.dp, ThornburyHairline)
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Circular Progress Indicator with Center Percentage
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(54.dp)
                         ) {
+                            CircularProgressIndicator(
+                                progress = { overallProgress },
+                                modifier = Modifier.fillMaxSize(),
+                                color = if (overallProgress == 1f) ThornburyAccentTeal else ThornburyPrimary,
+                                trackColor = ThornburyCanvas,
+                                strokeWidth = 5.dp
+                            )
+                            Text(
+                                text = "${(overallProgress * 100).toInt()}%",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                ),
+                                color = if (overallProgress == 1f) ThornburyAccentTeal else ThornburyPrimaryText
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(16.dp))
+
+                        // Stacked Clinical Progress Details (no horizontal overflow)
+                        Column(modifier = Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.TrendingUp,
                                     contentDescription = null,
                                     tint = ThornburyPrimary,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Overall Treatment Progress",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                     color = ThornburyInk
                                 )
                             }
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "$totalCompleted of $totalProcedures procedures completed (${(overallProgress * 100).toInt()}%)",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = if (overallProgress == 1f) ThornburyAccentTeal else ThornburyPrimary
+                                text = "$totalCompleted of $totalProcedures clinical procedures completed",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ThornburyMuted
                             )
                         }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        LinearProgressIndicator(
-                            progress = { overallProgress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp)
-                                .clip(RoundedCornerShape(3.dp)),
-                            color = if (overallProgress == 1f) ThornburyAccentTeal else ThornburyPrimary,
-                            trackColor = ThornburyCanvas
-                        )
                     }
                 }
             }

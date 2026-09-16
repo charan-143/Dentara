@@ -116,13 +116,13 @@ fun PatientDetailChartScreen(
 
         // --- 7 Clinical Tabs with Distinct Diagnosis & Treatment Plans ---
         val chartTabs = listOf(
-            "Demographics / Overview" to null,
-            "Examination" to null,
-            "Reports & Imaging" to patientReports.size,
-            "Diagnosis" to (if (patient.diagnosis != null) 1 else null),
-            "Treatment Plans" to patientPlans.size,
-            "Prescriptions" to patientPrescriptions.size,
-            "Visit History" to patientAppointments.size
+            "Demographics / Overview",
+            "Examination",
+            "Reports & Imaging",
+            "Diagnosis",
+            "Treatment Plans",
+            "Prescriptions",
+            "Visit History"
         )
 
         PrimaryScrollableTabRow(
@@ -132,34 +132,18 @@ fun PatientDetailChartScreen(
             edgePadding = 12.dp,
             divider = { HorizontalDivider(color = ThornburyHairline) }
         ) {
-            chartTabs.forEachIndexed { index, (title, count) ->
+            chartTabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { selectedTabIndex = index },
                     text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = title,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
-                                ),
-                                color = if (selectedTabIndex == index) ThornburyPrimaryText else ThornburyMuted
-                            )
-                            if (count != null && count > 0) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (selectedTabIndex == index) ThornburyPrimary else ThornburySurfaceSoft,
-                                    contentColor = if (selectedTabIndex == index) Color.White else ThornburyInk
-                                ) {
-                                    Text(
-                                        text = count.toString(),
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
-                                    )
-                                }
-                            }
-                        }
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.labelMedium.copy(
+                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
+                            ),
+                            color = if (selectedTabIndex == index) ThornburyPrimaryText else ThornburyMuted
+                        )
                     }
                 )
             }
