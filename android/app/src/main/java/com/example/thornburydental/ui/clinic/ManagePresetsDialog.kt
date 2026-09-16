@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.MedicationPreset
 import com.example.thornburydental.theme.*
@@ -56,13 +57,16 @@ fun ManagePresetsDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.9f)
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.92f)
                 .padding(vertical = 12.dp),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
             border = BorderStroke(1.dp, ThornburyHairline)
         ) {
@@ -427,19 +431,23 @@ fun PresetEditDialog(
 
     val categorySuggestions = listOf("Antibiotics", "Analgesics", "Antiseptics", "Anti-inflammatory", "Custom")
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 16.dp),
-            shape = RoundedCornerShape(16.dp),
+                .fillMaxWidth(0.95f)
+                .fillMaxHeight(0.90f)
+                .padding(vertical = 12.dp),
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
             border = BorderStroke(1.dp, ThornburyHairline)
         ) {
             Column(
                 modifier = Modifier
+                    .fillMaxSize()
                     .padding(20.dp)
-                    .verticalScroll(rememberScrollState())
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -459,8 +467,14 @@ fun PresetEditDialog(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Medication Name
-                OutlinedTextField(
+                // Scrollable Form Body
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    // Medication Name
+                    OutlinedTextField(
                     value = name,
                     onValueChange = {
                         name = it
@@ -574,13 +588,16 @@ fun PresetEditDialog(
                     colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(12.dp))
+            } // End of scrollable form body
 
-                // Actions
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Actions (pinned at bottom)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                     OutlinedButton(
                         onClick = onDismiss,
                         shape = RoundedCornerShape(8.dp),
