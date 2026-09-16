@@ -62,6 +62,7 @@ fun PatientReportsImagingTabView(
     reports: List<DiagnosticReport>,
     onAddReportClick: () -> Unit,
     onReportClick: (DiagnosticReport) -> Unit,
+    onReportAttachmentClick: ((DiagnosticReport, Int) -> Unit)? = null,
     onToggleRelease: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -324,75 +325,111 @@ fun PatientReportsImagingTabView(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // View Mode & Filters Row
+                // View Mode Segmented Control Row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Filter Chips (Scrollable)
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        kinds.forEach { kind ->
-                            val isSelected = selectedFilter == kind
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { selectedFilter = kind },
-                                label = { Text(kind, style = MaterialTheme.typography.labelSmall) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ThornburyPrimary,
-                                    selectedLabelColor = Color.White,
-                                    containerColor = ThornburySurfaceSoft,
-                                    labelColor = ThornburyInk
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // View Mode Toggle Button
+                    // Segmented Button Container for Column vs Grid View
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = ThornburySurfaceSoft,
                         border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
-                        Row(modifier = Modifier.padding(2.dp)) {
-                            IconButton(
+                        Row(
+                            modifier = Modifier.padding(3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Column View Button
+                            Surface(
                                 onClick = { viewMode = ReportsViewMode.RECORDS_AND_FILES },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (viewMode == ReportsViewMode.RECORDS_AND_FILES) ThornburyPrimary else Color.Transparent)
+                                shape = RoundedCornerShape(7.dp),
+                                color = if (viewMode == ReportsViewMode.RECORDS_AND_FILES) ThornburyPrimary else Color.Transparent,
+                                modifier = Modifier.height(34.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.ViewAgenda,
-                                    contentDescription = "List View",
-                                    tint = if (viewMode == ReportsViewMode.RECORDS_AND_FILES) Color.White else ThornburyMuted,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ViewAgenda,
+                                        contentDescription = "Column View",
+                                        tint = if (viewMode == ReportsViewMode.RECORDS_AND_FILES) Color.White else ThornburyMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Column",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = if (viewMode == ReportsViewMode.RECORDS_AND_FILES) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (viewMode == ReportsViewMode.RECORDS_AND_FILES) Color.White else ThornburyInk
+                                    )
+                                }
                             }
-                            IconButton(
+
+                            // Grid View Button
+                            Surface(
                                 onClick = { viewMode = ReportsViewMode.IMAGING_GALLERY },
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (viewMode == ReportsViewMode.IMAGING_GALLERY) ThornburyPrimary else Color.Transparent)
+                                shape = RoundedCornerShape(7.dp),
+                                color = if (viewMode == ReportsViewMode.IMAGING_GALLERY) ThornburyPrimary else Color.Transparent,
+                                modifier = Modifier.height(34.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.GridView,
-                                    contentDescription = "Gallery Grid",
-                                    tint = if (viewMode == ReportsViewMode.IMAGING_GALLERY) Color.White else ThornburyMuted,
-                                    modifier = Modifier.size(16.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.GridView,
+                                        contentDescription = "Grid View",
+                                        tint = if (viewMode == ReportsViewMode.IMAGING_GALLERY) Color.White else ThornburyMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Grid",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = if (viewMode == ReportsViewMode.IMAGING_GALLERY) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (viewMode == ReportsViewMode.IMAGING_GALLERY) Color.White else ThornburyInk
+                                    )
+                                }
                             }
                         }
+                    }
+
+                    Text(
+                        text = if (viewMode == ReportsViewMode.RECORDS_AND_FILES) "Detailed Records List" else "2-Column Imaging Grid",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = ThornburyMuted
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Full-Width Modality Filter Chips Row
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    kinds.forEach { kind ->
+                        val isSelected = selectedFilter == kind
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { selectedFilter = kind },
+                            label = { Text(kind, style = MaterialTheme.typography.labelSmall) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ThornburyPrimary,
+                                selectedLabelColor = Color.White,
+                                containerColor = ThornburySurfaceSoft,
+                                labelColor = ThornburyInk
+                            )
+                        )
                     }
                 }
             }
@@ -485,6 +522,9 @@ fun PatientReportsImagingTabView(
                             DiagnosticReportRecordCard(
                                 report = report,
                                 onReportClick = { onReportClick(report) },
+                                onReportAttachmentClick = { attIdx ->
+                                    onReportAttachmentClick?.invoke(report, attIdx) ?: onReportClick(report)
+                                },
                                 onToggleRelease = { onToggleRelease(report.id) },
                                 onOpenFile = { att -> AttachmentViewerUtils.openAttachment(context, att) },
                                 onShareFile = { att -> AttachmentViewerUtils.shareAttachment(context, att) },
@@ -500,9 +540,9 @@ fun PatientReportsImagingTabView(
                     val galleryItems = remember(filteredReports) {
                         filteredReports.flatMap { rep ->
                             if (rep.attachments.isNotEmpty()) {
-                                rep.attachments.map { att -> rep to att }
+                                rep.attachments.mapIndexed { idx, att -> Triple(rep, att, idx) }
                             } else {
-                                listOf(rep to null)
+                                listOf(Triple(rep, null, 0))
                             }
                         }
                     }
@@ -516,11 +556,13 @@ fun PatientReportsImagingTabView(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        items(galleryItems) { (report, attachment) ->
+                        items(galleryItems) { (report, attachment, attachmentIndex) ->
                             ImagingGalleryCard(
                                 report = report,
                                 attachment = attachment,
-                                onClick = { onReportClick(report) },
+                                onClick = {
+                                    onReportAttachmentClick?.invoke(report, attachmentIndex) ?: onReportClick(report)
+                                },
                                 onOpenFile = { att -> AttachmentViewerUtils.openAttachment(context, att) }
                             )
                         }
@@ -610,6 +652,7 @@ fun PatientReportsImagingTabView(
 private fun DiagnosticReportRecordCard(
     report: DiagnosticReport,
     onReportClick: () -> Unit,
+    onReportAttachmentClick: ((Int) -> Unit)? = null,
     onToggleRelease: () -> Unit,
     onOpenFile: (ReportAttachment) -> Unit,
     onShareFile: (ReportAttachment) -> Unit,
@@ -763,9 +806,16 @@ private fun DiagnosticReportRecordCard(
 
                         if (isImage) {
                             // Image Attachment Preview Card
+                            val attIndex = report.attachments.indexOf(att).coerceAtLeast(0)
                             InlineImageAttachmentCard(
                                 attachment = att,
-                                onClick = onReportClick
+                                onClick = {
+                                    if (onReportAttachmentClick != null) {
+                                        onReportAttachmentClick(attIndex)
+                                    } else {
+                                        onReportClick()
+                                    }
+                                }
                             )
                         } else {
                             // Document / PDF Attachment Card with Direct Open Action

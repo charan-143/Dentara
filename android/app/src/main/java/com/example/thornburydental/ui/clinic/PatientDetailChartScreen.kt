@@ -56,6 +56,7 @@ fun PatientDetailChartScreen(
     var selectedTabIndex by remember { mutableStateOf(0) }
     var selectedToothForEdit by remember { mutableStateOf<ToothRecord?>(null) }
     var selectedReportForLightbox by remember { mutableStateOf<DiagnosticReport?>(null) }
+    var selectedAttachmentIndexForLightbox by remember { mutableIntStateOf(0) }
     var showEditDiagnosisDialog by remember { mutableStateOf(false) }
     var showCreatePlanDialog by remember { mutableStateOf(false) }
     var showBookAppointmentDialog by remember { mutableStateOf(false) }
@@ -164,7 +165,14 @@ fun PatientDetailChartScreen(
                 patient = patient,
                 reports = patientReports,
                 onAddReportClick = { onOpenAddReportScreen(patient) },
-                onReportClick = { report -> selectedReportForLightbox = report },
+                onReportClick = { report ->
+                    selectedReportForLightbox = report
+                    selectedAttachmentIndexForLightbox = 0
+                },
+                onReportAttachmentClick = { report, index ->
+                    selectedReportForLightbox = report
+                    selectedAttachmentIndexForLightbox = index
+                },
                 onToggleRelease = { reportId -> DentalRepository.toggleReportRelease(reportId) }
             )
             3 -> PatientDiagnosisTabView(
@@ -212,6 +220,7 @@ fun PatientDetailChartScreen(
         val currentReport = diagnosticReports.find { it.id == report.id } ?: report
         ReportViewerLightboxDialog(
             report = currentReport,
+            initialAttachmentIndex = selectedAttachmentIndexForLightbox,
             onDismiss = { selectedReportForLightbox = null },
             onToggleRelease = {
                 DentalRepository.toggleReportRelease(currentReport.id)
