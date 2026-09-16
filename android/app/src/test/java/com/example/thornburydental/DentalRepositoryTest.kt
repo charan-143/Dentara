@@ -53,7 +53,7 @@ class DentalRepositoryTest {
 
         val rx = DentalRepository.issuePrescription(
             patient = patient,
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             drugName = "Amoxicillin",
             dosage = "500 mg",
             frequency = "TDS",
@@ -84,7 +84,7 @@ class DentalRepositoryTest {
 
         val rx = DentalRepository.issuePrescription(
             patient = patient,
-            clinicianName = "Dr. Anaya Krishnamurthy",
+            clinicianName = "Dr. Ingrid Halvorsen",
             drugName = "Ibuprofen",
             dosage = "400 mg",
             frequency = "TDS PRN",
@@ -360,7 +360,7 @@ class DentalRepositoryTest {
 
         val rx = DentalRepository.issuePrescription(
             patient = patient,
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             drugName = "Ibuprofen",
             dosage = "600 mg",
             frequency = "TDS PRN",
@@ -399,7 +399,7 @@ class DentalRepositoryTest {
         val created = DentalRepository.createTreatmentPlan(
             patientId = "p1",
             title = "Endo & Restorative Care",
-            clinicianName = "Dr. Tomas Ferreira",
+            clinicianName = "Dr. Ingrid Halvorsen",
             diagnosis = "Deep caries #19, #30",
             steps = steps
         )

@@ -146,51 +146,34 @@ fun BookAppointmentDialog(
                 )
                 Spacer(modifier = Modifier.height(6.dp))
 
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    clinicians.forEach { clinician ->
-                        val isSelected = clinician.id == selectedClinician.id
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectedClinician = clinician
-                                    room = clinician.room
-                                },
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) ThornburySurfaceSoft else ThornburyCanvas,
-                            border = BorderStroke(
-                                1.dp,
-                                if (isSelected) ThornburyPrimary else ThornburyHairline
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = ThornburySurfaceSoft,
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = ThornburyPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = selectedClinician.name,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = ThornburyInk
                             )
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = {
-                                        selectedClinician = clinician
-                                        room = clinician.room
-                                    },
-                                    colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Column {
-                                    Text(
-                                        text = clinician.name,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                        ),
-                                        color = ThornburyInk
-                                    )
-                                    Text(
-                                        text = "${clinician.specialty} • Default: ${clinician.room}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = ThornburyMuted
-                                    )
-                                }
-                            }
+                            Text(
+                                text = "${selectedClinician.specialty} • ${selectedClinician.room}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ThornburyMuted
+                            )
                         }
                     }
                 }

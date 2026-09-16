@@ -50,7 +50,7 @@ fun IssuePrescriptionDialog(
     val context = LocalContext.current
 
     var selectedDrugIndex by remember { mutableStateOf(0) }
-    var selectedClinician by remember { mutableStateOf(DentalRepository.clinicians[0].name) }
+    var selectedClinician by remember { mutableStateOf(DentalRepository.clinicians.firstOrNull()?.name ?: "Dr. Ingrid Halvorsen") }
 
     val drug = DentalFormulary[selectedDrugIndex]
     var dosage by remember(drug) { mutableStateOf(drug.defaultDosage) }
@@ -178,33 +178,35 @@ fun IssuePrescriptionDialog(
                     color = ThornburyInk
                 )
                 Spacer(modifier = Modifier.height(6.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    DentalRepository.clinicians.forEach { c ->
-                        val isSelected = c.name == selectedClinician
-                        Surface(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { selectedClinician = c.name },
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (isSelected) ThornburySurfaceSoft else ThornburyCanvas,
-                            border = BorderStroke(1.dp, if (isSelected) ThornburyPrimary else ThornburyHairline)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = isSelected,
-                                    onClick = { selectedClinician = c.name },
-                                    colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "${c.name} (${c.room})",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                    color = ThornburyInk
-                                )
-                            }
+                val activeClinician = DentalRepository.clinicians.firstOrNull()
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    color = ThornburySurfaceSoft,
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = ThornburyPrimary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = activeClinician?.name ?: selectedClinician,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = ThornburyInk
+                            )
+                            Text(
+                                text = "${activeClinician?.specialty ?: "Comprehensive Dental Care"} • ${activeClinician?.room ?: "Surgery 1"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = ThornburyMuted
+                            )
                         }
                     }
                 }

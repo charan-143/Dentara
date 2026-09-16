@@ -1,5 +1,6 @@
 package com.example.thornburydental.data.db
 
+import android.content.ContentValues
 import android.content.Context
 import android.util.Log
 import com.example.thornburydental.data.Appointment
@@ -61,6 +62,7 @@ object LocalDatabaseManager {
         reportDao = ReportDao(dbHelper)
         userDao = UserDao(dbHelper)
         userPreferencesDao = UserPreferencesDao(dbHelper)
+        sanitizeClinicianNames()
         isInitialized = true
         Log.d(TAG, "Thornbury local SQLite database initialized successfully.")
     }
@@ -120,6 +122,48 @@ object LocalDatabaseManager {
             Log.e(TAG, "Failed to seed initial database data", e)
         } finally {
             db.endTransaction()
+        }
+    }
+
+    /**
+     * Sanitize all stored records in local SQLite so that only the user clinician
+     * (Dr. Ingrid Halvorsen) is referenced, cleansing any legacy multi-clinician mock data.
+     */
+    fun sanitizeClinicianNames() {
+        try {
+            val db = dbHelper.writableDatabase
+            val singleClinician = "Dr. Ingrid Halvorsen"
+
+            val apptValues = ContentValues().apply {
+                put(ThornburyDbHelper.COL_APPTS_CLINICIAN_NAME, singleClinician)
+                put(ThornburyDbHelper.COL_APPTS_CLINICIAN_ID, "c1")
+            }
+            db.update(ThornburyDbHelper.TABLE_APPOINTMENTS, apptValues, null, null)
+
+            val rxValues = ContentValues().apply {
+                put(ThornburyDbHelper.COL_RX_CLINICIAN_NAME, singleClinician)
+            }
+            db.update(ThornburyDbHelper.TABLE_PRESCRIPTIONS, rxValues, null, null)
+
+            val planValues = ContentValues().apply {
+                put(ThornburyDbHelper.COL_PLANS_CLINICIAN_NAME, singleClinician)
+            }
+            db.update(ThornburyDbHelper.TABLE_TREATMENT_PLANS, planValues, null, null)
+
+            val reportValues = ContentValues().apply {
+                put(ThornburyDbHelper.COL_REPORTS_CLINICIAN_NAME, singleClinician)
+            }
+            db.update(ThornburyDbHelper.TABLE_DIAGNOSTIC_REPORTS, reportValues, null, null)
+
+            val patients = patientDao.getAllPatients()
+            patients.forEach { p ->
+                if (p.diagnosis != null && p.diagnosis.clinicianName != singleClinician) {
+                    val updatedDiag = p.diagnosis.copy(clinicianName = singleClinician)
+                    patientDao.updateDiagnosis(p.id, updatedDiag)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to sanitize clinician names in database", e)
         }
     }
 }

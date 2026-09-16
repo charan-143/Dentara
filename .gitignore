@@ -11,6 +11,10 @@ node_modules/
 !.agents/skills/
 !.agents/skills/android-build-and-launch/
 !.agents/skills/android-build-and-launch/**
+!.agents/skills/create-pr/
+!.agents/skills/create-pr/**
+!.agents/skills/design-analysis-and-planning/
+!.agents/skills/design-analysis-and-planning/**
 .claude/skills/
 
 # Generated caches. Regenerated on every build, and the impeccable cache

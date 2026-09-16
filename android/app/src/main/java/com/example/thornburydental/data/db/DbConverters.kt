@@ -105,7 +105,8 @@ object DbConverters {
     fun jsonToDiagnosis(raw: String?): PatientDiagnosis? {
         if (raw.isNullOrBlank()) return null
         return try {
-            json.decodeFromString(raw)
+            val diag = json.decodeFromString<PatientDiagnosis>(raw)
+            diag.copy(clinicianName = "Dr. Ingrid Halvorsen")
         } catch (_: Exception) {
             null
         }
