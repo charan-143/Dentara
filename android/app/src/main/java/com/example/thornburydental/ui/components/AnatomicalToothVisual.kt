@@ -1,5 +1,7 @@
 package com.example.thornburydental.ui.components
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -13,9 +15,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -104,28 +108,55 @@ fun AnatomicalToothView(
 ) {
     val condColor = getToothConditionColor(tooth.condition)
 
+    val scale by animateFloatAsState(
+        targetValue = if (isSelected) 1.07f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "ToothScaleSpring"
+    )
+
+    val animatedBgColor by animateColorAsState(
+        targetValue = if (isSelected) ThornburyPrimaryWash else ThornburyCanvas,
+        animationSpec = tween(durationMillis = 200),
+        label = "ToothBgColor"
+    )
+
+    val targetBorderColor = if (isSelected) {
+        ThornburyPrimary
+    } else if (tooth.condition != ToothCondition.SOUND) {
+        condColor.copy(alpha = 0.65f)
+    } else {
+        ThornburyHairline
+    }
+
+    val animatedBorderColor by animateColorAsState(
+        targetValue = targetBorderColor,
+        animationSpec = tween(durationMillis = 200),
+        label = "ToothBorderColor"
+    )
+
     Card(
         modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .width(52.dp)
             .height(104.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(8.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) ThornburyPrimaryWash else ThornburyCanvas
+            containerColor = animatedBgColor
         ),
         border = BorderStroke(
             width = if (isSelected) 2.dp else 1.dp,
-            color = if (isSelected) {
-                ThornburyPrimary
-            } else if (tooth.condition != ToothCondition.SOUND) {
-                condColor.copy(alpha = 0.65f)
-            } else {
-                ThornburyHairline
-            }
+            color = animatedBorderColor
         ),
         elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 3.dp else 0.dp,
-            pressedElevation = 4.dp
+            defaultElevation = if (isSelected) 4.dp else 0.dp,
+            pressedElevation = 6.dp
         )
     ) {
         Column(
@@ -135,11 +166,11 @@ fun AnatomicalToothView(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top: Universal Tooth Number (#1 - #32)
+            // Top: FDI Tooth Number (e.g. 11, 21, 51, 85)
             Text(
-                text = "#${tooth.number}",
+                text = "${tooth.fdiNumber}",
                 style = ClinicalCodeStyle.copy(
-                    fontSize = 11.sp,
+                    fontSize = 12.sp,
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold
                 ),
                 color = if (isSelected) ThornburyPrimaryText else ThornburyInk,
@@ -159,14 +190,14 @@ fun AnatomicalToothView(
                 )
             }
 
-            // Bottom: FDI Number + Condition indicator badge
+            // Bottom: Condition / Legacy indicator badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${tooth.fdiNumber}",
+                    text = if (tooth.number in 1..32 && tooth.number != tooth.fdiNumber) "#${tooth.number}" else "FDI",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontSize = 9.sp,
                         fontWeight = FontWeight.Medium

@@ -32,13 +32,19 @@ fun WelcomeBrandScreen(
         containerColor = ThornburyCanvas,
         modifier = modifier.fillMaxSize()
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .adaptiveContentContainer(560.dp)
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
             Spacer(modifier = Modifier.height(24.dp))
 
             // Subtle brand establishment mark
@@ -155,4 +161,5 @@ fun WelcomeBrandScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
     }
+}
 }

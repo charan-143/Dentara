@@ -67,6 +67,7 @@ fun EditDiagnosisDialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(600.dp)
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.92f)
                 .padding(vertical = 12.dp),

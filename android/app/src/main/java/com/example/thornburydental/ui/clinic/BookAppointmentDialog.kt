@@ -78,7 +78,7 @@ fun BookAppointmentDialog(
     var reminderLeadTimeMin by remember { mutableIntStateOf(defaultLeadMin) }
 
     val isDateValid = remember(date) {
-        Regex("^\\d{4}-\\d{2}-\\d{2}$").matches(date.trim())
+        Regex("""^\d{4}-\d{2}-\d{2}$|^\d{2}/\d{2}/\d{4}$""").matches(date.trim())
     }
 
     val isTimeValid = remember(time) {
@@ -127,6 +127,7 @@ fun BookAppointmentDialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(600.dp)
                 .fillMaxWidth(0.95f)
                 .wrapContentHeight()
                 .padding(vertical = 16.dp),
@@ -301,7 +302,7 @@ fun BookAppointmentDialog(
                         value = date,
                         onValueChange = { date = it },
                         label = "Scheduled Date",
-                        placeholder = "YYYY-MM-DD",
+                        placeholder = "DD/MM/YYYY",
                         isOptional = false,
                         helperText = isoDateDisplayLabel(date).takeIf { isDateValid }
                     )

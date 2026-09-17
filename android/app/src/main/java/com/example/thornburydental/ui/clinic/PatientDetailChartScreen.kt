@@ -12,6 +12,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
@@ -28,10 +30,12 @@ import androidx.compose.ui.unit.sp
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
+import kotlinx.coroutines.launch
 import com.example.thornburydental.data.*
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.AnatomicalToothView
 import com.example.thornburydental.ui.components.AnatomicalToothCanvas
+import com.example.thornburydental.util.formatAsDdMmYyyy
 
 @Composable
 fun PatientDetailChartScreen(
@@ -53,7 +57,7 @@ fun PatientDetailChartScreen(
     val diagnosticReports by DentalRepository.reports.collectAsState()
     val allAppointments by DentalRepository.appointments.collectAsState()
 
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    val coroutineScope = rememberCoroutineScope()
     var selectedToothForEdit by remember { mutableStateOf<ToothRecord?>(null) }
     var selectedReportForLightbox by remember { mutableStateOf<DiagnosticReport?>(null) }
     var selectedAttachmentIndexForLightbox by remember { mutableIntStateOf(0) }
@@ -61,6 +65,7 @@ fun PatientDetailChartScreen(
     var showCreatePlanDialog by remember { mutableStateOf(false) }
     var showBookAppointmentDialog by remember { mutableStateOf(false) }
     var showAddReportDialog by remember { mutableStateOf(false) }
+    var showSharePdfDialog by remember { mutableStateOf(false) }
 
     if (patient == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -108,9 +113,33 @@ fun PatientDetailChartScreen(
                         color = ThornburyInk
                     )
                     Text(
-                        text = "OP: ${patient.opNo} • DOB: ${patient.dob}",
+                        text = "OP: ${patient.opNo} • DOB: ${formatAsDdMmYyyy(patient.dob)}",
                         style = ClinicalCodeStyle.copy(fontSize = 11.sp),
                         color = ThornburyMuted
+                    )
+                }
+
+                // Share Health Record Action Button
+                FilledTonalButton(
+                    onClick = { showSharePdfDialog = true },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = ThornburyPrimaryWash,
+                        contentColor = ThornburyPrimaryText
+                    ),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share Record",
+                        modifier = Modifier.size(16.dp),
+                        tint = ThornburyPrimary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Share PDF",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyPrimary
                     )
                 }
             }
@@ -127,80 +156,94 @@ fun PatientDetailChartScreen(
             "Visit History"
         )
 
+        val pagerState = rememberPagerState(initialPage = 0, pageCount = { chartTabs.size })
+
         PrimaryScrollableTabRow(
-            selectedTabIndex = selectedTabIndex,
+            selectedTabIndex = pagerState.currentPage,
             containerColor = ThornburyCanvas,
             contentColor = ThornburyPrimary,
             edgePadding = 12.dp,
             divider = { HorizontalDivider(color = ThornburyHairline) }
         ) {
             chartTabs.forEachIndexed { index, title ->
+                val isSelected = pagerState.currentPage == index
                 Tab(
-                    selected = selectedTabIndex == index,
-                    onClick = { selectedTabIndex = index },
+                    selected = isSelected,
+                    onClick = {
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
+                    },
                     text = {
                         Text(
                             text = title,
                             style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                             ),
-                            color = if (selectedTabIndex == index) ThornburyPrimaryText else ThornburyMuted
+                            color = if (isSelected) ThornburyPrimaryText else ThornburyMuted
                         )
                     }
                 )
             }
         }
 
-        // Tab Content
-        when (selectedTabIndex) {
-            0 -> PatientDemographicsM3View(patient = patient)
-            1 -> ExaminationAndOdontogramTabView(
-                patient = patient,
-                selectedToothId = selectedToothForEdit?.number,
-                onToothClick = { tooth -> selectedToothForEdit = tooth },
-                onSaveAnswers = { newAnswers ->
-                    DentalRepository.updateExaminationAnswers(patient.id, newAnswers)
-                }
-            )
-            2 -> PatientReportsImagingTabView(
-                patient = patient,
-                reports = patientReports,
-                onAddReportClick = { showAddReportDialog = true },
-                onReportClick = { report ->
-                    selectedReportForLightbox = report
-                    selectedAttachmentIndexForLightbox = 0
-                },
-                onReportAttachmentClick = { report, index ->
-                    selectedReportForLightbox = report
-                    selectedAttachmentIndexForLightbox = index
-                },
-                onToggleRelease = { reportId -> DentalRepository.toggleReportRelease(reportId) }
-            )
-            3 -> PatientDiagnosisTabView(
-                patient = patient,
-                onEditDiagnosisClick = { showEditDiagnosisDialog = true },
-                onCreatePlanClick = {
-                    selectedTabIndex = 4
-                    showCreatePlanDialog = true
-                }
-            )
-            4 -> PatientTreatmentPlansTabView(
-                plans = patientPlans,
-                patientDiagnosis = patient.diagnosis?.primaryDiagnosis,
-                onCreatePlanClick = { showCreatePlanDialog = true },
-                onToggleStepCompletion = { planId, stepId -> DentalRepository.togglePlanStepCompletion(planId, stepId) }
-            )
-            5 -> PatientPrescriptionsView(
-                patient = patient,
-                prescriptions = patientPrescriptions,
-                onIssueNew = { onOpenIssuePrescription(patient) }
-            )
-            6 -> VisitHistoryView(
-                patient = patient,
-                appointments = patientAppointments,
-                onBookAppointmentClick = { showBookAppointmentDialog = true },
-                onUpdateStatus = { apptId, newStatus -> DentalRepository.updateAppointmentStatus(apptId, newStatus) }
-            )
+        // Swipeable Tab Content Pager
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) { page ->
+            when (page) {
+                0 -> PatientDemographicsM3View(patient = patient)
+                1 -> ExaminationAndOdontogramTabView(
+                    patient = patient,
+                    selectedToothId = selectedToothForEdit?.number,
+                    onToothClick = { tooth -> selectedToothForEdit = tooth },
+                    onSaveAnswers = { newAnswers ->
+                        DentalRepository.updateExaminationAnswers(patient.id, newAnswers)
+                    }
+                )
+                2 -> PatientReportsImagingTabView(
+                    patient = patient,
+                    reports = patientReports,
+                    onAddReportClick = { showAddReportDialog = true },
+                    onReportClick = { report ->
+                        selectedReportForLightbox = report
+                        selectedAttachmentIndexForLightbox = 0
+                    },
+                    onReportAttachmentClick = { report, index ->
+                        selectedReportForLightbox = report
+                        selectedAttachmentIndexForLightbox = index
+                    },
+                    onToggleRelease = { reportId -> DentalRepository.toggleReportRelease(reportId) }
+                )
+                3 -> PatientDiagnosisTabView(
+                    patient = patient,
+                    onEditDiagnosisClick = { showEditDiagnosisDialog = true },
+                    onCreatePlanClick = {
+                        coroutineScope.launch { pagerState.animateScrollToPage(4) }
+                        showCreatePlanDialog = true
+                    }
+                )
+                4 -> PatientTreatmentPlansTabView(
+                    plans = patientPlans,
+                    patientDiagnosis = patient.diagnosis?.primaryDiagnosis,
+                    onCreatePlanClick = { showCreatePlanDialog = true },
+                    onToggleStepCompletion = { planId, stepId -> DentalRepository.togglePlanStepCompletion(planId, stepId) }
+                )
+                5 -> PatientPrescriptionsView(
+                    patient = patient,
+                    prescriptions = patientPrescriptions,
+                    onIssueNew = { onOpenIssuePrescription(patient) }
+                )
+                6 -> VisitHistoryView(
+                    patient = patient,
+                    appointments = patientAppointments,
+                    onBookAppointmentClick = { showBookAppointmentDialog = true },
+                    onUpdateStatus = { apptId, newStatus -> DentalRepository.updateAppointmentStatus(apptId, newStatus) }
+                )
+            }
         }
     }
 
@@ -300,6 +343,18 @@ fun PatientDetailChartScreen(
             }
         )
     }
+
+    // Share Patient Health Record PDF Dialog
+    if (showSharePdfDialog) {
+        SharePatientPdfDialog(
+            patient = patient,
+            treatmentPlans = patientPlans,
+            prescriptions = patientPrescriptions,
+            reports = patientReports,
+            appointments = patientAppointments,
+            onDismiss = { showSharePdfDialog = false }
+        )
+    }
 }
 
 // =============================================================================
@@ -326,6 +381,7 @@ private fun ExaminationAndOdontogramTabView(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -335,7 +391,7 @@ private fun ExaminationAndOdontogramTabView(
                     onClick = { examSubTab = 0 },
                     label = {
                         Text(
-                            text = "Odontogram Chart (32 Teeth)",
+                            text = if (patient.isChild) "Odontogram (20 Primary Teeth • FDI)" else "Odontogram (32 Permanent Teeth • FDI)",
                             style = MaterialTheme.typography.labelMedium.copy(
                                 fontWeight = if (examSubTab == 0) FontWeight.Bold else FontWeight.Medium
                             )
@@ -404,7 +460,7 @@ private fun ExaminationAndOdontogramTabView(
 
         when (examSubTab) {
             0 -> OdontogramView(
-                teeth = patient.teeth,
+                patient = patient,
                 selectedToothId = selectedToothId,
                 onToothClick = onToothClick
             )
@@ -430,16 +486,18 @@ enum class ArchSelection(val title: String) {
 
 @Composable
 private fun OdontogramView(
-    teeth: Map<Int, ToothRecord>,
+    patient: Patient,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit
 ) {
+    val teeth = patient.teeth
     val scrollState = rememberScrollState()
     var quadrantFilter by remember { mutableStateOf(QuadrantFilter.ALL) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .adaptiveContentContainer(1100.dp)
             .verticalScroll(scrollState)
             .padding(16.dp)
     ) {
@@ -453,14 +511,14 @@ private fun OdontogramView(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // Upper Arch (Maxillary Teeth 1 to 16, split into Upper Right & Upper Left quadrants)
+        // Upper Arch (Maxillary Teeth, split into Upper Right & Upper Left quadrants)
         if (quadrantFilter == QuadrantFilter.ALL ||
             quadrantFilter == QuadrantFilter.UPPER ||
             quadrantFilter == QuadrantFilter.UPPER_RIGHT ||
             quadrantFilter == QuadrantFilter.UPPER_LEFT
         ) {
             MaxillaryArchContainer(
-                teeth = teeth,
+                patient = patient,
                 selectedToothId = selectedToothId,
                 onToothClick = onToothClick,
                 activeFilter = quadrantFilter
@@ -474,14 +532,14 @@ private fun OdontogramView(
             Spacer(modifier = Modifier.height(12.dp))
         }
 
-        // Lower Arch (Mandibular Teeth 17 to 32, split into Lower Left & Lower Right quadrants)
+        // Lower Arch (Mandibular Teeth, split into Lower Left & Lower Right quadrants)
         if (quadrantFilter == QuadrantFilter.ALL ||
             quadrantFilter == QuadrantFilter.LOWER ||
             quadrantFilter == QuadrantFilter.LOWER_LEFT ||
             quadrantFilter == QuadrantFilter.LOWER_RIGHT
         ) {
             MandibularArchContainer(
-                teeth = teeth,
+                patient = patient,
                 selectedToothId = selectedToothId,
                 onToothClick = onToothClick,
                 activeFilter = quadrantFilter
@@ -597,7 +655,8 @@ private fun ToothEditDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
+                .adaptiveDialogWidth(480.dp)
+                .fillMaxWidth(0.95f)
                 .padding(8.dp),
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
@@ -744,6 +803,7 @@ private fun PatientPrescriptionsView(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .adaptiveContentContainer(860.dp)
             .padding(16.dp)
     ) {
         Row(
@@ -877,12 +937,12 @@ private fun PatientPrescriptionsView(
                                     onClick = {
                                         val shareText = """
                                             DENTARA DENTAL PRACTICE - OFFICIAL PRESCRIPTION
-                                            Patient: ${patient.name} (OP: ${patient.opNo}, DOB: ${patient.dob})
+                                            Patient: ${patient.name} (OP: ${patient.opNo}, DOB: ${formatAsDdMmYyyy(patient.dob)})
                                             Medication: ${rx.drugName} ${rx.dosage}
                                             Sig: ${rx.frequency} for ${rx.duration}
                                             Instructions: ${rx.instructions}
                                             Prescriber: ${rx.clinicianName}
-                                            Date Issued: ${rx.issueDate}
+                                            Date Issued: ${formatAsDdMmYyyy(rx.issueDate)}
                                             Rx ID: ${rx.id}
                                         """.trimIndent()
                                         val sendIntent = Intent().apply {
@@ -944,6 +1004,7 @@ private fun VisitHistoryView(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .adaptiveContentContainer(860.dp)
             .padding(16.dp)
     ) {
         Row(

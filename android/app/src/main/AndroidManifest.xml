@@ -42,7 +42,7 @@
 
         <receiver
             android:name=".reminder.DentaraAlarmReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.dentara.dental.ACTION_DAILY_MORNING_BRIEFING" />
                 <action android:name="com.dentara.dental.ACTION_PATIENT_ARRIVAL" />

@@ -225,6 +225,7 @@ fun AddReportDialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(640.dp)
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.92f)
                 .padding(vertical = 12.dp),

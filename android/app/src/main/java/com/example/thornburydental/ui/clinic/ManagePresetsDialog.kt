@@ -63,6 +63,7 @@ fun ManagePresetsDialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(720.dp)
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.92f)
                 .padding(vertical = 12.dp),

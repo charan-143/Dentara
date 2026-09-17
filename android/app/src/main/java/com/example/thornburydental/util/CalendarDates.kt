@@ -70,3 +70,34 @@ fun isoDateMonthYearLabel(date: String): String =
     SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(isoDateToCalendar(date).time)
 
 fun isIsoDateToday(date: String): Boolean = date == todayIsoDate()
+
+/** Formats any date string into "dd/MM/yyyy" format. */
+fun formatAsDdMmYyyy(date: String): String {
+    if (date.isBlank()) return date
+    val trimmed = date.trim()
+    if (Regex("""^\d{2}/\d{2}/\d{4}$""").matches(trimmed)) return trimmed
+
+    val parsePatterns = listOf(
+        "yyyy-MM-dd",
+        "yyyy-MM-dd'T'HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "dd-MM-yyyy",
+        "yyyy/MM/dd",
+        "d MMM yyyy",
+        "dd MMM yyyy"
+    )
+
+    for (pattern in parsePatterns) {
+        try {
+            val parsed = SimpleDateFormat(pattern, Locale.getDefault()).apply { isLenient = false }.parse(trimmed)
+            if (parsed != null) {
+                return SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(parsed)
+            }
+        } catch (_: Exception) {}
+    }
+
+    return trimmed
+}
+
+fun todayDdMmYyyyDate(): String = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Calendar.getInstance().time)

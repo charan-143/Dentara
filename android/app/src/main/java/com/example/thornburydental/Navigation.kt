@@ -1,17 +1,23 @@
 package com.example.thornburydental
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
@@ -118,94 +124,238 @@ fun MainNavigation() {
                 rootDestination = RootDestination.WELCOME
             }
 
-            Scaffold(
-                modifier = Modifier.fillMaxSize(),
-                containerColor = ThornburyCanvas,
-                bottomBar = {
-                    // Persistent navigation bar across all pages
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = ThornburyCanvas,
-                        border = BorderStroke(1.dp, ThornburyHairline)
-                    ) {
-                        NavigationBar(
-                            containerColor = ThornburyCanvas,
-                            contentColor = ThornburyInk,
-                            tonalElevation = 0.dp
-                        ) {
-                            AppDestination.entries.forEach { destination ->
-                                val isSelected = currentTab == destination
-                                NavigationBarItem(
-                                    selected = isSelected,
-                                    onClick = { navigateToTab(destination) },
-                                    icon = {
-                                        Icon(
-                                            imageVector = destination.icon,
-                                            contentDescription = destination.label
-                                        )
-                                    },
-                                    label = {
-                                        Text(
-                                            text = destination.label,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        )
-                                    },
-                                    colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = ThornburyPrimary,
-                                        selectedTextColor = ThornburyPrimary,
-                                        unselectedIconColor = ThornburyMuted,
-                                        unselectedTextColor = ThornburyMuted,
-                                        indicatorColor = ThornburySurfaceSoft
+            val windowSizeClass = rememberWindowWidthSizeClass()
+            val isCompact = windowSizeClass == WindowWidthSizeClass.COMPACT
+
+            CompositionLocalProvider(LocalWindowWidthSizeClass provides windowSizeClass) {
+                @Composable
+                fun ScreenContentHost(modifier: Modifier = Modifier) {
+                    val activeKey = when {
+                        showRegisterPatientScreen -> "REGISTER"
+                        activePatientId != null -> "PATIENT_${activePatientId}"
+                        else -> "TAB_${currentTab.name}"
+                    }
+
+                    AnimatedContent(
+                        targetState = activeKey,
+                        transitionSpec = {
+                            val targetIsChild = targetState.startsWith("PATIENT_") || targetState == "REGISTER"
+                            val initialIsChild = initialState.startsWith("PATIENT_") || initialState == "REGISTER"
+
+                            if (targetIsChild) {
+                                slideInHorizontally(initialOffsetX = { it }, animationSpec = tween(280, easing = FastOutSlowInEasing)) +
+                                        fadeIn(animationSpec = tween(280)) togetherWith
+                                slideOutHorizontally(targetOffsetX = { -it / 3 }, animationSpec = tween(240, easing = FastOutSlowInEasing)) +
+                                        fadeOut(animationSpec = tween(200))
+                            } else if (initialIsChild) {
+                                slideInHorizontally(initialOffsetX = { -it / 3 }, animationSpec = tween(240, easing = FastOutSlowInEasing)) +
+                                        fadeIn(animationSpec = tween(240)) togetherWith
+                                slideOutHorizontally(targetOffsetX = { it }, animationSpec = tween(280, easing = FastOutSlowInEasing)) +
+                                        fadeOut(animationSpec = tween(200))
+                            } else {
+                                val targetTab = runCatching { AppDestination.valueOf(targetState.removePrefix("TAB_")) }.getOrNull()
+                                val initialTab = runCatching { AppDestination.valueOf(initialState.removePrefix("TAB_")) }.getOrNull()
+
+                                if (targetTab != null && initialTab != null && targetTab.ordinal != initialTab.ordinal) {
+                                    if (targetTab.ordinal > initialTab.ordinal) {
+                                        (slideInHorizontally(initialOffsetX = { (it * 0.20f).toInt() }, animationSpec = tween(240, easing = FastOutSlowInEasing)) +
+                                                fadeIn(animationSpec = tween(240, easing = LinearOutSlowInEasing))) togetherWith
+                                        (slideOutHorizontally(targetOffsetX = { (-it * 0.20f).toInt() }, animationSpec = tween(200, easing = FastOutSlowInEasing)) +
+                                                fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)))
+                                    } else {
+                                        (slideInHorizontally(initialOffsetX = { (-it * 0.20f).toInt() }, animationSpec = tween(240, easing = FastOutSlowInEasing)) +
+                                                fadeIn(animationSpec = tween(240, easing = LinearOutSlowInEasing))) togetherWith
+                                        (slideOutHorizontally(targetOffsetX = { (it * 0.20f).toInt() }, animationSpec = tween(200, easing = FastOutSlowInEasing)) +
+                                                fadeOut(animationSpec = tween(180, easing = FastOutSlowInEasing)))
+                                    }
+                                } else {
+                                    fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(180))
+                                }
+                            }
+                        },
+                        modifier = modifier.fillMaxSize(),
+                        label = "ScreenNavigationTransition"
+                    ) { key ->
+                        when {
+                            key == "REGISTER" -> {
+                                RegisterPatientScreen(
+                                    onBack = { showRegisterPatientScreen = false },
+                                    onRegistered = { newPatient ->
+                                        showRegisterPatientScreen = false
+                                        activePatientId = newPatient.id
+                                    }
+                                )
+                            }
+                            key.startsWith("PATIENT_") -> {
+                                val pId = key.removePrefix("PATIENT_")
+                                PatientDetailChartScreen(
+                                    patientId = pId,
+                                    onBack = { activePatientId = null },
+                                    onOpenIssuePrescription = { p -> prescriptionTargetPatient = p },
+                                    onOpenAddReportScreen = { p -> reportPatientTarget = p }
+                                )
+                            }
+                            key.startsWith("TAB_") -> {
+                                val tabName = key.removePrefix("TAB_")
+                                val dest = runCatching { AppDestination.valueOf(tabName) }.getOrDefault(currentTab)
+                                when (dest) {
+                                    AppDestination.TODAY -> TodayQueueScreen(
+                                        onOpenPatientChart = { patientId -> activePatientId = patientId }
                                     )
+                                    AppDestination.PATIENTS -> PatientRosterScreen(
+                                        onSelectPatient = { patientId -> activePatientId = patientId },
+                                        onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
+                                    )
+                                    AppDestination.SCHEDULE -> ScheduleScreen(
+                                        onOpenPatientChart = { patientId -> activePatientId = patientId },
+                                        onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
+                                    )
+                                    AppDestination.PROFILE -> ProfileScreen(
+                                        onSignOut = { rootDestination = RootDestination.WELCOME }
+                                    )
+                                }
+                            }
+                            else -> {
+                                TodayQueueScreen(
+                                    onOpenPatientChart = { patientId -> activePatientId = patientId }
                                 )
                             }
                         }
                     }
                 }
-            ) { innerPadding ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPadding)
-                ) {
-                    when {
-                        showRegisterPatientScreen -> {
-                            RegisterPatientScreen(
-                                onBack = { showRegisterPatientScreen = false },
-                                onRegistered = { newPatient ->
-                                    showRegisterPatientScreen = false
-                                    activePatientId = newPatient.id
+
+                if (isCompact) {
+                    Scaffold(
+                        modifier = Modifier.fillMaxSize(),
+                        containerColor = ThornburyCanvas,
+                        bottomBar = {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = ThornburyCanvas,
+                                border = BorderStroke(1.dp, ThornburyHairline)
+                            ) {
+                                NavigationBar(
+                                    containerColor = ThornburyCanvas,
+                                    contentColor = ThornburyInk,
+                                    tonalElevation = 0.dp
+                                ) {
+                                    AppDestination.entries.forEach { destination ->
+                                        val isSelected = currentTab == destination
+                                        NavigationBarItem(
+                                            selected = isSelected,
+                                            onClick = { navigateToTab(destination) },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = destination.icon,
+                                                    contentDescription = destination.label
+                                                )
+                                            },
+                                            label = {
+                                                Text(
+                                                    text = destination.label,
+                                                    style = MaterialTheme.typography.labelSmall.copy(
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                    )
+                                                )
+                                            },
+                                            colors = NavigationBarItemDefaults.colors(
+                                                selectedIconColor = ThornburyPrimary,
+                                                selectedTextColor = ThornburyPrimary,
+                                                unselectedIconColor = ThornburyMuted,
+                                                unselectedTextColor = ThornburyMuted,
+                                                indicatorColor = ThornburySurfaceSoft
+                                            )
+                                        )
+                                    }
                                 }
-                            )
-                        }
-                        activePatientId != null -> {
-                            PatientDetailChartScreen(
-                                patientId = activePatientId!!,
-                                onBack = { activePatientId = null },
-                                onOpenIssuePrescription = { p -> prescriptionTargetPatient = p },
-                                onOpenAddReportScreen = { p -> reportPatientTarget = p }
-                            )
-                        }
-                        else -> {
-                            when (currentTab) {
-                                AppDestination.TODAY -> TodayQueueScreen(
-                                    onOpenPatientChart = { patientId -> activePatientId = patientId }
-                                )
-                                AppDestination.PATIENTS -> PatientRosterScreen(
-                                    onSelectPatient = { patientId -> activePatientId = patientId },
-                                    onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
-                                )
-                                AppDestination.SCHEDULE -> ScheduleScreen(
-                                    onOpenPatientChart = { patientId -> activePatientId = patientId },
-                                    onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
-                                )
-                                AppDestination.PROFILE -> ProfileScreen(
-                                    onSignOut = { rootDestination = RootDestination.WELCOME }
-                                )
                             }
                         }
+                    ) { innerPadding ->
+                        ScreenContentHost(modifier = Modifier.padding(innerPadding))
+                    }
+                } else {
+                    // Tablet & Wide Screen Navigation Rail layout
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(ThornburyCanvas)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(92.dp),
+                            color = ThornburyCanvas,
+                            border = BorderStroke(1.dp, ThornburyHairline)
+                        ) {
+                            NavigationRail(
+                                containerColor = ThornburyCanvas,
+                                contentColor = ThornburyInk,
+                                header = {
+                                    Column(
+                                        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                                        modifier = Modifier.padding(top = 18.dp, bottom = 16.dp)
+                                    ) {
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = ThornburyPrimaryWash,
+                                            border = BorderStroke(1.dp, ThornburyHairline)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.MedicalServices,
+                                                contentDescription = "Dentara",
+                                                tint = ThornburyPrimary,
+                                                modifier = Modifier
+                                                    .padding(8.dp)
+                                                    .size(24.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "DENTARA",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Black,
+                                                letterSpacing = 1.2.sp
+                                            ),
+                                            color = ThornburyInk
+                                        )
+                                    }
+                                },
+                                modifier = Modifier.fillMaxHeight()
+                            ) {
+                                Spacer(modifier = Modifier.weight(1f))
+                                AppDestination.entries.forEach { destination ->
+                                    val isSelected = currentTab == destination
+                                    NavigationRailItem(
+                                        selected = isSelected,
+                                        onClick = { navigateToTab(destination) },
+                                        icon = {
+                                            Icon(
+                                                imageVector = destination.icon,
+                                                contentDescription = destination.label
+                                            )
+                                        },
+                                        label = {
+                                            Text(
+                                                text = destination.label,
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            )
+                                        },
+                                        colors = NavigationRailItemDefaults.colors(
+                                            selectedIconColor = ThornburyPrimary,
+                                            selectedTextColor = ThornburyPrimary,
+                                            unselectedIconColor = ThornburyMuted,
+                                            unselectedTextColor = ThornburyMuted,
+                                            indicatorColor = ThornburySurfaceSoft
+                                        ),
+                                        modifier = Modifier.padding(vertical = 6.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.weight(1.5f))
+                            }
+                        }
+                        ScreenContentHost(modifier = Modifier.weight(1f))
                     }
                 }
             }

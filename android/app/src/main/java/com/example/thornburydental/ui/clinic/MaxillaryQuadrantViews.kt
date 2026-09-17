@@ -67,7 +67,7 @@ enum class QuadrantFilter(val label: String, val badge: String) {
 // =============================================================================
 
 fun defaultUpperToothRecord(number: Int): ToothRecord {
-    val fdi = if (number <= 8) 19 - number else 20 + (number - 8)
+    val fdi = if (number <= 8) 19 - number else if (number <= 16) 20 + (number - 8) else number
     val namesUpper = listOf(
         "Third Molar (Wisdom)", "Second Molar", "First Molar", "Second Premolar",
         "First Premolar", "Canine (Cuspid)", "Lateral Incisor", "Central Incisor",
@@ -84,6 +84,28 @@ fun defaultUpperToothRecord(number: Int): ToothRecord {
         fdiNumber = fdi,
         name = name,
         arch = "Maxillary (Upper Arch)",
+        condition = ToothCondition.SOUND
+    )
+}
+
+fun defaultChildUpperToothRecord(fdi: Int): ToothRecord {
+    val names = mapOf(
+        55 to "Primary Maxillary Right Second Molar",
+        54 to "Primary Maxillary Right First Molar",
+        53 to "Primary Maxillary Right Canine",
+        52 to "Primary Maxillary Right Lateral Incisor",
+        51 to "Primary Maxillary Right Central Incisor",
+        61 to "Primary Maxillary Left Central Incisor",
+        62 to "Primary Maxillary Left Lateral Incisor",
+        63 to "Primary Maxillary Left Canine",
+        64 to "Primary Maxillary Left First Molar",
+        65 to "Primary Maxillary Left Second Molar"
+    )
+    return ToothRecord(
+        number = fdi,
+        fdiNumber = fdi,
+        name = names[fdi] ?: "Primary Maxillary Tooth $fdi",
+        arch = "Maxillary (Upper Primary Arch)",
         condition = ToothCondition.SOUND
     )
 }
@@ -235,10 +257,21 @@ fun UpperRightQuadrantCard(
     teeth: Map<Int, ToothRecord>,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val quadrantTeeth = remember(teeth) {
-        (1..8).map { num -> teeth[num] ?: defaultUpperToothRecord(num) }
+    val isChildTeeth = isChild || teeth.keys.any { it in 51..85 }
+    val quadrantTeeth = remember(teeth, isChildTeeth) {
+        if (isChildTeeth) {
+            val fdiNumbers = listOf(55, 54, 53, 52, 51)
+            fdiNumbers.map { fdi -> teeth[fdi] ?: defaultChildUpperToothRecord(fdi) }
+        } else {
+            val fdiNumbers = listOf(18, 17, 16, 15, 14, 13, 12, 11)
+            val universalNumbers = (1..8).toList()
+            fdiNumbers.mapIndexed { idx, fdi ->
+                teeth[fdi] ?: teeth[universalNumbers[idx]] ?: defaultUpperToothRecord(universalNumbers[idx])
+            }
+        }
     }
 
     Card(
@@ -263,7 +296,6 @@ fun UpperRightQuadrantCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    // ThornburyPrimary accent indicator bar
                     Box(
                         modifier = Modifier
                             .width(3.dp)
@@ -277,7 +309,7 @@ fun UpperRightQuadrantCard(
                             border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
                         ) {
                             Text(
-                                text = "Upper Right (UR • Q1)",
+                                text = if (isChildTeeth) "Upper Right Primary (UR • Q5)" else "Upper Right (UR • Q1)",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
@@ -287,7 +319,7 @@ fun UpperRightQuadrantCard(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Teeth 1–8 (FDI 18–11)",
+                            text = if (isChildTeeth) "Teeth FDI 55–51 (5 Primary Teeth)" else "Teeth FDI 18–11 (8 Permanent Teeth)",
                             style = ClinicalCodeStyle.copy(
                                 fontSize = 11.sp,
                                 color = ThornburyMuted
@@ -302,7 +334,7 @@ fun UpperRightQuadrantCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Horizontal Scrollable Teeth Strip (1 to 8)
+            // Horizontal Scrollable Teeth Strip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -313,7 +345,7 @@ fun UpperRightQuadrantCard(
                 for (tooth in quadrantTeeth) {
                     AnatomicalToothView(
                         tooth = tooth,
-                        isSelected = selectedToothId == tooth.number,
+                        isSelected = selectedToothId == tooth.number || selectedToothId == tooth.fdiNumber,
                         onClick = { onToothClick(tooth) }
                     )
                 }
@@ -327,12 +359,12 @@ fun UpperRightQuadrantCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "◀ Distal (#1)",
+                    text = if (isChildTeeth) "◀ Distal (FDI 55)" else "◀ Distal (FDI 18)",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = ThornburyMutedSoft
                 )
                 Text(
-                    text = "Mesial (#8) ▶ Midline",
+                    text = if (isChildTeeth) "Mesial (FDI 51) ▶ Midline" else "Mesial (FDI 11) ▶ Midline",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = ThornburyMutedSoft
                 )
@@ -355,33 +387,35 @@ fun UpperRightQuadrantCard(
         teeth = patient.teeth,
         selectedToothId = selectedToothId,
         onToothClick = onToothClick,
+        isChild = patient.isChild,
         modifier = modifier
     )
 }
 
 // =============================================================================
-// 4. Upper Left Quadrant Card Composable (UL • Q2)
+// 4. Upper Left Quadrant Card Composable (UL • Q2 / Q6)
 // =============================================================================
 
-/**
- * Upper Left Quadrant Card covering Teeth 9 to 16 (FDI 21 to 28).
- * Features:
- * - Thornbury theme styling (ThornburyCanvas, ThornburyHairline, ThornburyPrimary accent).
- * - Header with:
- *   - Quadrant indicator badge: "Upper Left (UL • Q2)"
- *   - Subtitle / range: "Teeth 9–16 (FDI 21–28)"
- *   - Pathology summary badge ("All Sound" in ThornburySuccess or "N Flagged" in ThornburyWarning).
- * - Horizontal scrollable teeth strip rendering [AnatomicalToothView] for teeth 9..16 with selection state and click handler.
- */
 @Composable
 fun UpperLeftQuadrantCard(
     teeth: Map<Int, ToothRecord>,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val quadrantTeeth = remember(teeth) {
-        (9..16).map { num -> teeth[num] ?: defaultUpperToothRecord(num) }
+    val isChildTeeth = isChild || teeth.keys.any { it in 51..85 }
+    val quadrantTeeth = remember(teeth, isChildTeeth) {
+        if (isChildTeeth) {
+            val fdiNumbers = listOf(61, 62, 63, 64, 65)
+            fdiNumbers.map { fdi -> teeth[fdi] ?: defaultChildUpperToothRecord(fdi) }
+        } else {
+            val fdiNumbers = listOf(21, 22, 23, 24, 25, 26, 27, 28)
+            val universalNumbers = (9..16).toList()
+            fdiNumbers.mapIndexed { idx, fdi ->
+                teeth[fdi] ?: teeth[universalNumbers[idx]] ?: defaultUpperToothRecord(universalNumbers[idx])
+            }
+        }
     }
 
     Card(
@@ -406,7 +440,6 @@ fun UpperLeftQuadrantCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.weight(1f, fill = false)
                 ) {
-                    // ThornburyPrimary accent indicator bar
                     Box(
                         modifier = Modifier
                             .width(3.dp)
@@ -420,7 +453,7 @@ fun UpperLeftQuadrantCard(
                             border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
                         ) {
                             Text(
-                                text = "Upper Left (UL • Q2)",
+                                text = if (isChildTeeth) "Upper Left Primary (UL • Q6)" else "Upper Left (UL • Q2)",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
@@ -430,7 +463,7 @@ fun UpperLeftQuadrantCard(
                         }
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Teeth 9–16 (FDI 21–28)",
+                            text = if (isChildTeeth) "Teeth FDI 61–65 (5 Primary Teeth)" else "Teeth FDI 21–28 (8 Permanent Teeth)",
                             style = ClinicalCodeStyle.copy(
                                 fontSize = 11.sp,
                                 color = ThornburyMuted
@@ -445,7 +478,7 @@ fun UpperLeftQuadrantCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Horizontal Scrollable Teeth Strip (9 to 16)
+            // Horizontal Scrollable Teeth Strip
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -456,7 +489,7 @@ fun UpperLeftQuadrantCard(
                 for (tooth in quadrantTeeth) {
                     AnatomicalToothView(
                         tooth = tooth,
-                        isSelected = selectedToothId == tooth.number,
+                        isSelected = selectedToothId == tooth.number || selectedToothId == tooth.fdiNumber,
                         onClick = { onToothClick(tooth) }
                     )
                 }
@@ -470,12 +503,12 @@ fun UpperLeftQuadrantCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Midline ◀ Mesial (#9)",
+                    text = if (isChildTeeth) "Midline ◀ Mesial (FDI 61)" else "Midline ◀ Mesial (FDI 21)",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = ThornburyMutedSoft
                 )
                 Text(
-                    text = "Distal (#16) ▶",
+                    text = if (isChildTeeth) "Distal (FDI 65) ▶" else "Distal (FDI 28) ▶",
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     color = ThornburyMutedSoft
                 )
@@ -498,6 +531,7 @@ fun UpperLeftQuadrantCard(
         teeth = patient.teeth,
         selectedToothId = selectedToothId,
         onToothClick = onToothClick,
+        isChild = patient.isChild,
         modifier = modifier
     )
 }
@@ -506,19 +540,14 @@ fun UpperLeftQuadrantCard(
 // 5. Maxillary Arch Container Composable
 // =============================================================================
 
-/**
- * Wraps the Maxillary arch with:
- * - Header: "Maxillary Arch (Upper Teeth 1–16)"
- * - Anatomical Orientation Badge: "Roots Point Up • Crown Points Down"
- * - Conditionally displays [UpperRightQuadrantCard] when activeFilter is ALL, UPPER, or UPPER_RIGHT.
- * - Conditionally displays [UpperLeftQuadrantCard] when activeFilter is ALL, UPPER, or UPPER_LEFT.
- */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MaxillaryArchContainer(
     teeth: Map<Int, ToothRecord>,
     activeFilter: QuadrantFilter = QuadrantFilter.ALL,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val showUpperRight = activeFilter in listOf(
@@ -534,6 +563,8 @@ fun MaxillaryArchContainer(
 
     if (!showUpperRight && !showUpperLeft) return
 
+    val isChildTeeth = isChild || teeth.keys.any { it in 51..85 }
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -546,14 +577,14 @@ fun MaxillaryArchContainer(
                 .padding(14.dp)
         ) {
             // Arch Main Header
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.padding(end = 8.dp)
                 ) {
                     Box(
                         modifier = Modifier
@@ -562,7 +593,7 @@ fun MaxillaryArchContainer(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Maxillary Arch (Upper Teeth 1–16)",
+                        text = if (isChildTeeth) "Maxillary Primary Arch (FDI 51–65 • 10 Teeth)" else "Maxillary Arch (FDI 11–28 • 16 Teeth)",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                         ),
@@ -590,27 +621,51 @@ fun MaxillaryArchContainer(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Upper Right Quadrant Card (if visible under activeFilter)
-            if (showUpperRight) {
-                UpperRightQuadrantCard(
-                    teeth = teeth,
-                    selectedToothId = selectedToothId,
-                    onToothClick = onToothClick
-                )
-            }
+            val isCompact = LocalWindowWidthSizeClass.current == WindowWidthSizeClass.Compact
+            if (showUpperRight && showUpperLeft && !isCompact) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        UpperRightQuadrantCard(
+                            teeth = teeth,
+                            selectedToothId = selectedToothId,
+                            onToothClick = onToothClick,
+                            isChild = isChildTeeth
+                        )
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        UpperLeftQuadrantCard(
+                            teeth = teeth,
+                            selectedToothId = selectedToothId,
+                            onToothClick = onToothClick,
+                            isChild = isChildTeeth
+                        )
+                    }
+                }
+            } else {
+                if (showUpperRight) {
+                    UpperRightQuadrantCard(
+                        teeth = teeth,
+                        selectedToothId = selectedToothId,
+                        onToothClick = onToothClick,
+                        isChild = isChildTeeth
+                    )
+                }
 
-            // Spacing between quadrant cards if both are displayed
-            if (showUpperRight && showUpperLeft) {
-                Spacer(modifier = Modifier.height(12.dp))
-            }
+                if (showUpperRight && showUpperLeft) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
-            // Upper Left Quadrant Card (if visible under activeFilter)
-            if (showUpperLeft) {
-                UpperLeftQuadrantCard(
-                    teeth = teeth,
-                    selectedToothId = selectedToothId,
-                    onToothClick = onToothClick
-                )
+                if (showUpperLeft) {
+                    UpperLeftQuadrantCard(
+                        teeth = teeth,
+                        selectedToothId = selectedToothId,
+                        onToothClick = onToothClick,
+                        isChild = isChildTeeth
+                    )
+                }
             }
         }
     }
@@ -632,6 +687,7 @@ fun MaxillaryArchContainer(
         activeFilter = activeFilter,
         selectedToothId = selectedToothId,
         onToothClick = onToothClick,
+        isChild = patient.isChild,
         modifier = modifier
     )
 }

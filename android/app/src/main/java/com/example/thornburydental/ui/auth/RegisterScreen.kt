@@ -165,11 +165,13 @@ fun RegisterScreen(
             .fillMaxSize()
             .background(ThornburyCanvas)
             .statusBarsPadding()
-            .navigationBarsPadding()
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .adaptiveContentContainer(560.dp)
                 .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally

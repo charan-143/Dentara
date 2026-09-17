@@ -12,7 +12,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
-        const val DATABASE_VERSION = 5
+        const val DATABASE_VERSION = 6
 
         // Table Names
         const val TABLE_PATIENTS = "patients"
@@ -74,6 +74,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         const val COL_PATIENTS_PHONE = "phone"
         const val COL_PATIENTS_EMAIL = "email"
         const val COL_PATIENTS_ADDRESS = "address"
+        const val COL_PATIENTS_IS_CHILD = "is_child"
         const val COL_PATIENTS_MEDICAL_HISTORY = "medical_history"
         const val COL_PATIENTS_FAMILY_HISTORY = "family_history"
         const val COL_PATIENTS_PAST_DENTAL_HISTORY = "past_dental_history"
@@ -177,6 +178,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 $COL_PATIENTS_PHONE TEXT,
                 $COL_PATIENTS_EMAIL TEXT,
                 $COL_PATIENTS_ADDRESS TEXT,
+                $COL_PATIENTS_IS_CHILD INTEGER NOT NULL DEFAULT 0,
                 $COL_PATIENTS_MEDICAL_HISTORY TEXT,
                 $COL_PATIENTS_FAMILY_HISTORY TEXT,
                 $COL_PATIENTS_PAST_DENTAL_HISTORY TEXT,
@@ -354,6 +356,11 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 6) {
+            try {
+                db.execSQL("ALTER TABLE $TABLE_PATIENTS ADD COLUMN $COL_PATIENTS_IS_CHILD INTEGER NOT NULL DEFAULT 0")
+            } catch (_: Exception) {}
+        }
         if (oldVersion < 5) {
             try {
                 db.execSQL("ALTER TABLE $TABLE_APPOINTMENTS ADD COLUMN $COL_APPTS_REMINDER_ENABLED INTEGER NOT NULL DEFAULT 0")
@@ -361,21 +368,7 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 db.execSQL("ALTER TABLE $TABLE_USER_PREFERENCES ADD COLUMN $COL_PREF_MORNING_REMINDER_ENABLED INTEGER NOT NULL DEFAULT 1")
                 db.execSQL("ALTER TABLE $TABLE_USER_PREFERENCES ADD COLUMN $COL_PREF_MORNING_REMINDER_TIME TEXT NOT NULL DEFAULT '08:00'")
                 db.execSQL("ALTER TABLE $TABLE_USER_PREFERENCES ADD COLUMN $COL_PREF_CHAIRSIDE_REMINDER_DEFAULT_MIN INTEGER NOT NULL DEFAULT 15")
-                return
-            } catch (e: Exception) {
-                // If migration fails, fall back to recreation
-            }
+            } catch (_: Exception) {}
         }
-        // Drop existing tables in reverse dependency order
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_MEDICATION_PRESETS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USER_PREFERENCES")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_USERS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_DIAGNOSTIC_REPORTS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_PRESCRIPTIONS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_TREATMENT_PLANS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_APPOINTMENTS")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_TEETH")
-        db.execSQL("DROP TABLE IF EXISTS $TABLE_PATIENTS")
-        onCreate(db)
     }
 }

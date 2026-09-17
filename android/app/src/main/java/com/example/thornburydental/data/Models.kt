@@ -70,9 +70,18 @@ enum class ToothAnatomyType {
 
 fun getToothAnatomyType(toothNumber: Int): ToothAnatomyType {
     return when (toothNumber) {
-        // Universal 1-32 system
-        // Upper: 1,2,3 (molar), 4,5 (premolar), 6 (canine), 7,8 (incisor), 9,10 (incisor), 11 (canine), 12,13 (premolar), 14,15,16 (molar)
-        // Lower: 17,18,19 (molar), 20,21 (premolar), 22 (canine), 23,24 (incisor), 25,26 (incisor), 27 (canine), 28,29 (premolar), 30,31,32 (molar)
+        // Adult Permanent FDI Notation (11-48) & Primary Child FDI Notation (51-85)
+        18, 17, 16, 26, 27, 28, 38, 37, 36, 46, 47, 48,
+        55, 54, 64, 65, 75, 74, 84, 85 -> ToothAnatomyType.MOLAR
+
+        15, 14, 24, 25, 34, 35, 44, 45 -> ToothAnatomyType.PREMOLAR
+
+        13, 23, 33, 43, 53, 63, 73, 83 -> ToothAnatomyType.CANINE
+
+        12, 11, 21, 22, 31, 32, 41, 42,
+        51, 52, 61, 62, 71, 72, 81, 82 -> ToothAnatomyType.INCISOR
+
+        // Universal 1-32 fallback
         1, 2, 3, 14, 15, 16, 17, 18, 19, 30, 31, 32 -> ToothAnatomyType.MOLAR
         4, 5, 12, 13, 20, 21, 28, 29 -> ToothAnatomyType.PREMOLAR
         6, 11, 22, 27 -> ToothAnatomyType.CANINE
@@ -123,6 +132,7 @@ data class Patient(
     val phone: String = "",
     val email: String = "",
     val address: String = "",
+    val isChild: Boolean = false, // Pediatric flag: false = Adult (32 teeth), true = Child (20 primary teeth)
     val medicalHistory: String = "",
     val familyHistory: String = "",
     val pastDentalHistory: String = "",
@@ -163,12 +173,27 @@ typealias DentalReport = DiagnosticReport
 data class PlanStep(
     val id: String,
     val toothNumber: Int?,
+    val toothNumbers: List<Int> = emptyList(),
     val procedure: String,
     val code: String,
     val fee: Double,
     val completed: Boolean = false
 ) {
     val procedureCode: String get() = code
+
+    val effectiveToothNumbers: List<Int> get() {
+        if (toothNumbers.isNotEmpty()) return toothNumbers
+        return if (toothNumber != null) listOf(toothNumber) else emptyList()
+    }
+
+    val toothDisplayString: String get() {
+        val teeth = effectiveToothNumbers
+        return when {
+            teeth.isEmpty() -> "General"
+            teeth.size == 1 -> "Tooth ${teeth.first()}"
+            else -> "Teeth ${teeth.joinToString(", ")}"
+        }
+    }
 }
 
 @Serializable

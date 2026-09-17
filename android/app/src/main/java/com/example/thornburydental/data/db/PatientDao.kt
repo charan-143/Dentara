@@ -87,6 +87,7 @@ class PatientDao(
                 put(ThornburyDbHelper.COL_PATIENTS_PHONE, patient.phone)
                 put(ThornburyDbHelper.COL_PATIENTS_EMAIL, patient.email)
                 put(ThornburyDbHelper.COL_PATIENTS_ADDRESS, patient.address)
+                put(ThornburyDbHelper.COL_PATIENTS_IS_CHILD, if (patient.isChild) 1 else 0)
                 put(ThornburyDbHelper.COL_PATIENTS_MEDICAL_HISTORY, patient.medicalHistory)
                 put(ThornburyDbHelper.COL_PATIENTS_FAMILY_HISTORY, patient.familyHistory)
                 put(ThornburyDbHelper.COL_PATIENTS_PAST_DENTAL_HISTORY, patient.pastDentalHistory)
@@ -143,7 +144,8 @@ class PatientDao(
         medicalHistory: String,
         familyHistory: String,
         pastDentalHistory: String,
-        dob: String?
+        dob: String?,
+        isChild: Boolean = false
     ) {
         val db = dbHelper.writableDatabase
         val values = ContentValues().apply {
@@ -153,6 +155,7 @@ class PatientDao(
             put(ThornburyDbHelper.COL_PATIENTS_PHONE, phone)
             put(ThornburyDbHelper.COL_PATIENTS_EMAIL, email)
             put(ThornburyDbHelper.COL_PATIENTS_ADDRESS, address)
+            put(ThornburyDbHelper.COL_PATIENTS_IS_CHILD, if (isChild) 1 else 0)
             put(ThornburyDbHelper.COL_PATIENTS_MEDICAL_HISTORY, medicalHistory)
             put(ThornburyDbHelper.COL_PATIENTS_FAMILY_HISTORY, familyHistory)
             put(ThornburyDbHelper.COL_PATIENTS_PAST_DENTAL_HISTORY, pastDentalHistory)
@@ -382,8 +385,9 @@ class PatientDao(
         val medicalAlertsJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_MEDICAL_ALERTS_JSON))
         val allergiesJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_ALLERGIES_JSON))
         val examAnswersJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_EXAM_ANSWERS_JSON))
-        val diagnosisIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PATIENTS_DIAGNOSIS_JSON)
-        val diagnosisJson = if (diagnosisIndex >= 0) cursor.getString(diagnosisIndex) else null
+        val diagnosisJson = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PATIENTS_DIAGNOSIS_JSON))
+        val isChildIndex = cursor.getColumnIndex(ThornburyDbHelper.COL_PATIENTS_IS_CHILD)
+        val isChild = if (isChildIndex >= 0) cursor.getInt(isChildIndex) == 1 else false
 
         return Patient(
             id = id,
@@ -393,6 +397,7 @@ class PatientDao(
             phone = phone,
             email = email,
             address = address,
+            isChild = isChild,
             medicalHistory = medicalHistory,
             familyHistory = familyHistory,
             pastDentalHistory = pastDentalHistory,

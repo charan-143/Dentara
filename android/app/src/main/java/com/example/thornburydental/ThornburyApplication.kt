@@ -14,5 +14,6 @@ class ThornburyApplication : Application() {
         instance = this
         com.example.thornburydental.data.db.LocalDatabaseManager.initialize(this)
         com.example.thornburydental.data.DentalRepository.initializeFromDatabase()
+        com.example.thornburydental.reminder.ReminderManager.createNotificationChannels(this)
     }
 }

@@ -30,10 +30,10 @@ fun ThornburyDatePickerField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String = "Date",
-    placeholder: String = "YYYY-MM-DD",
+    placeholder: String = "DD/MM/YYYY",
     modifier: Modifier = Modifier,
     isOptional: Boolean = true,
-    helperText: String? = "Enter manually or select from calendar"
+    helperText: String? = "Format: DD/MM/YYYY"
 ) {
     var showDatePickerDialog by remember { mutableStateOf(false) }
 
@@ -109,7 +109,7 @@ fun ThornburyDatePickerField(
                 TextButton(
                     onClick = {
                         datePickerState.selectedDateMillis?.let { millis ->
-                            val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).apply {
+                            val sdf = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).apply {
                                 timeZone = TimeZone.getTimeZone("UTC")
                             }
                             onValueChange(sdf.format(Date(millis)))

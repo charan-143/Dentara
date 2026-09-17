@@ -71,6 +71,7 @@ object LocalDatabaseManager {
         userPreferencesDao = UserPreferencesDao(dbHelper)
         medicationPresetDao = MedicationPresetDao(dbHelper)
         ensureMedicationPresetsTable()
+        userDao.seedDefaultUsersIfEmpty()
         sanitizeClinicianNames()
         isInitialized = true
         Log.d(TAG, "Thornbury local SQLite database initialized successfully.")
@@ -113,47 +114,47 @@ object LocalDatabaseManager {
     }
 
     /**
-     * Seed initial demo records if the local database is fresh/empty.
+     * Deprecated development mock data seeder. Retained as a no-op for backward compatibility.
      */
     suspend fun seedInitialDataIfEmpty(
-        patients: List<Patient>,
-        appointments: List<Appointment>,
-        prescriptions: List<Prescription>,
-        treatmentPlans: List<TreatmentPlan>,
-        reports: List<DiagnosticReport>
+        patients: List<Patient> = emptyList(),
+        appointments: List<Appointment> = emptyList(),
+        prescriptions: List<Prescription> = emptyList(),
+        treatmentPlans: List<TreatmentPlan> = emptyList(),
+        reports: List<DiagnosticReport> = emptyList()
     ) = withContext(Dispatchers.IO) {
+        // No-op in production: development mock data seeding has been purged.
+    }
+
+    /**
+     * Purges legacy development mock patients (p1..p7) and their associated records
+     * (appointments, reports, prescriptions, treatment plans, teeth) from SQLite
+     * on existing devices that ran earlier development builds.
+     * Preserves clinical formulary presets and user preferences.
+     */
+    suspend fun purgeDevelopmentSeedData() = withContext(Dispatchers.IO) {
         if (!isInitialized) return@withContext
-        val db = dbHelper.writableDatabase
-        db.beginTransaction()
         try {
-            val existing = patientDao.getAllPatients()
-            if (existing.isEmpty()) {
-                Log.d(TAG, "Seeding initial local database records...")
-                patients.forEach { patient ->
-                    patientDao.insertPatient(patient)
-                }
-                appointments.forEach { appt ->
-                    appointmentDao.insertAppointment(appt)
-                }
-                prescriptions.forEach { rx ->
-                    prescriptionDao.insertPrescription(rx)
-                }
-                treatmentPlans.forEach { plan ->
-                    treatmentPlanDao.insertTreatmentPlan(plan)
-                }
-                reports.forEach { report ->
-                    reportDao.insertReport(report)
-                }
-                userDao.seedDefaultUsersIfEmpty()
+            val db = dbHelper.writableDatabase
+            val mockIds = listOf("p1", "p2", "p3", "p4", "p5", "p6", "p7")
+            val placeholders = mockIds.joinToString(",") { "?" }
+            val args = mockIds.toTypedArray()
+
+            db.beginTransaction()
+            try {
+                db.delete(ThornburyDbHelper.TABLE_APPOINTMENTS, "${ThornburyDbHelper.COL_APPTS_PATIENT_ID} IN ($placeholders)", args)
+                db.delete(ThornburyDbHelper.TABLE_DIAGNOSTIC_REPORTS, "${ThornburyDbHelper.COL_REPORTS_PATIENT_ID} IN ($placeholders)", args)
+                db.delete(ThornburyDbHelper.TABLE_PRESCRIPTIONS, "${ThornburyDbHelper.COL_RX_PATIENT_ID} IN ($placeholders)", args)
+                db.delete(ThornburyDbHelper.TABLE_TREATMENT_PLANS, "${ThornburyDbHelper.COL_PLANS_PATIENT_ID} IN ($placeholders)", args)
+                db.delete(ThornburyDbHelper.TABLE_TEETH, "${ThornburyDbHelper.COL_TEETH_PATIENT_ID} IN ($placeholders)", args)
+                db.delete(ThornburyDbHelper.TABLE_PATIENTS, "${ThornburyDbHelper.COL_PATIENTS_ID} IN ($placeholders)", args)
                 db.setTransactionSuccessful()
-                Log.d(TAG, "Seeding completed successfully.")
-            } else {
-                userDao.seedDefaultUsersIfEmpty()
+                Log.d(TAG, "Development mock seed data purged successfully.")
+            } finally {
+                db.endTransaction()
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to seed initial database data", e)
-        } finally {
-            db.endTransaction()
+            Log.e(TAG, "Failed to purge development seed data", e)
         }
     }
 

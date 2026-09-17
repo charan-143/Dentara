@@ -179,6 +179,8 @@ fun PatientDiagnosisTabView(
             return
         }
 
+        val isCompact = LocalWindowWidthSizeClass.current == WindowWidthSizeClass.Compact
+
         // Populated Diagnosis View
         Column(
             modifier = Modifier
@@ -187,214 +189,259 @@ fun PatientDiagnosisTabView(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Primary Diagnosis Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
-                border = BorderStroke(1.dp, ThornburyPrimary)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            if (!isCompact) {
+                // 2-Column Responsive Layout for Tablets
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // Left Column: Primary Diagnosis & Prognosis
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MedicalInformation,
-                                contentDescription = null,
-                                tint = ThornburyPrimary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "PRIMARY CLINICAL DIAGNOSIS",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.5.sp
-                                ),
-                                color = ThornburyPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-
-                        IconButton(
-                            onClick = onEditDiagnosisClick,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Edit Diagnosis",
-                                tint = ThornburyPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                        PrimaryDiagnosisCard(
+                            diagnosis = diagnosis,
+                            onEditDiagnosisClick = onEditDiagnosisClick
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    // Right Column: Findings & Systemic Considerations
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        ClinicalFindingsCard(diagnosis = diagnosis)
+                        SystemicConsiderationsCard(diagnosis = diagnosis)
+                    }
+                }
+            } else {
+                // Single Column Phone Layout
+                PrimaryDiagnosisCard(
+                    diagnosis = diagnosis,
+                    onEditDiagnosisClick = onEditDiagnosisClick
+                )
+                ClinicalFindingsCard(diagnosis = diagnosis)
+                SystemicConsiderationsCard(diagnosis = diagnosis)
+            }
+        }
+    }
+}
 
+@Composable
+private fun PrimaryDiagnosisCard(
+    diagnosis: com.example.thornburydental.data.PatientDiagnosis,
+    onEditDiagnosisClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
+        border = BorderStroke(1.dp, ThornburyPrimary)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MedicalInformation,
+                        contentDescription = null,
+                        tint = ThornburyPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = diagnosis.primaryDiagnosis,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            lineHeight = 24.sp
+                        text = "PRIMARY CLINICAL DIAGNOSIS",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
                         ),
-                        color = ThornburyInk
+                        color = ThornburyPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Clinical Prognosis Section
-                    val lowerProg = diagnosis.prognosis.lowercase()
-                    val progColor = when {
-                        lowerProg.contains("good") || lowerProg.contains("favour") || lowerProg.contains("excellent") -> ThornburyAccentTeal
-                        lowerProg.contains("guarded") || lowerProg.contains("questionable") || lowerProg.contains("fair") -> ThornburyWarning
-                        lowerProg.contains("poor") || lowerProg.contains("hopeless") -> ThornburyError
-                        else -> ThornburyPrimary
-                    }
-
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = progColor.copy(alpha = 0.08f),
-                        border = BorderStroke(1.dp, progColor.copy(alpha = 0.3f)),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.Top
-                        ) {
-                            Icon(
-                                imageVector = when {
-                                    progColor == ThornburyAccentTeal -> Icons.Default.CheckCircle
-                                    progColor == ThornburyWarning -> Icons.Default.Warning
-                                    progColor == ThornburyError -> Icons.Default.ErrorOutline
-                                    else -> Icons.Default.Info
-                                },
-                                contentDescription = null,
-                                tint = progColor,
-                                modifier = Modifier
-                                    .padding(top = 1.dp)
-                                    .size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Prognosis:",
-                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                color = progColor,
-                                modifier = Modifier.padding(top = 1.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = diagnosis.prognosis,
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                                color = ThornburyInk,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = ThornburyHairlineSoft)
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "First recorded: ${diagnosis.dateRecorded}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ThornburyMuted
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Attending: ${diagnosis.clinicianName}",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
-                            color = ThornburyInk,
-                            modifier = Modifier.weight(1f, fill = false),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.End
-                        )
-                    }
+                IconButton(
+                    onClick = onEditDiagnosisClick,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Diagnosis",
+                        tint = ThornburyPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
-            // Clinical Findings & Diagnostic Evidence Card
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
-                border = BorderStroke(1.dp, ThornburyHairline)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = diagnosis.primaryDiagnosis,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 24.sp
+                ),
+                color = ThornburyInk
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            val lowerProg = diagnosis.prognosis.lowercase()
+            val progColor = when {
+                lowerProg.contains("good") || lowerProg.contains("favour") || lowerProg.contains("excellent") -> ThornburyAccentTeal
+                lowerProg.contains("guarded") || lowerProg.contains("questionable") || lowerProg.contains("fair") -> ThornburyWarning
+                lowerProg.contains("poor") || lowerProg.contains("hopeless") -> ThornburyError
+                else -> ThornburyPrimary
+            }
+
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = progColor.copy(alpha = 0.08f),
+                border = BorderStroke(1.dp, progColor.copy(alpha = 0.3f)),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.FactCheck,
-                            contentDescription = null,
-                            tint = ThornburyPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Clinical Findings & Examination Evidence",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = when {
+                            progColor == ThornburyAccentTeal -> Icons.Default.CheckCircle
+                            progColor == ThornburyWarning -> Icons.Default.Warning
+                            progColor == ThornburyError -> Icons.Default.ErrorOutline
+                            else -> Icons.Default.Info
+                        },
+                        contentDescription = null,
+                        tint = progColor,
+                        modifier = Modifier
+                            .padding(top = 1.dp)
+                            .size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = if (diagnosis.clinicalFindings.isNotBlank()) diagnosis.clinicalFindings
-                        else "No detailed findings documented.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (diagnosis.clinicalFindings.isNotBlank()) ThornburyInk else ThornburyMuted
+                        text = "Prognosis:",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = progColor,
+                        modifier = Modifier.padding(top = 1.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = diagnosis.prognosis,
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                        color = ThornburyInk,
+                        modifier = Modifier.weight(1f)
                     )
                 }
             }
 
-            // Systemic & Medical Considerations Card
-            Card(
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = ThornburyHairlineSoft)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
-                border = BorderStroke(1.dp, ThornburyHairline)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.HealthAndSafety,
-                            contentDescription = null,
-                            tint = ThornburyAccentTeal,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Systemic & Medical Considerations",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = if (diagnosis.systemicConsiderations.isNotBlank()) diagnosis.systemicConsiderations
-                        else "None noted.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (diagnosis.systemicConsiderations.isNotBlank()) ThornburyInk else ThornburyMuted
-                    )
-                }
+                Text(
+                    text = "First recorded: ${diagnosis.dateRecorded}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ThornburyMuted
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Attending: ${diagnosis.clinicianName}",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
+                    color = ThornburyInk,
+                    modifier = Modifier.weight(1f, fill = false),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.End
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun ClinicalFindingsCard(diagnosis: com.example.thornburydental.data.PatientDiagnosis) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.FactCheck,
+                    contentDescription = null,
+                    tint = ThornburyPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Clinical Findings & Examination Evidence",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (diagnosis.clinicalFindings.isNotBlank()) diagnosis.clinicalFindings
+                else "No detailed findings documented.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (diagnosis.clinicalFindings.isNotBlank()) ThornburyInk else ThornburyMuted
+            )
+        }
+    }
+}
+
+@Composable
+private fun SystemicConsiderationsCard(diagnosis: com.example.thornburydental.data.PatientDiagnosis) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.HealthAndSafety,
+                    contentDescription = null,
+                    tint = ThornburyAccentTeal,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Systemic & Medical Considerations",
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (diagnosis.systemicConsiderations.isNotBlank()) diagnosis.systemicConsiderations
+                else "None noted.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (diagnosis.systemicConsiderations.isNotBlank()) ThornburyInk else ThornburyMuted
+            )
         }
     }
 }

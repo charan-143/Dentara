@@ -28,6 +28,7 @@ import com.example.thornburydental.data.PlanAddendum
 import com.example.thornburydental.data.PlanStep
 import com.example.thornburydental.data.TreatmentPlan
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.util.formatAsDdMmYyyy
 
 /**
  * Modern Redesigned Treatment Plans Tab.
@@ -223,7 +224,9 @@ fun PatientTreatmentPlansTabView(
         val overallProgress = if (totalProcedures > 0) totalCompleted.toFloat() / totalProcedures else 0f
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .adaptiveContentContainer(860.dp),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -338,7 +341,7 @@ private fun TreatmentPlanCard(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "Plan #${plan.id} • ${plan.clinicianName} • ${plan.dateCreated}",
+                        text = "Plan #${plan.id} • ${plan.clinicianName} • ${formatAsDdMmYyyy(plan.dateCreated)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = ThornburyMuted
                     )
@@ -500,7 +503,7 @@ private fun TreatmentPlanCard(
                                     color = ThornburyPrimaryText
                                 )
                                 Text(
-                                    text = addendum.date,
+                                    text = formatAsDdMmYyyy(addendum.date),
                                     style = ClinicalCodeStyle.copy(fontSize = 10.sp),
                                     color = ThornburyMuted
                                 )
@@ -557,19 +560,19 @@ private fun ProcedureStepRow(
             Spacer(modifier = Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                // Tooth badge
+                // Tooth badge (supports single or multiple teeth e.g. Teeth #14, #15, #16)
                 Surface(
                     shape = RoundedCornerShape(4.dp),
-                    color = if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.10f) else ThornburySurfaceSoft,
-                    border = BorderStroke(0.5.dp, if (step.toothNumber != null) ThornburyPrimary.copy(alpha = 0.35f) else ThornburyHairline)
+                    color = if (step.effectiveToothNumbers.isNotEmpty()) ThornburyPrimary.copy(alpha = 0.10f) else ThornburySurfaceSoft,
+                    border = BorderStroke(0.5.dp, if (step.effectiveToothNumbers.isNotEmpty()) ThornburyPrimary.copy(alpha = 0.35f) else ThornburyHairline)
                 ) {
                     Text(
-                        text = if (step.toothNumber != null) "Tooth #${step.toothNumber}" else "General",
+                        text = step.toothDisplayString,
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
                             fontSize = 10.sp
                         ),
-                        color = if (step.toothNumber != null) ThornburyPrimaryText else ThornburyMuted,
+                        color = if (step.effectiveToothNumbers.isNotEmpty()) ThornburyPrimaryText else ThornburyMuted,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }

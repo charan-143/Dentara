@@ -26,6 +26,7 @@ import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.MedicationPreset
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.util.formatAsDdMmYyyy
 
 @Composable
 fun IssuePrescriptionDialog(
@@ -84,6 +85,7 @@ fun IssuePrescriptionDialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(680.dp)
                 .fillMaxWidth(0.95f)
                 .fillMaxHeight(0.92f)
                 .padding(vertical = 12.dp),
@@ -524,7 +526,7 @@ fun IssuePrescriptionDialog(
                                 Tel: +1 (503) 224-7700
                                 ----------------------------------------
                                 PRESCRIPTION FOR: ${patient.name}
-                                OP: ${patient.opNo} | DOB: ${patient.dob}
+                                OP: ${patient.opNo} | DOB: ${formatAsDdMmYyyy(patient.dob)}
                                 
                                 Rx: $drugName $dosage
                                 Sig: $frequency
