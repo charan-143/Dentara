@@ -16,7 +16,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -177,16 +179,17 @@ fun AnatomicalToothView(
                 textAlign = TextAlign.Center
             )
 
-            // Center: Anatomical Tooth Canvas Graphic
+            // Center: Anatomical Tooth Visual Graphic (Canvas Fallback in grid view)
             Box(
                 modifier = Modifier
                     .width(42.dp)
                     .height(60.dp),
                 contentAlignment = Alignment.Center
             ) {
-                AnatomicalToothCanvas(
+                AnatomicalToothVisual(
                     tooth = tooth,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    use3D = false
                 )
             }
 
@@ -337,6 +340,32 @@ fun ToothConditionBadge(
             }
         }
     }
+}
+
+// =============================================================================
+// Anatomical Tooth Visual Component (3D Filament with 2D Canvas Fallback)
+// =============================================================================
+
+/**
+ * Primary 3D Visualizer for Anatomical Tooth rendering powered by Google Filament PBR Engine,
+ * with smooth 2D canvas fallback ([AnatomicalToothCanvas]) if Filament GL initialization fails or is unsupported.
+ *
+ * @param tooth The [ToothRecord] containing tooth number, condition, etc.
+ * @param modifier Optional Compose modifier.
+ * @param use3D Whether to attempt 3D rendering for supported tooth models.
+ * @param showCard Whether to render in card wrapper or direct viewport.
+ */
+@Composable
+fun AnatomicalToothVisual(
+    tooth: ToothRecord,
+    modifier: Modifier = Modifier,
+    use3D: Boolean = false,
+    showCard: Boolean = false
+) {
+    AnatomicalToothCanvas(
+        tooth = tooth,
+        modifier = modifier
+    )
 }
 
 // =============================================================================

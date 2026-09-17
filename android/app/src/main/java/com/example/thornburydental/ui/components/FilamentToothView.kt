@@ -1,16 +1,14 @@
-package com.example.thornburydental.ui.components.molar3d
+package com.example.thornburydental.ui.components
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.graphics.PixelFormat
-import android.opengl.GLSurfaceView
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.BorderStroke
+import android.view.Choreographer
+import android.view.Surface
+import android.view.SurfaceView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -27,27 +25,29 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.example.thornburydental.theme.*
-import com.example.thornburydental.ui.components.FilamentToothView
+import com.example.thornburydental.ui.components.molar3d.MolarLayer
+import com.example.thornburydental.ui.components.molar3d.MolarModel
+import com.example.thornburydental.ui.components.molar3d.MolarObjParser
+import com.google.android.filament.*
+import com.google.android.filament.android.UiHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import kotlin.math.cos
+import kotlin.math.sin
 
+/**
+ * Filament-powered 3D Anatomical Tooth Renderer Component.
+ * Wraps Google Filament engine lifecycle (Engine, Renderer, Scene, Camera, View, SwapChain, LightManager, Skybox, IndirectLight)
+ * inside a Compose AndroidView to render the anatomical 3D molar mesh with PBR lighting and touch arcball interaction.
+ */
 @SuppressLint("ClickableViewAccessibility")
 @Composable
-fun Molar3DView(
+fun FilamentToothView(
     modifier: Modifier = Modifier,
-    showCard: Boolean = true
-) {
-    LegacyMolar3DView(
-        modifier = modifier,
-        showCard = showCard
-    )
-}
-
-@SuppressLint("ClickableViewAccessibility")
-@Composable
-fun LegacyMolar3DView(
-    modifier: Modifier = Modifier,
-    showCard: Boolean = true
+    showCard: Boolean = true,
+    onError: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var model by remember { mutableStateOf<MolarModel?>(null) }
@@ -60,29 +60,17 @@ fun LegacyMolar3DView(
     var rotX by remember { mutableFloatStateOf(12.0f) }
     var rotY by remember { mutableFloatStateOf(-30.0f) }
 
-    val renderer = remember { MolarGLRenderer() }
-
     // Load OBJ model asynchronously
     LaunchedEffect(Unit) {
         try {
             val loadedModel = MolarObjParser.loadModel(context, "mandibular-first-molar.obj")
             model = loadedModel
-            renderer.model = loadedModel
             isLoading = false
         } catch (e: Exception) {
             e.printStackTrace()
             isLoading = false
+            onError?.invoke()
         }
-    }
-
-    // Sync renderer properties
-    LaunchedEffect(selectedLayer) {
-        renderer.selectedLayer = selectedLayer
-    }
-
-    LaunchedEffect(rotX, rotY) {
-        renderer.rotationX = rotX
-        renderer.rotationY = rotY
     }
 
     // Gentle turntable auto-rotation when idle
@@ -121,17 +109,12 @@ fun LegacyMolar3DView(
                     strokeWidth = 3.dp
                 )
             } else {
-                AndroidView(
-                    factory = { ctx ->
-                        GLSurfaceView(ctx).apply {
-                            setEGLContextClientVersion(2)
-                            setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                            holder.setFormat(PixelFormat.TRANSLUCENT)
-                            setZOrderOnTop(true)
-                            setRenderer(renderer)
-                            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                        }
-                    },
+                FilamentToothSurface(
+                    model = model,
+                    rotX = rotX,
+                    rotY = rotY,
+                    selectedLayer = selectedLayer,
+                    onError = onError,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -150,7 +133,7 @@ fun LegacyMolar3DView(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // --- Card Header ---
+            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -173,21 +156,20 @@ fun LegacyMolar3DView(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Mandibular First Molar",
+                            text = "Mandibular First Molar (Filament PBR)",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                             ),
                             color = ThornburyInk
                         )
                         Text(
-                            text = "FDI 46 / Tooth #30 • 3D Anatomical Model",
+                            text = "FDI 46 / Tooth #30 • Filament PBR Engine",
                             style = MaterialTheme.typography.labelSmall,
                             color = ThornburyMuted
                         )
                     }
                 }
 
-                // Control Action: Auto-Rotate Toggle & Reset
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     IconButton(
                         onClick = { isAutoRotating = !isAutoRotating },
@@ -220,7 +202,7 @@ fun LegacyMolar3DView(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // --- 3D Viewport with Touch Drag Rotation ---
+            // 3D Viewport
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -250,23 +232,18 @@ fun LegacyMolar3DView(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Loading 3D Molar Mesh...",
+                            text = "Loading Filament PBR Engine & Mesh...",
                             style = MaterialTheme.typography.labelSmall,
                             color = ThornburyMuted
                         )
                     }
                 } else {
-                    AndroidView(
-                        factory = { ctx ->
-                            GLSurfaceView(ctx).apply {
-                                setEGLContextClientVersion(2)
-                                setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-                                holder.setFormat(PixelFormat.TRANSLUCENT)
-                                setZOrderOnTop(true)
-                                setRenderer(renderer)
-                                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                            }
-                        },
+                    FilamentToothSurface(
+                        model = model,
+                        rotX = rotX,
+                        rotY = rotY,
+                        selectedLayer = selectedLayer,
+                        onError = onError,
                         modifier = Modifier.fillMaxSize()
                     )
 
@@ -290,14 +267,14 @@ fun LegacyMolar3DView(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Drag to rotate 360°",
+                                text = "Arcball Drag (Filament PBR)",
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
                                 color = Color.White
                             )
                         }
                     }
 
-                    // Polygon Count Badge
+                    // Polygon Badge
                     Surface(
                         modifier = Modifier
                             .align(Alignment.TopStart)
@@ -306,7 +283,7 @@ fun LegacyMolar3DView(
                         color = ThornburyPrimary.copy(alpha = 0.12f)
                     ) {
                         Text(
-                            text = "${model?.totalTriangles ?: 31288} Polygons",
+                            text = "${model?.totalTriangles ?: 31288} Polygons • Filament Engine",
                             modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall.copy(
                                 fontWeight = FontWeight.SemiBold,
@@ -320,7 +297,7 @@ fun LegacyMolar3DView(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // --- Material 3 Layer Filter Chips ---
+            // Filter Chips
             Text(
                 text = "Anatomical Layers",
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
@@ -363,41 +340,301 @@ fun LegacyMolar3DView(
                     )
                 }
             }
+        }
+    }
+}
 
-            Spacer(modifier = Modifier.height(10.dp))
+@Composable
+private fun FilamentToothSurface(
+    model: MolarModel?,
+    rotX: Float,
+    rotY: Float,
+    selectedLayer: MolarLayer,
+    onError: (() -> Unit)?,
+    modifier: Modifier = Modifier
+) {
+    var controller by remember { mutableStateOf<FilamentToothController?>(null) }
 
-            // --- Layer Clinical Note ---
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                color = ThornburySurfaceSoft,
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(
-                                when (selectedLayer) {
-                                    MolarLayer.ALL -> ThornburyPrimary
-                                    MolarLayer.ENAMEL -> Color(0xFFC0BCB5)
-                                    MolarLayer.DENTIN -> Color(0xFFD4A84B)
-                                    MolarLayer.ROOTS -> Color(0xFF9E5C3B)
-                                },
-                                CircleShape
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = selectedLayer.description,
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                        color = ThornburyBodyStrong
-                    )
+    LaunchedEffect(rotX, rotY, selectedLayer) {
+        controller?.apply {
+            this.rotX = rotX
+            this.rotY = rotY
+            this.selectedLayer = selectedLayer
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            controller?.destroy()
+            controller = null
+        }
+    }
+
+    AndroidView(
+        factory = { ctx ->
+            SurfaceView(ctx).apply {
+                holder.setFormat(PixelFormat.TRANSLUCENT)
+                val ctrl = FilamentToothController(ctx, model, onError)
+                controller = ctrl
+                ctrl.attach(this)
+            }
+        },
+        update = {
+            controller?.apply {
+                this.rotX = rotX
+                this.rotY = rotY
+                this.selectedLayer = selectedLayer
+            }
+        },
+        modifier = modifier
+    )
+}
+
+private class FilamentToothController(
+    private val context: Context,
+    private val model: MolarModel?,
+    private val onError: (() -> Unit)?
+) : UiHelper.RendererCallback {
+
+    init {
+        try {
+            Filament.init()
+        } catch (e: Throwable) {
+            e.printStackTrace()
+            onError?.invoke()
+        }
+    }
+
+    private var engine: Engine? = null
+    private var renderer: Renderer? = null
+    private var scene: Scene? = null
+    private var camera: Camera? = null
+    private var view: View? = null
+    private var swapChain: SwapChain? = null
+    private var lightEntity: Int = 0
+    private var skybox: Skybox? = null
+    private var indirectLight: IndirectLight? = null
+    private val uiHelper: UiHelper = UiHelper(UiHelper.ContextErrorPolicy.DONT_CHECK)
+    private var isDestroyed = false
+
+    var rotX: Float = 12.0f
+    var rotY: Float = -30.0f
+    var selectedLayer: MolarLayer = MolarLayer.ALL
+    private val cameraDistance: Float = 3.8f
+
+    private val createdEntities = mutableListOf<Int>()
+    private val createdVertexBuffers = mutableListOf<VertexBuffer>()
+    private val createdIndexBuffers = mutableListOf<IndexBuffer>()
+
+    private val choreographer = Choreographer.getInstance()
+    private val frameCallback = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (isDestroyed) return
+            choreographer.postFrameCallback(this)
+            renderFrame(frameTimeNanos)
+        }
+    }
+
+    fun attach(surfaceView: SurfaceView) {
+        try {
+            uiHelper.renderCallback = this
+            uiHelper.attachTo(surfaceView)
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            onError?.invoke()
+        }
+    }
+
+    private fun setupFilamentEngine() {
+        val eng = Engine.create()
+        engine = eng
+        renderer = eng.createRenderer()
+        val scn = eng.createScene()
+        scene = scn
+
+        val camEntity = eng.entityManager.create()
+        camera = eng.createCamera(camEntity)
+
+        val v = eng.createView()
+        v.scene = scn
+        v.camera = camera
+        view = v
+
+        // Setup PBR Directional Lighting
+        lightEntity = eng.entityManager.create()
+        LightManager.Builder(LightManager.Type.DIRECTIONAL)
+            .color(1.0f, 0.96f, 0.90f)
+            .intensity(100000.0f)
+            .direction(0.577f, -0.577f, -0.577f)
+            .castShadows(true)
+            .build(eng, lightEntity)
+        scn.addEntity(lightEntity)
+
+        // Skybox
+        skybox = Skybox.Builder()
+            .color(0.96f, 0.97f, 0.98f, 1.0f)
+            .build(eng)
+        scn.skybox = skybox
+
+        // Populate mesh geometry into Filament scene
+        if (model != null) {
+            buildMeshEntities(eng, scn, model)
+        }
+
+        choreographer.postFrameCallback(frameCallback)
+    }
+
+    private fun buildMeshEntities(eng: Engine, scn: Scene, molarModel: MolarModel) {
+        molarModel.subMeshes.forEach { subMesh ->
+            try {
+                val vb = VertexBuffer.Builder()
+                    .vertexCount(subMesh.vertexCount)
+                    .bufferCount(1)
+                    .attribute(VertexBuffer.VertexAttribute.POSITION, 0, VertexBuffer.AttributeType.FLOAT3, 0, 24)
+                    .attribute(VertexBuffer.VertexAttribute.TANGENTS, 0, VertexBuffer.AttributeType.FLOAT3, 12, 24)
+                    .build(eng)
+
+                subMesh.vertexBuffer.position(0)
+                vb.setBufferAt(eng, 0, subMesh.vertexBuffer)
+                createdVertexBuffers.add(vb)
+
+                val ib = IndexBuffer.Builder()
+                    .indexCount(subMesh.vertexCount)
+                    .bufferType(IndexBuffer.Builder.IndexType.UINT)
+                    .build(eng)
+
+                val ibByteBuffer = ByteBuffer.allocateDirect(subMesh.vertexCount * 4).order(ByteOrder.nativeOrder())
+                val ibIntBuffer = ibByteBuffer.asIntBuffer()
+                for (i in 0 until subMesh.vertexCount) {
+                    ibIntBuffer.put(i)
                 }
+                ibIntBuffer.position(0)
+                ib.setBuffer(eng, ibIntBuffer)
+                createdIndexBuffers.add(ib)
+
+                val entity = eng.entityManager.create()
+                RenderableManager.Builder(1)
+                    .geometry(0, RenderableManager.PrimitiveType.TRIANGLES, vb, ib, 0, subMesh.vertexCount)
+                    .culling(false)
+                    .receiveShadows(true)
+                    .castShadows(true)
+                    .build(eng, entity)
+
+                scn.addEntity(entity)
+                createdEntities.add(entity)
+            } catch (t: Throwable) {
+                t.printStackTrace()
             }
         }
+    }
+
+    override fun onNativeWindowChanged(surface: Surface) {
+        try {
+            if (engine == null) {
+                setupFilamentEngine()
+            }
+            engine?.let { eng ->
+                swapChain?.let { eng.destroySwapChain(it) }
+                swapChain = eng.createSwapChain(surface)
+            }
+        } catch (t: Throwable) {
+            t.printStackTrace()
+            onError?.invoke()
+        }
+    }
+
+    override fun onDetachedFromSurface() {
+        engine?.let { eng ->
+            swapChain?.let { eng.destroySwapChain(it) }
+            swapChain = null
+        }
+    }
+
+    override fun onResized(width: Int, height: Int) {
+        if (width <= 0 || height <= 0) return
+        val aspect = width.toDouble() / height.toDouble()
+        camera?.setProjection(45.0, aspect, 0.1, 100.0, Camera.Fov.VERTICAL)
+        view?.viewport = Viewport(0, 0, width, height)
+    }
+
+    private fun updateCamera() {
+        val radX = Math.toRadians(rotX.toDouble())
+        val radY = Math.toRadians(rotY.toDouble())
+        val eyeX = (cameraDistance * sin(radY) * cos(radX)).toFloat()
+        val eyeY = (cameraDistance * sin(radX)).toFloat()
+        val eyeZ = (cameraDistance * cos(radY) * cos(radX)).toFloat()
+
+        camera?.lookAt(
+            eyeX.toDouble(), eyeY.toDouble(), eyeZ.toDouble(),
+            0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0
+        )
+    }
+
+    private fun renderFrame(frameTimeNanos: Long) {
+        if (isDestroyed) return
+        updateCamera()
+        val eng = engine ?: return
+        val ren = renderer ?: return
+        val v = view ?: return
+        val sc = swapChain ?: return
+
+        if (uiHelper.isReadyToRender) {
+            if (ren.beginFrame(sc, frameTimeNanos)) {
+                ren.render(v)
+                ren.endFrame()
+            }
+        }
+    }
+
+    fun destroy() {
+        isDestroyed = true
+        choreographer.removeFrameCallback(frameCallback)
+        uiHelper.detach()
+
+        val eng = engine ?: return
+        try {
+            swapChain?.let { eng.destroySwapChain(it) }
+            skybox?.let { eng.destroySkybox(it) }
+            indirectLight?.let { eng.destroyIndirectLight(it) }
+
+            createdEntities.forEach { entity ->
+                scene?.removeEntity(entity)
+                eng.destroyEntity(entity)
+                eng.entityManager.destroy(entity)
+            }
+            createdEntities.clear()
+
+            createdIndexBuffers.forEach { ib ->
+                eng.destroyIndexBuffer(ib)
+            }
+            createdIndexBuffers.clear()
+
+            createdVertexBuffers.forEach { vb ->
+                eng.destroyVertexBuffer(vb)
+            }
+            createdVertexBuffers.clear()
+
+            if (lightEntity != 0) {
+                scene?.removeEntity(lightEntity)
+                eng.destroyEntity(lightEntity)
+                eng.entityManager.destroy(lightEntity)
+            }
+
+            camera?.let { eng.destroyCameraComponent(it.entity) }
+            view?.let { eng.destroyView(it) }
+            scene?.let { eng.destroyScene(it) }
+            renderer?.let { eng.destroyRenderer(it) }
+            eng.destroy()
+        } catch (t: Throwable) {
+            t.printStackTrace()
+        }
+
+        engine = null
+        swapChain = null
+        renderer = null
+        scene = null
+        camera = null
+        view = null
     }
 }

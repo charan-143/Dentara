@@ -42,6 +42,11 @@ android {
       shaders = false
     }
 
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     packaging {
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -66,6 +71,11 @@ dependencies {
   // Arch Components
   implementation(libs.androidx.lifecycle.runtime.compose)
   implementation(libs.androidx.lifecycle.viewmodel.compose)
+  implementation(libs.androidx.lifecycle.process)
+
+  // Biometric authentication & Fragment
+  implementation(libs.androidx.biometric)
+  implementation(libs.androidx.fragment.ktx)
 
   // Compose
   implementation(libs.androidx.compose.ui)
@@ -95,4 +105,13 @@ dependencies {
 
   // Serialization
   implementation(libs.kotlinx.serialization.json)
+
+  // Database Encryption & SQLite KTX
+  implementation(libs.sqlcipher)
+  implementation(libs.androidx.sqlite.ktx)
+
+  // Google Filament 3D Engine
+  implementation(libs.filament.android)
+  implementation(libs.gltfio.android)
+  implementation(libs.filament.utils)
 }

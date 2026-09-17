@@ -1,7 +1,8 @@
 package com.example.thornburydental.data.db
 
 import android.content.ContentValues
-import android.database.sqlite.SQLiteDatabase
+import android.database.Cursor
+import net.sqlcipher.database.SQLiteDatabase
 import com.example.thornburydental.data.UserProfilePreferences
 
 /**
@@ -39,7 +40,7 @@ class UserPreferencesDao(private val dbHelper: ThornburyDbHelper) {
             ThornburyDbHelper.COL_PREF_UPDATED_AT
         )
 
-        return db.query(
+        val cursor: Cursor? = db.query(
             ThornburyDbHelper.TABLE_USER_PREFERENCES,
             projection,
             "${ThornburyDbHelper.COL_PREF_ID} = ?",
@@ -47,8 +48,9 @@ class UserPreferencesDao(private val dbHelper: ThornburyDbHelper) {
             null,
             null,
             null
-        ).use { cursor ->
-            if (cursor.moveToFirst()) {
+        )
+        return try {
+            if (cursor != null && cursor.moveToFirst()) {
                 val fullName = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_FULL_NAME)) ?: ""
                 val pronouns = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_PRONOUNS)) ?: ""
                 val dob = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_PREF_DOB)) ?: ""
@@ -99,6 +101,8 @@ class UserPreferencesDao(private val dbHelper: ThornburyDbHelper) {
             } else {
                 null
             }
+        } finally {
+            cursor?.close()
         }
     }
 
