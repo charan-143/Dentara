@@ -1,14 +1,100 @@
 package com.example.thornburydental.data.db
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
+import android.util.Log
+import com.example.thornburydental.data.security.KeyStoreManager
+import net.sqlcipher.database.SQLiteDatabase
+import net.sqlcipher.database.SQLiteOpenHelper
+import java.io.File
 
 /**
  * SQLite database helper for Thornbury Dental application.
- * Manages schema creation, table definitions, foreign key constraints, indexes, and migrations.
+ * Manages schema creation, table definitions, foreign key constraints, indexes, and SQLCipher database encryption.
  */
-class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+
+    init {
+        SQLiteDatabase.loadLibs(context)
+    }
+
+    val passphrase: String
+        get() = KeyStoreManager.getPassphrase(context)
+
+    val writableDatabase: SQLiteDatabase
+        @JvmName("getEncryptedWritableDatabase")
+        get() {
+            ensureMigratedIfNeeded()
+            return getWritableDatabase(passphrase)
+        }
+
+    val readableDatabase: SQLiteDatabase
+        @JvmName("getEncryptedReadableDatabase")
+        get() {
+            ensureMigratedIfNeeded()
+            return getReadableDatabase(passphrase)
+        }
+
+    @Synchronized
+    private fun ensureMigratedIfNeeded() {
+        val dbFile = context.getDatabasePath(DATABASE_NAME)
+        if (!dbFile.exists() || dbFile.length() == 0L) {
+            return
+        }
+
+        var isAlreadyEncrypted = false
+        try {
+            val testDb = SQLiteDatabase.openDatabase(
+                dbFile.absolutePath,
+                passphrase,
+                null,
+                SQLiteDatabase.OPEN_READWRITE
+            )
+            testDb.close()
+            isAlreadyEncrypted = true
+        } catch (_: Exception) {
+            isAlreadyEncrypted = false
+        }
+
+        if (isAlreadyEncrypted) {
+            return
+        }
+
+        try {
+            val unencryptedDb = SQLiteDatabase.openDatabase(
+                dbFile.absolutePath,
+                "",
+                null,
+                SQLiteDatabase.OPEN_READWRITE
+            )
+            unencryptedDb.changePassword(passphrase)
+            unencryptedDb.close()
+            Log.i("ThornburyDbHelper", "Successfully migrated legacy unencrypted database to SQLCipher encryption.")
+        } catch (e: Exception) {
+            Log.w("ThornburyDbHelper", "Direct rekey failed, trying temp file copy migration...", e)
+            migrateViaTempCopy(dbFile)
+        }
+    }
+
+    private fun migrateViaTempCopy(dbFile: File) {
+        val tempFile = File(context.cacheDir, "unencrypted_temp.db")
+        try {
+            dbFile.copyTo(tempFile, overwrite = true)
+            val unencryptedDb = SQLiteDatabase.openDatabase(
+                tempFile.absolutePath,
+                "",
+                null,
+                SQLiteDatabase.OPEN_READWRITE
+            )
+            unencryptedDb.changePassword(passphrase)
+            unencryptedDb.close()
+            tempFile.copyTo(dbFile, overwrite = true)
+            tempFile.delete()
+            Log.i("ThornburyDbHelper", "Legacy database migrated via copy and re-encrypted successfully.")
+        } catch (e: Exception) {
+            Log.e("ThornburyDbHelper", "Legacy database migration failed", e)
+            if (tempFile.exists()) tempFile.delete()
+        }
+    }
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
@@ -156,7 +242,10 @@ class ThornburyDbHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
         fun getInstance(context: Context): ThornburyDbHelper {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: ThornburyDbHelper(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: ThornburyDbHelper(context.applicationContext).also {
+                    SQLiteDatabase.loadLibs(context.applicationContext)
+                    INSTANCE = it
+                }
             }
         }
     }

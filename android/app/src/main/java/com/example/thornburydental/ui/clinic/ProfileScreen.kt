@@ -66,6 +66,8 @@ fun ProfileScreen(
     }
 
     val isDarkModeEnabled by DentalRepository.isDarkModeEnabled.collectAsState()
+    val isBiometricAuthEnabled by DentalRepository.isBiometricAuthEnabled.collectAsState()
+    val biometricLockTimeoutMinutes by DentalRepository.biometricLockTimeoutMinutes.collectAsState()
     val areNotificationsEnabled by DentalRepository.appointmentRemindersEnabled.collectAsState()
     val morningReminderEnabled by DentalRepository.morningReminderEnabled.collectAsState()
     val morningReminderTime by DentalRepository.morningReminderTime.collectAsState()
@@ -147,7 +149,11 @@ fun ProfileScreen(
                     patientsCount = patients.size,
                     plansCount = treatmentPlans.size,
                     reportsCount = reports.size,
-                    visitsCount = appointments.size
+                    visitsCount = appointments.size,
+                    isBiometricAuthEnabled = isBiometricAuthEnabled,
+                    biometricLockTimeoutMinutes = biometricLockTimeoutMinutes,
+                    onBiometricAuthChange = { DentalRepository.setBiometricAuthEnabled(it) },
+                    onBiometricTimeoutChange = { DentalRepository.setBiometricLockTimeoutMinutes(it) }
                 )
 
                 AccountSecurityCard(
@@ -200,12 +206,16 @@ fun ProfileScreen(
                         context = context
                     )
 
-                    SecurityShieldTelemetryCard(
-                        patientsCount = patients.size,
-                        plansCount = treatmentPlans.size,
-                        reportsCount = reports.size,
-                        visitsCount = appointments.size
-                    )
+                SecurityShieldTelemetryCard(
+                    patientsCount = patients.size,
+                    plansCount = treatmentPlans.size,
+                    reportsCount = reports.size,
+                    visitsCount = appointments.size,
+                    isBiometricAuthEnabled = isBiometricAuthEnabled,
+                    biometricLockTimeoutMinutes = biometricLockTimeoutMinutes,
+                    onBiometricAuthChange = { DentalRepository.setBiometricAuthEnabled(it) },
+                    onBiometricTimeoutChange = { DentalRepository.setBiometricLockTimeoutMinutes(it) }
+                )
                 }
             }
         }
@@ -723,7 +733,11 @@ private fun SecurityShieldTelemetryCard(
     patientsCount: Int,
     plansCount: Int,
     reportsCount: Int,
-    visitsCount: Int
+    visitsCount: Int,
+    isBiometricAuthEnabled: Boolean,
+    biometricLockTimeoutMinutes: Int,
+    onBiometricAuthChange: (Boolean) -> Unit,
+    onBiometricTimeoutChange: (Int) -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -735,26 +749,126 @@ private fun SecurityShieldTelemetryCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Data Security & Local Database", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                Text(text = "Data Security & Patient Privacy", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Surface(
+            // Biometric Auth Session Lock Switch
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(10.dp),
-                color = ThornburySuccessWash,
-                border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(ThornburyPrimary.copy(alpha = 0.12f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(imageVector = Icons.Default.Fingerprint, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
+                    }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text(text = "FLAG_SECURE Active", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
-                        Text(text = "Task-switcher screenshot protection enabled to safeguard patient records.", style = MaterialTheme.typography.bodySmall, color = ThornburyBodyStrong)
+                        Text(text = "Biometric & Fingerprint Security", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                        Text(text = "Require fingerprint, facial recognition, or PIN on resume", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                    }
+                }
+                Switch(
+                    checked = isBiometricAuthEnabled,
+                    onCheckedChange = onBiometricAuthChange
+                )
+            }
+
+            if (isBiometricAuthEnabled) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Require lock after backgrounding:",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(
+                            listOf(
+                                0 to "Immediately",
+                                1 to "1 min",
+                                5 to "5 min",
+                                15 to "15 min",
+                                30 to "30 min"
+                            )
+                        ) { (timeoutMin, label) ->
+                            val isSelected = biometricLockTimeoutMinutes == timeoutMin
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { onBiometricTimeoutChange(timeoutMin) },
+                                label = {
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        ),
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ThornburyPrimaryWash,
+                                    selectedLabelColor = ThornburyPrimaryText
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 12.dp))
+
+            // SQLCipher Encryption & FLAG_SECURE badges
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = ThornburySuccessWash,
+                    border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(text = "SQLCipher AES-256", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
+                            Text(text = "Database encrypted at rest", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyBodyStrong)
+                        }
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = ThornburySuccessWash,
+                    border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(text = "FLAG_SECURE Active", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
+                            Text(text = "Screenshot protection enabled", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyBodyStrong)
+                        }
                     }
                 }
             }

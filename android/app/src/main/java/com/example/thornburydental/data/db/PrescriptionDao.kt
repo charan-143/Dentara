@@ -2,7 +2,7 @@ package com.example.thornburydental.data.db
 
 import android.content.ContentValues
 import android.database.Cursor
-import android.database.sqlite.SQLiteDatabase
+import net.sqlcipher.database.SQLiteDatabase
 import com.example.thornburydental.data.Prescription
 
 /**

@@ -1,7 +1,8 @@
 package com.example.thornburydental.data.db
 
 import android.content.ContentValues
-import android.database.sqlite.SQLiteDatabase
+import android.database.Cursor
+import net.sqlcipher.database.SQLiteDatabase
 import com.example.thornburydental.data.ToothCondition
 import com.example.thornburydental.data.ToothRecord
 

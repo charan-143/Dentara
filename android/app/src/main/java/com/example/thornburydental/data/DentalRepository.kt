@@ -36,6 +36,49 @@ object DentalRepository {
     val isDarkModeEnabled: StateFlow<Boolean> = _isDarkModeEnabled.asStateFlow()
     fun setDarkModeEnabled(enabled: Boolean) {
         _isDarkModeEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("dark_mode_enabled", enabled)
+            ?.apply()
+    }
+
+    private val _isBiometricAuthEnabled = MutableStateFlow(true)
+    val isBiometricAuthEnabled: StateFlow<Boolean> = _isBiometricAuthEnabled.asStateFlow()
+    fun setBiometricAuthEnabled(enabled: Boolean) {
+        _isBiometricAuthEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("biometric_auth_enabled", enabled)
+            ?.apply()
+        com.example.thornburydental.data.security.AppSessionLifecycleObserver.isGatingEnabled = enabled
+        if (!enabled) {
+            com.example.thornburydental.data.security.AppSessionLifecycleObserver.unlockSession()
+        }
+    }
+
+    private val _biometricLockTimeoutMinutes = MutableStateFlow(0)
+    val biometricLockTimeoutMinutes: StateFlow<Int> = _biometricLockTimeoutMinutes.asStateFlow()
+    fun setBiometricLockTimeoutMinutes(minutes: Int) {
+        _biometricLockTimeoutMinutes.value = minutes
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putInt("biometric_lock_timeout_min", minutes)
+            ?.apply()
+        com.example.thornburydental.data.security.AppSessionLifecycleObserver.lockTimeoutMs = minutes * 60 * 1000L
+    }
+
+    fun initializePreferencesSynchronously(context: android.content.Context) {
+        val prefs = context.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+        val savedDarkMode = prefs.getBoolean("dark_mode_enabled", false)
+        _isDarkModeEnabled.value = savedDarkMode
+
+        val savedBioAuth = prefs.getBoolean("biometric_auth_enabled", true)
+        _isBiometricAuthEnabled.value = savedBioAuth
+
+        val savedTimeoutMin = prefs.getInt("biometric_lock_timeout_min", 0)
+        _biometricLockTimeoutMinutes.value = savedTimeoutMin
+
+        com.example.thornburydental.data.security.AppSessionLifecycleObserver.initPreferences(context)
     }
 
     private val _defaultSurgeryRoom = MutableStateFlow("Surgery 1")
@@ -157,6 +200,10 @@ object DentalRepository {
             val dbPresets = LocalDatabaseManager.medicationPresetDao.getAllPresets()
             if (dbPresets.isNotEmpty()) {
                 _medicationPresets.value = dbPresets
+            }
+
+            LocalDatabaseManager.appContext?.let { ctx ->
+                initializePreferencesSynchronously(ctx)
             }
         } catch (e: Exception) {
             Log.e("DentalRepository", "Error reloading from local database", e)
