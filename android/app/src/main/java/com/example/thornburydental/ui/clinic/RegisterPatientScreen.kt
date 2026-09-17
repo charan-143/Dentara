@@ -36,6 +36,7 @@ fun RegisterPatientScreen(
     modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf("") }
+    var isChild by remember { mutableStateOf(false) }
     var selectedGender by remember { mutableStateOf("Female") }
     var dob by remember { mutableStateOf("") }
     var opNo by remember { mutableStateOf("OP-${(40000..49999).random()}") }
@@ -82,14 +83,22 @@ fun RegisterPatientScreen(
         containerColor = ThornburyCanvas,
         modifier = modifier
     ) { innerPadding ->
-        Column(
+        val isCompact = LocalWindowWidthSizeClass.current == WindowWidthSizeClass.Compact
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState())
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            Spacer(modifier = Modifier.height(10.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .adaptiveContentContainer(860.dp)
+                    .padding(horizontal = 20.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Spacer(modifier = Modifier.height(10.dp))
 
             errorMessage?.let { err ->
                 Surface(
@@ -161,13 +170,89 @@ fun RegisterPatientScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
+                    Text(
+                        text = "Patient Category (Dentition Type) *",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Adult Option
+                        Surface(
+                            onClick = { isChild = false },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (!isChild) ThornburyPrimaryWash else ThornburyCanvas,
+                            border = BorderStroke(1.dp, if (!isChild) ThornburyPrimary else ThornburyHairline),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = !isChild,
+                                    onClick = { isChild = false },
+                                    colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Adult Patient",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = ThornburyInk
+                                    )
+                                    Text(
+                                        text = "Permanent Dentition • 32 Teeth (FDI 11–48)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ThornburyMuted
+                                    )
+                                }
+                            }
+                        }
+
+                        // Child Option
+                        Surface(
+                            onClick = { isChild = true },
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isChild) ThornburyPrimaryWash else ThornburyCanvas,
+                            border = BorderStroke(1.dp, if (isChild) ThornburyPrimary else ThornburyHairline),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isChild,
+                                    onClick = { isChild = true },
+                                    colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "Child / Pediatric Patient",
+                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = ThornburyInk
+                                    )
+                                    Text(
+                                        text = "Primary Dentition • 20 Teeth (FDI 51–85)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ThornburyMuted
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     ThornburyDatePickerField(
                         value = dob,
                         onValueChange = { dob = it },
                         label = "Date of Birth",
-                        placeholder = "YYYY-MM-DD",
+                        placeholder = "DD/MM/YYYY",
                         isOptional = true,
-                        helperText = "Type or select from calendar"
+                        helperText = "Format: DD/MM/YYYY"
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -462,7 +547,8 @@ fun RegisterPatientScreen(
                             address = address.trim(),
                             allergies = emptyList(),
                             medicalAlerts = emptyList(),
-                            medicalHistory = ""
+                            medicalHistory = "",
+                            isChild = isChild
                         )
                         onRegistered(created)
                     },
@@ -481,4 +567,5 @@ fun RegisterPatientScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
 }

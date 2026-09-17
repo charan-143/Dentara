@@ -38,6 +38,7 @@ import com.example.thornburydental.data.*
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.ThornburyDatePickerField
 import com.example.thornburydental.util.ValidationUtils
+import com.example.thornburydental.util.formatAsDdMmYyyy
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -66,6 +67,8 @@ fun PatientDemographicsM3View(
 
     val age = remember(patient.dob) { calculatePatientAge(patient.dob) }
 
+    val isCompact = LocalWindowWidthSizeClass.current == WindowWidthSizeClass.Compact
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -73,273 +76,113 @@ fun PatientDemographicsM3View(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // ---------------------------------------------------------------------
-        // 1. Executive Patient Identification Banner
-        // ---------------------------------------------------------------------
-        ElevatedCard(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(16.dp)),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
-            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+        if (!isCompact) {
+            // 2-Column Responsive Layout for Tablets & Large Screens
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                // Top Row: Avatar + Name + OP Badge + Edit Button
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                // Left Column: Identification + Contact Information
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(64.dp)
-                            .clip(CircleShape)
-                            .background(ThornburyPrimary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = getPatientMonogram(patient.name),
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
+                    ExecutivePatientIdentificationCard(
+                        patient = patient,
+                        age = age,
+                        context = context,
+                        clipboard = clipboard,
+                        coroutineScope = coroutineScope
+                    )
 
-                    Spacer(modifier = Modifier.width(14.dp))
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = patient.name,
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = ThornburyInk,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // OP Number Chip with 1-tap copy
-                            SuggestionChip(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("OP Number", patient.opNo)))
-                                    }
-                                    Toast.makeText(context, "OP No ${patient.opNo} copied", Toast.LENGTH_SHORT).show()
-                                },
-                                label = {
-                                    Text(
-                                        text = "OP: ${patient.opNo}",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = ThornburyPrimaryText
-                                    )
-                                },
-                                icon = {
-                                    Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = "Copy OP",
-                                        modifier = Modifier.size(12.dp),
-                                        tint = ThornburyPrimary
-                                    )
-                                },
-                                colors = SuggestionChipDefaults.suggestionChipColors(
-                                    containerColor = ThornburyPrimaryWash,
-                                    labelColor = ThornburyPrimaryText
-                                ),
-                                border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f)),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-
-                            // Status Chip
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = ThornburySuccessWash,
-                                border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
-                            ) {
-                                Text(
-                                    text = "Active Patient",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = ThornburySuccess,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                                )
-                            }
-                        }
-                    }
+                    ContactAndResidencyCard(
+                        patient = patient,
+                        context = context,
+                        clipboard = clipboard,
+                        coroutineScope = coroutineScope,
+                        onEditContact = { showEditContactDialog = true }
+                    )
                 }
 
-                HorizontalDivider(color = ThornburyHairlineSoft)
-
-                // Key Clinical Vitals Row
-                // Key Clinical Vitals Row (Age / DOB and Last Visit)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Right Column: Clinical History Cards
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        DemographicMetricPill(
-                            label = "AGE / DOB",
-                            value = if (age != null) "$age yrs (${patient.dob})" else if (patient.dob.isNotBlank()) patient.dob else "Not recorded",
-                            icon = Icons.Default.Cake
-                        )
-                    }
-                    Box(modifier = Modifier.weight(1f)) {
-                        DemographicMetricPill(
-                            label = "LAST VISIT",
-                            value = patient.lastVisit.ifBlank { "Recent" },
-                            icon = Icons.Default.History
-                        )
-                    }
+                    ClinicalHistorySectionCard(
+                        title = "Systemic Medical History",
+                        subtitle = "Recorded medical conditions, chronic illnesses, and medications",
+                        icon = Icons.Default.LocalHospital,
+                        bullets = medBullets,
+                        emptyMessage = "No systemic conditions, chronic illnesses, or routine medications recorded.",
+                        onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.MEDICAL }
+                    )
+
+                    ClinicalHistorySectionCard(
+                        title = "Past Dental & Restorative History",
+                        subtitle = "Historical restorations, endodontic therapy, prosthetics, and implants",
+                        icon = Icons.Default.MedicalServices,
+                        bullets = dentalBullets,
+                        emptyMessage = "No prior restorative work, endodontic procedures, or trauma noted on file.",
+                        onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.DENTAL }
+                    )
+
+                    ClinicalHistorySectionCard(
+                        title = "Family & Hereditary History",
+                        subtitle = "Familial periodontal tendencies, tooth loss patterns, or genetic conditions",
+                        icon = Icons.Default.Groups,
+                        bullets = famBullets,
+                        emptyMessage = "No familial oral health or genetic systemic conditions recorded.",
+                        onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.FAMILY }
+                    )
                 }
             }
+        } else {
+            // Single Column Phone Layout
+            ExecutivePatientIdentificationCard(
+                patient = patient,
+                age = age,
+                context = context,
+                clipboard = clipboard,
+                coroutineScope = coroutineScope
+            )
+
+            ContactAndResidencyCard(
+                patient = patient,
+                context = context,
+                clipboard = clipboard,
+                coroutineScope = coroutineScope,
+                onEditContact = { showEditContactDialog = true }
+            )
+
+            ClinicalHistorySectionCard(
+                title = "Systemic Medical History",
+                subtitle = "Recorded medical conditions, chronic illnesses, and medications",
+                icon = Icons.Default.LocalHospital,
+                bullets = medBullets,
+                emptyMessage = "No systemic conditions, chronic illnesses, or routine medications recorded.",
+                onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.MEDICAL }
+            )
+
+            ClinicalHistorySectionCard(
+                title = "Past Dental & Restorative History",
+                subtitle = "Historical restorations, endodontic therapy, prosthetics, and implants",
+                icon = Icons.Default.MedicalServices,
+                bullets = dentalBullets,
+                emptyMessage = "No prior restorative work, endodontic procedures, or trauma noted on file.",
+                onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.DENTAL }
+            )
+
+            ClinicalHistorySectionCard(
+                title = "Family & Hereditary History",
+                subtitle = "Familial periodontal tendencies, tooth loss patterns, or genetic conditions",
+                icon = Icons.Default.Groups,
+                bullets = famBullets,
+                emptyMessage = "No familial oral health or genetic systemic conditions recorded.",
+                onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.FAMILY }
+            )
         }
-
-        // ---------------------------------------------------------------------
-        // 2. Contact & Residency Details Card
-        // ---------------------------------------------------------------------
-        OutlinedCard(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.outlinedCardColors(containerColor = ThornburyCanvas),
-            border = BorderStroke(1.dp, ThornburyHairline)
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // Header
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ContactPhone,
-                            contentDescription = null,
-                            tint = ThornburyPrimary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Contact & Residential Information",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = ThornburyInk
-                        )
-                    }
-
-                    TextButton(
-                        onClick = { showEditContactDialog = true },
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = ThornburyPrimary)
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Edit", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
-                    }
-                }
-
-                HorizontalDivider(color = ThornburyHairlineSoft)
-
-                // Phone Row
-                ContactDetailItem(
-                    title = if (patient.phone.isNotBlank()) patient.phone else "No telephone recorded",
-                    subtitle = "Primary Telephone",
-                    icon = Icons.Default.Call,
-                    onCopy = {
-                        coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Phone", patient.phone))) }
-                        Toast.makeText(context, "Phone copied", Toast.LENGTH_SHORT).show()
-                    },
-                    onAction = {
-                        if (patient.phone.isNotBlank()) {
-                            launchIntentSafely(context, Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone.trim()}")))
-                        }
-                    },
-                    actionIcon = Icons.Default.Phone
-                )
-
-                HorizontalDivider(color = ThornburyHairlineSoft)
-
-                // Email Row
-                ContactDetailItem(
-                    title = if (patient.email.isNotBlank()) patient.email else "No email address recorded",
-                    subtitle = "Direct Patient Email",
-                    icon = Icons.Default.Email,
-                    onCopy = {
-                        coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Email", patient.email))) }
-                        Toast.makeText(context, "Email copied", Toast.LENGTH_SHORT).show()
-                    },
-                    onAction = {
-                        if (patient.email.isNotBlank()) {
-                            launchIntentSafely(context, Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${patient.email.trim()}")))
-                        }
-                    },
-                    actionIcon = Icons.Default.Send
-                )
-
-                HorizontalDivider(color = ThornburyHairlineSoft)
-
-                // Address Row
-                ContactDetailItem(
-                    title = if (patient.address.isNotBlank()) patient.address else "No postal address recorded",
-                    subtitle = "Residential & Billing Address",
-                    icon = Icons.Default.Place,
-                    onCopy = {
-                        coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Address", patient.address))) }
-                        Toast.makeText(context, "Address copied", Toast.LENGTH_SHORT).show()
-                    },
-                    onAction = {
-                        if (patient.address.isNotBlank()) {
-                            launchIntentSafely(context, Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(patient.address)}")))
-                        }
-                    },
-                    actionIcon = Icons.Default.Place
-                )
-            }
-        }
-
-        // ---------------------------------------------------------------------
-        // 3. Categorized Clinical History Cards
-        // ---------------------------------------------------------------------
-
-        // A. Systemic Medical History Card
-        ClinicalHistorySectionCard(
-            title = "Systemic Medical History",
-            subtitle = "Recorded medical conditions, chronic illnesses, and medications",
-            icon = Icons.Default.LocalHospital,
-            bullets = medBullets,
-            emptyMessage = "No systemic conditions, chronic illnesses, or routine medications recorded.",
-            onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.MEDICAL }
-        )
-
-        // B. Past Dental Records & Restorations Card
-        ClinicalHistorySectionCard(
-            title = "Past Dental & Restorative History",
-            subtitle = "Historical restorations, endodontic therapy, prosthetics, and implants",
-            icon = Icons.Default.MedicalServices,
-            bullets = dentalBullets,
-            emptyMessage = "No prior restorative work, endodontic procedures, or trauma noted on file.",
-            onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.DENTAL }
-        )
-
-        // C. Family & Hereditary Risk Card
-        ClinicalHistorySectionCard(
-            title = "Family & Hereditary History",
-            subtitle = "Familial periodontal tendencies, tooth loss patterns, or genetic conditions",
-            icon = Icons.Default.Groups,
-            bullets = famBullets,
-            emptyMessage = "No familial oral health or genetic systemic conditions recorded.",
-            onEditClick = { activeHistoryEditType = ClinicalHistoryEditType.FAMILY }
-        )
 
         Spacer(modifier = Modifier.height(20.dp))
     }
@@ -352,7 +195,7 @@ fun PatientDemographicsM3View(
         EditContactInfoM3Dialog(
             patient = patient,
             onDismiss = { showEditContactDialog = false },
-            onSave = { updatedName, updatedOpNo, updatedDob, updatedPhone, updatedEmail, updatedAddress ->
+            onSave = { updatedName, updatedOpNo, updatedDob, updatedPhone, updatedEmail, updatedAddress, updatedIsChild ->
                 DentalRepository.updatePatientDemographics(
                     patientId = patient.id,
                     opNo = updatedOpNo,
@@ -363,7 +206,8 @@ fun PatientDemographicsM3View(
                     medicalHistory = patient.medicalHistory,
                     familyHistory = patient.familyHistory,
                     pastDentalHistory = patient.pastDentalHistory,
-                    dob = updatedDob
+                    dob = updatedDob,
+                    isChild = updatedIsChild
                 )
                 showEditContactDialog = false
                 Toast.makeText(context, "Patient profile updated", Toast.LENGTH_SHORT).show()
@@ -430,6 +274,257 @@ fun PatientDemographicsM3View(
                 Toast.makeText(context, "${historyType.title} saved", Toast.LENGTH_SHORT).show()
             }
         )
+    }
+}
+
+@Composable
+private fun ExecutivePatientIdentificationCard(
+    patient: Patient,
+    age: Int?,
+    context: Context,
+    clipboard: androidx.compose.ui.platform.Clipboard,
+    coroutineScope: kotlinx.coroutines.CoroutineScope
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(ThornburyPrimary),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = getPatientMonogram(patient.name),
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = patient.name,
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = ThornburyInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SuggestionChip(
+                            onClick = {
+                                coroutineScope.launch {
+                                    clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("OP Number", patient.opNo)))
+                                }
+                                Toast.makeText(context, "OP No ${patient.opNo} copied", Toast.LENGTH_SHORT).show()
+                            },
+                            label = {
+                                Text(
+                                    text = "OP: ${patient.opNo}",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburyPrimaryText
+                                )
+                            },
+                            icon = {
+                                Icon(
+                                    imageVector = Icons.Default.ContentCopy,
+                                    contentDescription = "Copy OP",
+                                    modifier = Modifier.size(12.dp),
+                                    tint = ThornburyPrimary
+                                )
+                            },
+                            colors = SuggestionChipDefaults.suggestionChipColors(
+                                containerColor = ThornburyPrimaryWash,
+                                labelColor = ThornburyPrimaryText
+                            ),
+                            border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f)),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ThornburySuccessWash,
+                            border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = "Active Patient",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburySuccess,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (patient.isChild) ThornburyWarningWash else ThornburyPrimaryWash,
+                            border = BorderStroke(1.dp, (if (patient.isChild) ThornburyWarning else ThornburyPrimary).copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = if (patient.isChild) "Child • 20 Primary Teeth" else "Adult • 32 Teeth",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = if (patient.isChild) ThornburyWarning else ThornburyPrimaryText,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    DemographicMetricPill(
+                        label = "AGE / DOB",
+                        value = if (age != null) "$age yrs (${formatAsDdMmYyyy(patient.dob)})" else if (patient.dob.isNotBlank()) formatAsDdMmYyyy(patient.dob) else "Not recorded",
+                        icon = Icons.Default.Cake
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    DemographicMetricPill(
+                        label = "LAST VISIT",
+                        value = patient.lastVisit.ifBlank { "Recent" },
+                        icon = Icons.Default.History
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactAndResidencyCard(
+    patient: Patient,
+    context: Context,
+    clipboard: androidx.compose.ui.platform.Clipboard,
+    coroutineScope: kotlinx.coroutines.CoroutineScope,
+    onEditContact: () -> Unit
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburyCanvas),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.ContactPhone,
+                        contentDescription = null,
+                        tint = ThornburyPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Contact & Residential Information",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                }
+
+                TextButton(
+                    onClick = onEditContact,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = ThornburyPrimary)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Edit", style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimary)
+                }
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft)
+
+            ContactDetailItem(
+                title = if (patient.phone.isNotBlank()) patient.phone else "No telephone recorded",
+                subtitle = "Primary Telephone",
+                icon = Icons.Default.Call,
+                onCopy = {
+                    coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Phone", patient.phone))) }
+                    Toast.makeText(context, "Phone copied", Toast.LENGTH_SHORT).show()
+                },
+                onAction = {
+                    if (patient.phone.isNotBlank()) {
+                        launchIntentSafely(context, Intent(Intent.ACTION_DIAL, Uri.parse("tel:${patient.phone.trim()}")))
+                    }
+                },
+                actionIcon = Icons.Default.Phone
+            )
+
+            HorizontalDivider(color = ThornburyHairlineSoft)
+
+            ContactDetailItem(
+                title = if (patient.email.isNotBlank()) patient.email else "No email address recorded",
+                subtitle = "Direct Patient Email",
+                icon = Icons.Default.Email,
+                onCopy = {
+                    coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Email", patient.email))) }
+                    Toast.makeText(context, "Email copied", Toast.LENGTH_SHORT).show()
+                },
+                onAction = {
+                    if (patient.email.isNotBlank()) {
+                        launchIntentSafely(context, Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${patient.email.trim()}")))
+                    }
+                },
+                actionIcon = Icons.Default.Send
+            )
+
+            HorizontalDivider(color = ThornburyHairlineSoft)
+
+            ContactDetailItem(
+                title = if (patient.address.isNotBlank()) patient.address else "No postal address recorded",
+                subtitle = "Residential & Billing Address",
+                icon = Icons.Default.Place,
+                onCopy = {
+                    coroutineScope.launch { clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("Address", patient.address))) }
+                    Toast.makeText(context, "Address copied", Toast.LENGTH_SHORT).show()
+                },
+                onAction = {
+                    if (patient.address.isNotBlank()) {
+                        launchIntentSafely(context, Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(patient.address)}")))
+                    }
+                },
+                actionIcon = Icons.Default.Place
+            )
+        }
     }
 }
 
@@ -642,7 +737,7 @@ enum class ClinicalHistoryEditType(val title: String, val subtitle: String) {
 private fun EditContactInfoM3Dialog(
     patient: Patient,
     onDismiss: () -> Unit,
-    onSave: (name: String, opNo: String, dob: String, phone: String, email: String, address: String) -> Unit
+    onSave: (name: String, opNo: String, dob: String, phone: String, email: String, address: String, isChild: Boolean) -> Unit
 ) {
     var name by remember { mutableStateOf(patient.name) }
     var opNo by remember { mutableStateOf(patient.opNo) }
@@ -650,6 +745,7 @@ private fun EditContactInfoM3Dialog(
     var phone by remember { mutableStateOf(patient.phone) }
     var email by remember { mutableStateOf(patient.email) }
     var address by remember { mutableStateOf(patient.address) }
+    var isChild by remember { mutableStateOf(patient.isChild) }
 
     val isPhoneValid = phone.isBlank() || ValidationUtils.isValidPhone(phone)
     val isEmailValid = email.isBlank() || ValidationUtils.isValidEmail(email)
@@ -660,6 +756,7 @@ private fun EditContactInfoM3Dialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(560.dp)
                 .fillMaxWidth(0.95f)
                 .wrapContentHeight()
                 .padding(vertical = 16.dp),
@@ -697,6 +794,62 @@ private fun EditContactInfoM3Dialog(
                     colors = thornburyTextFieldColors()
                 )
 
+                Text(
+                    text = "Patient Category (Dentition Type)",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Surface(
+                        onClick = { isChild = false },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (!isChild) ThornburyPrimaryWash else ThornburyCanvas,
+                        border = BorderStroke(1.dp, if (!isChild) ThornburyPrimary else ThornburyHairline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = !isChild,
+                                onClick = { isChild = false },
+                                colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Adult (32 Permanent Teeth • FDI 11–48)",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyInk
+                            )
+                        }
+                    }
+                    Surface(
+                        onClick = { isChild = true },
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isChild) ThornburyPrimaryWash else ThornburyCanvas,
+                        border = BorderStroke(1.dp, if (isChild) ThornburyPrimary else ThornburyHairline),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isChild,
+                                onClick = { isChild = true },
+                                colors = RadioButtonDefaults.colors(selectedColor = ThornburyPrimary)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Child (20 Primary Teeth • FDI 51–85)",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyInk
+                            )
+                        }
+                    }
+                }
+
                 OutlinedTextField(
                     value = opNo,
                     onValueChange = { opNo = it },
@@ -710,7 +863,7 @@ private fun EditContactInfoM3Dialog(
                     value = dob,
                     onValueChange = { dob = it },
                     label = "Date of Birth",
-                    placeholder = "YYYY-MM-DD",
+                    placeholder = "DD/MM/YYYY",
                     modifier = Modifier.fillMaxWidth(),
                     isOptional = true,
                     helperText = null
@@ -779,7 +932,7 @@ private fun EditContactInfoM3Dialog(
                     Button(
                         onClick = {
                             if (name.isNotBlank() && isPhoneValid && isEmailValid) {
-                                onSave(name.trim(), opNo.trim(), dob.trim(), phone.trim(), email.trim(), address.trim())
+                                onSave(name.trim(), opNo.trim(), dob.trim(), phone.trim(), email.trim(), address.trim(), isChild)
                             }
                         },
                         enabled = name.isNotBlank() && isPhoneValid && isEmailValid,
@@ -809,6 +962,7 @@ private fun EditClinicalHistoryM3Dialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(560.dp)
                 .fillMaxWidth(0.95f)
                 .wrapContentHeight()
                 .padding(vertical = 16.dp),
@@ -908,24 +1062,26 @@ private fun getPatientMonogram(name: String): String {
 private fun calculatePatientAge(dob: String): Int? {
     if (dob.isBlank()) return null
     return try {
-        val parts = dob.trim().split("-")
-        if (parts.isNotEmpty()) {
-            val year = parts[0].toIntOrNull() ?: return null
-            val month = if (parts.size > 1) parts[1].toIntOrNull() ?: 1 else 1
-            val day = if (parts.size > 2) parts[2].toIntOrNull() ?: 1 else 1
+        val trimmed = dob.trim()
+        val (year, month, day) = if (trimmed.contains("/")) {
+            val parts = trimmed.split("/")
+            Triple(parts[2].toIntOrNull() ?: 1990, parts[1].toIntOrNull() ?: 1, parts[0].toIntOrNull() ?: 1)
+        } else {
+            val parts = trimmed.split("-")
+            Triple(parts[0].toIntOrNull() ?: 1990, if (parts.size > 1) parts[1].toIntOrNull() ?: 1 else 1, if (parts.size > 2) parts[2].toIntOrNull() ?: 1 else 1)
+        }
 
-            val cal = Calendar.getInstance()
-            val currYear = cal.get(Calendar.YEAR)
-            val currMonth = cal.get(Calendar.MONTH) + 1
-            val currDay = cal.get(Calendar.DAY_OF_MONTH)
+        val cal = Calendar.getInstance()
+        val currYear = cal.get(Calendar.YEAR)
+        val currMonth = cal.get(Calendar.MONTH) + 1
+        val currDay = cal.get(Calendar.DAY_OF_MONTH)
 
-            var age = currYear - year
-            if (currMonth < month || (currMonth == month && currDay < day)) {
-                age--
-            }
-            if (age >= 0) age else null
-        } else null
-    } catch (e: Exception) {
+        var age = currYear - year
+        if (currMonth < month || (currMonth == month && currDay < day)) {
+            age--
+        }
+        if (age < 0) 0 else age
+    } catch (_: Exception) {
         null
     }
 }

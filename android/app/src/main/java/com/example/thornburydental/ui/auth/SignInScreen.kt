@@ -133,11 +133,13 @@ fun SignInScreen(
             .fillMaxSize()
             .background(ThornburyCanvas)
             .statusBarsPadding()
-            .navigationBarsPadding()
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.TopCenter
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .adaptiveContentContainer(520.dp)
                 .verticalScroll(scrollState)
                 .padding(horizontal = 24.dp, vertical = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally

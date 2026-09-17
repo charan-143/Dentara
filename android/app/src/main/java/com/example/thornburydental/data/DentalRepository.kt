@@ -264,40 +264,118 @@ object DentalRepository {
             )
         }
 
-    fun generateDefaultTeeth(): Map<Int, ToothRecord> {
+    fun generateDefaultTeeth(isChild: Boolean = false): Map<Int, ToothRecord> {
         val map = mutableMapOf<Int, ToothRecord>()
-        val namesUpper = listOf(
-            "Third Molar (Wisdom)", "Second Molar", "First Molar", "Second Premolar",
-            "First Premolar", "Canine (Cuspid)", "Lateral Incisor", "Central Incisor",
-            "Central Incisor", "Lateral Incisor", "Canine (Cuspid)", "First Premolar",
-            "Second Premolar", "First Molar", "Second Molar", "Third Molar (Wisdom)"
-        )
-        val namesLower = listOf(
-            "Third Molar (Wisdom)", "Second Molar", "First Molar", "Second Premolar",
-            "First Premolar", "Canine (Cuspid)", "Lateral Incisor", "Central Incisor",
-            "Central Incisor", "Lateral Incisor", "Canine (Cuspid)", "First Premolar",
-            "Second Premolar", "First Molar", "Second Molar", "Third Molar (Wisdom)"
-        )
+        if (isChild) {
+            // Child / Pediatric Primary Dentition (20 teeth: FDI 51-55, 61-65, 71-75, 81-85)
+            val primaryUpperRight = listOf(
+                55 to "Primary Maxillary Right Second Molar",
+                54 to "Primary Maxillary Right First Molar",
+                53 to "Primary Maxillary Right Canine",
+                52 to "Primary Maxillary Right Lateral Incisor",
+                51 to "Primary Maxillary Right Central Incisor"
+            )
+            val primaryUpperLeft = listOf(
+                61 to "Primary Maxillary Left Central Incisor",
+                62 to "Primary Maxillary Left Lateral Incisor",
+                63 to "Primary Maxillary Left Canine",
+                64 to "Primary Maxillary Left First Molar",
+                65 to "Primary Maxillary Left Second Molar"
+            )
+            val primaryLowerLeft = listOf(
+                71 to "Primary Mandibular Left Central Incisor",
+                72 to "Primary Mandibular Left Lateral Incisor",
+                73 to "Primary Mandibular Left Canine",
+                74 to "Primary Mandibular Left First Molar",
+                75 to "Primary Mandibular Left Second Molar"
+            )
+            val primaryLowerRight = listOf(
+                81 to "Primary Mandibular Right Central Incisor",
+                82 to "Primary Mandibular Right Lateral Incisor",
+                83 to "Primary Mandibular Right Canine",
+                84 to "Primary Mandibular Right First Molar",
+                85 to "Primary Mandibular Right Second Molar"
+            )
 
-        for (i in 1..16) {
-            val fdi = if (i <= 8) 19 - i else 20 + (i - 8)
-            map[i] = ToothRecord(
-                number = i,
-                fdiNumber = fdi,
-                name = "Maxillary Right/Left " + namesUpper[i - 1],
-                arch = "Maxillary (Upper Arch)",
-                condition = ToothCondition.SOUND
+            (primaryUpperRight + primaryUpperLeft).forEach { (fdi, name) ->
+                map[fdi] = ToothRecord(
+                    number = fdi,
+                    fdiNumber = fdi,
+                    name = name,
+                    arch = "Maxillary (Upper Primary Arch)",
+                    condition = ToothCondition.SOUND
+                )
+            }
+            (primaryLowerLeft + primaryLowerRight).forEach { (fdi, name) ->
+                map[fdi] = ToothRecord(
+                    number = fdi,
+                    fdiNumber = fdi,
+                    name = name,
+                    arch = "Mandibular (Lower Primary Arch)",
+                    condition = ToothCondition.SOUND
+                )
+            }
+        } else {
+            // Adult Permanent Dentition (32 teeth: FDI 11-18, 21-28, 31-38, 41-48)
+            val q1UpperRight = listOf(
+                18 to "Maxillary Right Third Molar (Wisdom)",
+                17 to "Maxillary Right Second Molar",
+                16 to "Maxillary Right First Molar",
+                15 to "Maxillary Right Second Premolar",
+                14 to "Maxillary Right First Premolar",
+                13 to "Maxillary Right Canine (Cuspid)",
+                12 to "Maxillary Right Lateral Incisor",
+                11 to "Maxillary Right Central Incisor"
             )
-        }
-        for (i in 17..32) {
-            val fdi = if (i <= 24) 30 + (25 - i) else 40 + (i - 24)
-            map[i] = ToothRecord(
-                number = i,
-                fdiNumber = fdi,
-                name = "Mandibular Left/Right " + namesLower[i - 17],
-                arch = "Mandibular (Lower Arch)",
-                condition = ToothCondition.SOUND
+            val q2UpperLeft = listOf(
+                21 to "Maxillary Left Central Incisor",
+                22 to "Maxillary Left Lateral Incisor",
+                23 to "Maxillary Left Canine (Cuspid)",
+                24 to "Maxillary Left First Premolar",
+                25 to "Maxillary Left Second Premolar",
+                26 to "Maxillary Left First Molar",
+                27 to "Maxillary Left Second Molar",
+                28 to "Maxillary Left Third Molar (Wisdom)"
             )
+            val q3LowerLeft = listOf(
+                31 to "Mandibular Left Central Incisor",
+                32 to "Mandibular Left Lateral Incisor",
+                33 to "Mandibular Left Canine (Cuspid)",
+                34 to "Mandibular Left First Premolar",
+                35 to "Mandibular Left Second Premolar",
+                36 to "Mandibular Left First Molar",
+                37 to "Mandibular Left Second Molar",
+                38 to "Mandibular Left Third Molar (Wisdom)"
+            )
+            val q4LowerRight = listOf(
+                41 to "Mandibular Right Central Incisor",
+                42 to "Mandibular Right Lateral Incisor",
+                43 to "Mandibular Right Canine (Cuspid)",
+                44 to "Mandibular Right First Premolar",
+                45 to "Mandibular Right Second Premolar",
+                46 to "Mandibular Right First Molar",
+                47 to "Mandibular Right Second Molar",
+                48 to "Mandibular Right Third Molar (Wisdom)"
+            )
+
+            (q1UpperRight + q2UpperLeft).forEach { (fdi, name) ->
+                map[fdi] = ToothRecord(
+                    number = fdi,
+                    fdiNumber = fdi,
+                    name = name,
+                    arch = "Maxillary (Upper Arch)",
+                    condition = ToothCondition.SOUND
+                )
+            }
+            (q3LowerLeft + q4LowerRight).forEach { (fdi, name) ->
+                map[fdi] = ToothRecord(
+                    number = fdi,
+                    fdiNumber = fdi,
+                    name = name,
+                    arch = "Mandibular (Lower Arch)",
+                    condition = ToothCondition.SOUND
+                )
+            }
         }
         return map
     }
@@ -659,7 +737,7 @@ object DentalRepository {
     ): TreatmentPlan {
         val planId = "plan-" + System.currentTimeMillis()
         val tamperHash = computeCanonicalPlanHash(planId, patientId, diagnosis, steps)
-        val dateCreated = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        val dateCreated = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
 
         val newPlan = TreatmentPlan(
             id = planId,
@@ -905,7 +983,8 @@ object DentalRepository {
         address: String,
         allergies: List<Allergy>,
         medicalAlerts: List<String>,
-        medicalHistory: String
+        medicalHistory: String,
+        isChild: Boolean = false
     ): Patient {
         var createdPatient: Patient? = null
         _patients.update { current ->
@@ -921,13 +1000,14 @@ object DentalRepository {
                 phone = phone,
                 email = email,
                 address = address,
+                isChild = isChild,
                 medicalHistory = medicalHistory,
                 familyHistory = "None recorded at registration.",
                 pastDentalHistory = "Initial registration visit.",
                 lastVisit = "Today (New)",
                 medicalAlerts = medicalAlerts,
                 allergies = allergies,
-                teeth = generateDefaultTeeth()
+                teeth = generateDefaultTeeth(isChild)
             )
             createdPatient = newPatient
             listOf(newPatient) + current
@@ -959,21 +1039,26 @@ object DentalRepository {
         medicalHistory: String,
         familyHistory: String,
         pastDentalHistory: String,
-        dob: String? = null
+        dob: String? = null,
+        isChild: Boolean = false
     ) {
         _patients.update { list ->
             list.map { p ->
                 if (p.id == patientId) {
+                    val teethChanged = p.isChild != isChild
+                    val newTeeth = if (teethChanged) generateDefaultTeeth(isChild) else p.teeth
                     p.copy(
                         opNo = opNo ?: p.opNo,
                         name = name,
                         phone = phone,
                         email = email,
                         address = address,
+                        isChild = isChild,
                         medicalHistory = medicalHistory,
                         familyHistory = familyHistory,
                         pastDentalHistory = pastDentalHistory,
-                        dob = dob ?: p.dob
+                        dob = dob ?: p.dob,
+                        teeth = newTeeth
                     )
                 } else p
             }
@@ -990,7 +1075,8 @@ object DentalRepository {
                     medicalHistory = medicalHistory,
                     familyHistory = familyHistory,
                     pastDentalHistory = pastDentalHistory,
-                    dob = dob
+                    dob = dob,
+                    isChild = isChild
                 )
             }
         }

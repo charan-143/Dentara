@@ -29,10 +29,11 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
         val action = intent.action ?: return
         Log.d(TAG, "Alarm triggered with action: $action")
 
-        // Ensure database manager is initialized in this process
+        // Ensure database manager and notification channels are initialized in this process
         if (!LocalDatabaseManager.isInitialized) {
             LocalDatabaseManager.initialize(context)
         }
+        ReminderManager.createNotificationChannels(context)
 
         when (action) {
             ReminderManager.ACTION_DAILY_MORNING_BRIEFING -> {
@@ -97,7 +98,9 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
             .setContentTitle(title)
             .setContentText(shortText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(summaryText))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -136,15 +139,26 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = "Patient Arriving Soon • $patientName"
-        val content = "$patientName is scheduled at $time for $procedure ($leadMin min reminder)."
+        val formattedTime = if (time.isNotBlank()) ReminderManager.formatTime12Hour(time) else ""
+        val title = if (formattedTime.isNotBlank()) {
+            "Appointment at $formattedTime • $patientName"
+        } else {
+            "Upcoming Patient Appointment • $patientName"
+        }
+        val content = if (formattedTime.isNotBlank()) {
+            "$patientName is scheduled for $procedure at $formattedTime."
+        } else {
+            "$patientName is scheduled for $procedure."
+        }
 
         val notification = NotificationCompat.Builder(context, ReminderManager.CHANNEL_PATIENT_ARRIVAL)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(content)
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)

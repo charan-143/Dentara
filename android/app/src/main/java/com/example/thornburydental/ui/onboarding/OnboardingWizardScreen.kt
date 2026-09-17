@@ -161,49 +161,54 @@ fun OnboardingWizardScreen(
                 shadowElevation = 8.dp,
                 border = BorderStroke(1.dp, ThornburyHairline)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (currentStep > 0) {
-                        OutlinedButton(
-                            onClick = { currentStep-- },
+                    Row(
+                        modifier = Modifier
+                            .adaptiveContentContainer(640.dp)
+                            .navigationBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (currentStep > 0) {
+                            OutlinedButton(
+                                onClick = { currentStep-- },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(52.dp),
+                                shape = RoundedCornerShape(14.dp),
+                                border = BorderStroke(1.dp, ThornburyHairline)
+                            ) {
+                                Text("Back", color = ThornburyInk, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        Button(
+                            onClick = { handleContinue() },
                             modifier = Modifier
-                                .weight(1f)
+                                .weight(if (currentStep > 0) 2f else 1f)
                                 .height(52.dp),
                             shape = RoundedCornerShape(14.dp),
-                            border = BorderStroke(1.dp, ThornburyHairline)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = ThornburyPrimary,
+                                contentColor = Color.White
+                            )
                         ) {
-                            Text("Back", color = ThornburyInk, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                text = if (currentStep == totalSteps - 1) "Finish Setup & Enter Operatory" else "Continue",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 15.sp
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Icon(
+                                imageVector = if (currentStep == totalSteps - 1) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
-                    }
-
-                    Button(
-                        onClick = { handleContinue() },
-                        modifier = Modifier
-                            .weight(if (currentStep > 0) 2f else 1f)
-                            .height(52.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = ThornburyPrimary,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            text = if (currentStep == totalSteps - 1) "Finish Setup & Enter Operatory" else "Continue",
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(
-                            imageVector = if (currentStep == totalSteps - 1) Icons.Default.CheckCircle else Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
                     }
                 }
             }
@@ -211,43 +216,50 @@ fun OnboardingWizardScreen(
     ) { innerPadding ->
         val scrollState = rememberScrollState()
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(scrollState)
-                .padding(24.dp)
+                .padding(innerPadding),
+            contentAlignment = Alignment.TopCenter
         ) {
-            AnimatedContent(
-                targetState = currentStep,
-                transitionSpec = {
-                    if (targetState > initialState) {
-                        (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
-                            slideOutHorizontally { width -> -width } + fadeOut()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .adaptiveContentContainer(640.dp)
+                    .verticalScroll(scrollState)
+                    .padding(24.dp)
+            ) {
+                AnimatedContent(
+                    targetState = currentStep,
+                    transitionSpec = {
+                        if (targetState > initialState) {
+                            (slideInHorizontally { width -> width } + fadeIn()).togetherWith(
+                                slideOutHorizontally { width -> -width } + fadeOut()
+                            )
+                        } else {
+                            (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
+                                slideOutHorizontally { width -> width } + fadeOut()
+                            )
+                        }
+                    },
+                    label = "MinimalClinicianWizardTransition"
+                ) { step ->
+                    when (step) {
+                        0 -> StepClinicianName(
+                            name = clinicianName,
+                            onNameChange = { clinicianName = it }
                         )
-                    } else {
-                        (slideInHorizontally { width -> -width } + fadeIn()).togetherWith(
-                            slideOutHorizontally { width -> width } + fadeOut()
+                        1 -> StepCredentialsAndSpecialty(
+                            credentials = credentials,
+                            onCredentialsChange = { credentials = it },
+                            selectedSpecialty = specialty,
+                            onSelectSpecialty = { specialty = it }
+                        )
+                        2 -> StepPracticeDate(
+                            date = practiceDate,
+                            onDateChange = { practiceDate = it }
                         )
                     }
-                },
-                label = "MinimalClinicianWizardTransition"
-            ) { step ->
-                when (step) {
-                    0 -> StepClinicianName(
-                        name = clinicianName,
-                        onNameChange = { clinicianName = it }
-                    )
-                    1 -> StepCredentialsAndSpecialty(
-                        credentials = credentials,
-                        onCredentialsChange = { credentials = it },
-                        selectedSpecialty = specialty,
-                        onSelectSpecialty = { specialty = it }
-                    )
-                    2 -> StepPracticeDate(
-                        date = practiceDate,
-                        onDateChange = { practiceDate = it }
-                    )
                 }
             }
         }
@@ -392,7 +404,7 @@ private fun StepPracticeDate(
             value = date,
             onValueChange = onDateChange,
             label = "Registration / Inception Date",
-            placeholder = "YYYY-MM-DD",
+            placeholder = "DD/MM/YYYY",
             isOptional = true,
             helperText = "Optional • Type manually or tap the calendar icon"
         )

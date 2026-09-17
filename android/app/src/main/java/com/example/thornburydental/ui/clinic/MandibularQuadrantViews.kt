@@ -6,6 +6,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,18 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.ToothCondition
 import com.example.thornburydental.data.ToothRecord
-import com.example.thornburydental.theme.ThornburyAccentTeal
-import com.example.thornburydental.theme.ThornburyCanvas
-import com.example.thornburydental.theme.ThornburyHairline
-import com.example.thornburydental.theme.ThornburyInfoWash
-import com.example.thornburydental.theme.ThornburyInk
-import com.example.thornburydental.theme.ThornburyMuted
-import com.example.thornburydental.theme.ThornburySurfaceSoft
-import com.example.thornburydental.theme.ThornburySuccess
-import com.example.thornburydental.theme.ThornburySuccessWash
-import com.example.thornburydental.theme.ThornburyTertiaryText
-import com.example.thornburydental.theme.ThornburyWarning
-import com.example.thornburydental.theme.ThornburyWarningWash
+import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.AnatomicalToothView
 
 // =============================================================================
@@ -113,6 +104,28 @@ fun getMandibularToothRecord(teeth: Map<Int, ToothRecord>, number: Int): ToothRe
             condition = ToothCondition.SOUND
         )
     }
+}
+
+fun defaultChildLowerToothRecord(fdi: Int): ToothRecord {
+    val names = mapOf(
+        75 to "Primary Mandibular Left Second Molar",
+        74 to "Primary Mandibular Left First Molar",
+        73 to "Primary Mandibular Left Canine",
+        72 to "Primary Mandibular Left Lateral Incisor",
+        71 to "Primary Mandibular Left Central Incisor",
+        81 to "Primary Mandibular Right Central Incisor",
+        82 to "Primary Mandibular Right Lateral Incisor",
+        83 to "Primary Mandibular Right Canine",
+        84 to "Primary Mandibular Right First Molar",
+        85 to "Primary Mandibular Right Second Molar"
+    )
+    return ToothRecord(
+        number = fdi,
+        fdiNumber = fdi,
+        name = names[fdi] ?: "Primary Mandibular Tooth $fdi",
+        arch = "Mandibular (Lower Primary Arch)",
+        condition = ToothCondition.SOUND
+    )
 }
 
 // =============================================================================
@@ -226,28 +239,27 @@ fun PathologySummaryBadge(
 }
 
 // =============================================================================
-// 2. Lower Left Quadrant Card (LL • Q3)
+// 2. Lower Left Quadrant Card (LL • Q3 / Q7)
 // =============================================================================
 
 /**
- * Mandibular Lower Left Quadrant Composable (LL • Q3).
- *
- * Covers Teeth 17 to 24 (FDI 38 to 31).
- * Features:
- * - Thornbury themed card container (ThornburyCanvas, ThornburyHairline, ThornburyAccentTeal)
- * - Header with Quadrant badge ("Lower Left (LL • Q3)"), subtitle ("Teeth 17–24 (FDI 38–31)"),
- *   and pathology summary badge.
- * - Horizontal scrollable strip of [AnatomicalToothView]s.
+ * Mandibular Lower Left Quadrant Composable (LL • Q3 for Adult, LL • Q7 for Child).
  */
 @Composable
 fun LowerLeftQuadrantCard(
     teeth: Map<Int, ToothRecord>,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val toothRange = 17..24
-    val quadrantTeeth = toothRange.map { getMandibularToothRecord(teeth, it) }
+    val isChildTeeth = isChild || teeth.keys.any { it in 51..85 }
+    val quadrantTeeth = if (isChildTeeth) {
+        val fdiNumbers = listOf(75, 74, 73, 72, 71)
+        fdiNumbers.map { fdi -> teeth[fdi] ?: defaultChildLowerToothRecord(fdi) }
+    } else {
+        (17..24).map { getMandibularToothRecord(teeth, it) }
+    }
     val flaggedCount = quadrantTeeth.count { it.condition != ToothCondition.SOUND }
 
     Card(
@@ -284,7 +296,7 @@ fun LowerLeftQuadrantCard(
                                     .background(ThornburyAccentTeal, CircleShape)
                             )
                             Text(
-                                text = "Lower Left (LL • Q3)",
+                                text = if (isChildTeeth) "Lower Left Primary (LL • Q7)" else "Lower Left (LL • Q3)",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
@@ -294,7 +306,7 @@ fun LowerLeftQuadrantCard(
                         }
                     }
                     Text(
-                        text = "Teeth 17–24 (FDI 38–31)",
+                        text = if (isChildTeeth) "Teeth FDI 75–71 (5 Primary Teeth)" else "Teeth FDI 38–31 (8 Permanent Teeth)",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = ThornburyMuted
                     )
@@ -317,7 +329,7 @@ fun LowerLeftQuadrantCard(
                 quadrantTeeth.forEach { tooth ->
                     AnatomicalToothView(
                         tooth = tooth,
-                        isSelected = selectedToothId == tooth.number,
+                        isSelected = selectedToothId == tooth.number || selectedToothId == tooth.fdiNumber,
                         onClick = { onToothClick(tooth) }
                     )
                 }
@@ -327,28 +339,27 @@ fun LowerLeftQuadrantCard(
 }
 
 // =============================================================================
-// 3. Lower Right Quadrant Card (LR • Q4)
+// 3. Lower Right Quadrant Card (LR • Q4 / Q8)
 // =============================================================================
 
 /**
- * Mandibular Lower Right Quadrant Composable (LR • Q4).
- *
- * Covers Teeth 25 to 32 (FDI 41 to 48).
- * Features:
- * - Thornbury themed card container (ThornburyCanvas, ThornburyHairline, ThornburyAccentTeal)
- * - Header with Quadrant badge ("Lower Right (LR • Q4)"), subtitle ("Teeth 25–32 (FDI 41–48)"),
- *   and pathology summary badge.
- * - Horizontal scrollable strip of [AnatomicalToothView]s.
+ * Mandibular Lower Right Quadrant Composable (LR • Q4 for Adult, LR • Q8 for Child).
  */
 @Composable
 fun LowerRightQuadrantCard(
     teeth: Map<Int, ToothRecord>,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val toothRange = 25..32
-    val quadrantTeeth = toothRange.map { getMandibularToothRecord(teeth, it) }
+    val isChildTeeth = isChild || teeth.keys.any { it in 51..85 }
+    val quadrantTeeth = if (isChildTeeth) {
+        val fdiNumbers = listOf(81, 82, 83, 84, 85)
+        fdiNumbers.map { fdi -> teeth[fdi] ?: defaultChildLowerToothRecord(fdi) }
+    } else {
+        (25..32).map { getMandibularToothRecord(teeth, it) }
+    }
     val flaggedCount = quadrantTeeth.count { it.condition != ToothCondition.SOUND }
 
     Card(
@@ -385,7 +396,7 @@ fun LowerRightQuadrantCard(
                                     .background(ThornburyAccentTeal, CircleShape)
                             )
                             Text(
-                                text = "Lower Right (LR • Q4)",
+                                text = if (isChildTeeth) "Lower Right Primary (LR • Q8)" else "Lower Right (LR • Q4)",
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
@@ -395,7 +406,7 @@ fun LowerRightQuadrantCard(
                         }
                     }
                     Text(
-                        text = "Teeth 25–32 (FDI 41–48)",
+                        text = if (isChildTeeth) "Teeth FDI 81–85 (5 Primary Teeth)" else "Teeth FDI 41–48 (8 Permanent Teeth)",
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = ThornburyMuted
                     )
@@ -418,7 +429,7 @@ fun LowerRightQuadrantCard(
                 quadrantTeeth.forEach { tooth ->
                     AnatomicalToothView(
                         tooth = tooth,
-                        isSelected = selectedToothId == tooth.number,
+                        isSelected = selectedToothId == tooth.number || selectedToothId == tooth.fdiNumber,
                         onClick = { onToothClick(tooth) }
                     )
                 }
@@ -432,19 +443,15 @@ fun LowerRightQuadrantCard(
 // =============================================================================
 
 /**
- * Mandibular Arch Container wrapping the lower dental arch (Teeth 17–32).
- *
- * @param teeth Map of Universal tooth number (1–32) to [ToothRecord].
- * @param selectedToothId Currently selected tooth number, if any.
- * @param onToothClick Callback invoked when a tooth is tapped.
- * @param modifier Optional Compose modifier.
- * @param activeFilter Filter controlling which quadrants to display.
+ * Mandibular Arch Container wrapping the lower dental arch.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MandibularArchContainer(
     teeth: Map<Int, ToothRecord>,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier,
     activeFilter: QuadrantFilter = QuadrantFilter.ALL
 ) {
@@ -458,19 +465,22 @@ fun MandibularArchContainer(
 
     if (!showLL && !showLR) return
 
+    val isChildTeeth = isChild || teeth.keys.any { it in 51..85 }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Arch Header Section
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(end = 8.dp)
             ) {
                 Box(
                     modifier = Modifier
@@ -478,7 +488,7 @@ fun MandibularArchContainer(
                         .background(ThornburyAccentTeal, CircleShape)
                 )
                 Text(
-                    text = "Mandibular Arch (Lower Teeth 17–32)",
+                    text = if (isChildTeeth) "Mandibular Primary Arch (FDI 71–85 • 10 Teeth)" else "Mandibular Arch (FDI 31–48 • 16 Teeth)",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Bold,
                     ),
@@ -503,22 +513,53 @@ fun MandibularArchContainer(
             }
         }
 
-        // Lower Left Quadrant (LL • Q3)
-        if (showLL) {
-            LowerLeftQuadrantCard(
-                teeth = teeth,
-                selectedToothId = selectedToothId,
-                onToothClick = onToothClick
-            )
-        }
+        val isCompact = LocalWindowWidthSizeClass.current == WindowWidthSizeClass.Compact
+        if (showLL && showLR && !isCompact) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(modifier = Modifier.weight(1f)) {
+                    LowerLeftQuadrantCard(
+                        teeth = teeth,
+                        selectedToothId = selectedToothId,
+                        onToothClick = onToothClick,
+                        isChild = isChildTeeth
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    LowerRightQuadrantCard(
+                        teeth = teeth,
+                        selectedToothId = selectedToothId,
+                        onToothClick = onToothClick,
+                        isChild = isChildTeeth
+                    )
+                }
+            }
+        } else {
+            // Lower Left Quadrant (LL • Q3 / Q7)
+            if (showLL) {
+                LowerLeftQuadrantCard(
+                    teeth = teeth,
+                    selectedToothId = selectedToothId,
+                    onToothClick = onToothClick,
+                    isChild = isChildTeeth
+                )
+            }
 
-        // Lower Right Quadrant (LR • Q4)
-        if (showLR) {
-            LowerRightQuadrantCard(
-                teeth = teeth,
-                selectedToothId = selectedToothId,
-                onToothClick = onToothClick
-            )
+            if (showLL && showLR) {
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Lower Right Quadrant (LR • Q4 / Q8)
+            if (showLR) {
+                LowerRightQuadrantCard(
+                    teeth = teeth,
+                    selectedToothId = selectedToothId,
+                    onToothClick = onToothClick,
+                    isChild = isChildTeeth
+                )
+            }
         }
     }
 }
@@ -531,6 +572,7 @@ fun MandibularArchContainer(
     teeth: Map<Int, ToothRecord>,
     selectedToothId: Int? = null,
     onToothClick: (ToothRecord) -> Unit,
+    isChild: Boolean = false,
     modifier: Modifier = Modifier,
     activeFilter: String
 ) {
@@ -538,8 +580,30 @@ fun MandibularArchContainer(
         teeth = teeth,
         selectedToothId = selectedToothId,
         onToothClick = onToothClick,
+        isChild = isChild,
         modifier = modifier,
         activeFilter = parseQuadrantFilter(activeFilter)
+    )
+}
+
+/**
+ * Convenience overload of [MandibularArchContainer] accepting a [Patient] model.
+ */
+@Composable
+fun MandibularArchContainer(
+    patient: com.example.thornburydental.data.Patient,
+    selectedToothId: Int? = null,
+    onToothClick: (ToothRecord) -> Unit,
+    modifier: Modifier = Modifier,
+    activeFilter: QuadrantFilter = QuadrantFilter.ALL
+) {
+    MandibularArchContainer(
+        teeth = patient.teeth,
+        selectedToothId = selectedToothId,
+        onToothClick = onToothClick,
+        isChild = patient.isChild,
+        modifier = modifier,
+        activeFilter = activeFilter
     )
 }
 

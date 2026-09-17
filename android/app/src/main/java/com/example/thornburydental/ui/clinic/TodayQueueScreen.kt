@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -90,647 +91,170 @@ fun TodayQueueScreen(
         SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(Calendar.getInstance().time)
     }
 
-    LazyColumn(
+    val windowSizeClass = LocalWindowWidthSizeClass.current
+    val isCompact = windowSizeClass == WindowWidthSizeClass.COMPACT
+
+    Column(
         modifier = modifier
             .fillMaxSize()
-            .background(ThornburyCanvas),
-        contentPadding = PaddingValues(bottom = 32.dp)
+            .background(ThornburyCanvas)
     ) {
-        // =====================================================================
-        // 1. MATERIAL 3 CLEAN HEADER
-        // =====================================================================
-        item {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                color = ThornburyCanvas,
-                border = BorderStroke(1.dp, ThornburyHairline)
+        // Top Header (shared across all screen widths)
+        TodayQueueHeader(
+            greeting = greeting,
+            clinicianName = clinicianName,
+            todayDateLabel = todayDateLabel,
+            remainingCount = confirmedList.size,
+            seenCount = completedList.size
+        )
+
+        if (isCompact) {
+            // =================================================================
+            // COMPACT LAYOUT (Single scrolling column for phones < 600dp)
+            // =================================================================
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(bottom = 32.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 18.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "$greeting, $clinicianName",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = todayDateLabel,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ThornburyMuted
-                            )
-                        }
-
-                        // Compact M3 status pill
-                        Surface(
-                            shape = RoundedCornerShape(9999.dp),
-                            color = ThornburySurfaceSoft,
-                            border = BorderStroke(1.dp, ThornburyHairline)
-                        ) {
-                            Text(
-                                text = "${confirmedList.size} Remaining • ${completedList.size} Seen",
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyPrimaryText
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // =====================================================================
-        // 2. NEXT PATIENT IN CHAIR SPOTLIGHT
-        // =====================================================================
-        if (nextAppt != null) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-                ElevatedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.elevatedCardColors(containerColor = ThornburySurfaceCard),
-                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp)
-                    ) {
-                        // Header pill / badge & Time badge
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(9999.dp),
-                                color = ThornburyPrimary
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(6.dp)
-                                            .clip(CircleShape)
-                                            .background(ThornburyOnPrimary)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "NEXT IN CHAIR",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = 1.2.sp
-                                        ),
-                                        color = ThornburyOnPrimary
-                                    )
-                                }
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = ThornburyCanvas,
-                                border = BorderStroke(1.dp, ThornburyHairline)
-                            ) {
-                                Text(
-                                    text = "${formatTimeWithAmPm(nextAppt.time)} • ${nextAppt.durationMin} MIN",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.5.sp
-                                    ),
-                                    color = ThornburyInk
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        // Patient name, age & OP number
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { onOpenPatientChart(nextAppt.patientId) }
-                        ) {
-                            Text(
-                                text = nextAppt.patientName,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "(${calculateAge(nextAppt.patientDob)} yrs)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ThornburyMuted
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = RoundedCornerShape(6.dp),
-                                color = ThornburySurfaceSoft,
-                                border = BorderStroke(1.dp, ThornburyHairlineSoft)
-                            ) {
-                                Text(
-                                    text = "OP: ${nextAppt.patientOpNo}",
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.Medium
-                                    ),
-                                    color = ThornburyBodyStrong
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Procedure
-                        Text(
-                            text = nextAppt.procedure,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ThornburyBodyStrong
-                        )
-
-
-
+                if (nextAppt != null) {
+                    item {
                         Spacer(modifier = Modifier.height(16.dp))
-
-                        // Action Buttons: Filled Open Chart & Outlined Mark Seen
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Button(
-                                onClick = { onOpenPatientChart(nextAppt.patientId) },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = ThornburyPrimary,
-                                    contentColor = ThornburyOnPrimary
-                                ),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Open Chart",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = { DentalRepository.updateAppointmentStatus(nextAppt.id, "completed") },
-                                shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = ThornburyInk
-                                ),
-                                border = BorderStroke(1.dp, ThornburyHairline),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = ThornburySuccess,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Mark Seen",
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
-                                )
-                            }
+                        Box(modifier = Modifier.padding(horizontal = 20.dp)) {
+                            NextPatientSpotlightCard(
+                                nextAppt = nextAppt,
+                                onOpenPatientChart = onOpenPatientChart,
+                                onMarkSeen = { DentalRepository.updateAppointmentStatus(nextAppt.id, "completed") }
+                            )
                         }
                     }
                 }
-            }
-        }
 
-        // =====================================================================
-        // 3. SEARCH & MATERIAL 3 FILTER CHIPS
-        // =====================================================================
-        item {
-            Spacer(modifier = Modifier.height(16.dp))
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp)
-            ) {
-                // Search Bar (24dp pill shape)
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(24.dp),
-                    placeholder = {
-                        Text(
-                            text = "Search patient, OP, type...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = ThornburyMuted
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = ThornburyMuted,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(
-                                onClick = { searchQuery = "" },
-                                modifier = Modifier.size(20.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Clear search",
-                                    tint = ThornburyMuted
-                                )
-                            }
-                        }
-                    },
-                    singleLine = true,
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = ThornburyInk,
-                        unfocusedTextColor = ThornburyInk,
-                        focusedContainerColor = ThornburyCanvas,
-                        unfocusedContainerColor = ThornburyCanvas,
-                        focusedBorderColor = ThornburyPrimary,
-                        unfocusedBorderColor = ThornburyHairline,
-                        cursorColor = ThornburyPrimary
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Material 3 FilterChips Row
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    val filterOptions = listOf(
-                        "all" to "All (${todayAppointments.size})",
-                        "confirmed" to "Upcoming (${confirmedList.size})",
-                        "completed" to "Seen (${completedList.size})",
-                        "cancelled" to "Cancelled (${cancelledList.size})"
-                    )
-
-                    filterOptions.forEach { (mode, label) ->
-                        val isSelected = filterMode == mode
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { filterMode = mode },
-                            label = {
-                                Text(
-                                    text = label,
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                containerColor = ThornburySurfaceSoft,
-                                labelColor = ThornburyBody,
-                                selectedContainerColor = ThornburyPrimary,
-                                selectedLabelColor = ThornburyOnPrimary
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = isSelected,
-                                borderColor = ThornburyHairline,
-                                selectedBorderColor = ThornburyPrimary
-                            ),
-                            shape = RoundedCornerShape(20.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        // =====================================================================
-        // 4. TODAY'S SCHEDULE HEADER
-        // =====================================================================
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Today's Schedule",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = ThornburyInk
-                )
-                Surface(
-                    shape = RoundedCornerShape(9999.dp),
-                    color = ThornburySurfaceSoft,
-                    border = BorderStroke(1.dp, ThornburyHairline)
-                ) {
-                    Text(
-                        text = "${filteredAppointments.size} scheduled",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyPrimaryText
-                    )
-                }
-            }
-        }
-
-        // =====================================================================
-        // 5. APPOINTMENTS LIST / EMPTY STATE
-        // =====================================================================
-        if (filteredAppointments.isEmpty()) {
-            item {
-                OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft.copy(alpha = 0.5f)),
-                    border = BorderStroke(1.dp, ThornburyHairline)
-                ) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                            .padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.EventBusy,
-                            contentDescription = null,
-                            tint = ThornburyMuted,
-                            modifier = Modifier.size(40.dp)
+                        QueueSearchBar(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = { searchQuery = it }
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "No matching appointments" else "No appointments found",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-                            color = ThornburyInk
+                        QueueFilterChips(
+                            filterMode = filterMode,
+                            onFilterModeChange = { filterMode = it },
+                            totalCount = todayAppointments.size,
+                            confirmedCount = confirmedList.size,
+                            completedCount = completedList.size,
+                            cancelledCount = cancelledList.size
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (searchQuery.isNotBlank()) "Try refining your search terms or clearing the search query." else "No appointments match the selected filter tab.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ThornburyMuted,
-                            textAlign = TextAlign.Center
+                    }
+                }
+
+                item {
+                    TodayScheduleHeader(
+                        count = filteredAppointments.size,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                }
+
+                if (filteredAppointments.isEmpty()) {
+                    item {
+                        EmptyQueueCard(
+                            searchQuery = searchQuery,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
                         )
+                    }
+                } else {
+                    items(filteredAppointments, key = { it.id }) { row ->
+                        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)) {
+                            AppointmentRowCard(
+                                row = row,
+                                onOpenPatientChart = onOpenPatientChart,
+                                onCancelClick = { appointmentToCancel = it }
+                            )
+                        }
                     }
                 }
             }
         } else {
-            items(filteredAppointments, key = { it.id }) { row ->
-                val isConfirmed = row.status == "confirmed"
-                val isCompleted = row.status == "completed"
-                val isCancelled = row.status == "cancelled"
-
-                OutlinedCard(
+            // =================================================================
+            // TABLET / EXPANDED LAYOUT (2-column layout for >= 600dp)
+            // =================================================================
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Left Column: Spotlight Card + Daily Practice Stats
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = CardDefaults.outlinedCardColors(
-                        containerColor = if (isConfirmed) ThornburySurfaceCard else ThornburyCanvas
-                    ),
-                    border = BorderStroke(
-                        1.dp,
-                        if (isConfirmed) ThornburyHairline else ThornburyHairlineSoft
-                    )
+                        .weight(0.42f)
+                        .fillMaxHeight()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                        // Top Row: Time badge (left) and Status badge (right)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = ThornburySurfaceSoft,
-                                border = BorderStroke(1.dp, ThornburyHairline)
-                            ) {
-                                Text(
-                                    text = "${formatTimeWithAmPm(row.time)} • ${row.durationMin} MIN",
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 0.5.sp
-                                    ),
-                                    color = ThornburyInk
-                                )
-                            }
-
-                            when {
-                                isConfirmed -> {
-                                    Surface(
-                                        shape = RoundedCornerShape(9999.dp),
-                                        color = ThornburySuccessWash,
-                                        border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
-                                    ) {
-                                        Text(
-                                            text = "Upcoming",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp
-                                            ),
-                                            color = ThornburySuccess
-                                        )
-                                    }
-                                }
-                                isCompleted -> {
-                                    Surface(
-                                        shape = RoundedCornerShape(9999.dp),
-                                        color = ThornburyInfoWash,
-                                        border = BorderStroke(1.dp, ThornburyAccentTeal.copy(alpha = 0.3f))
-                                    ) {
-                                        Row(
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = null,
-                                                tint = ThornburyPrimaryText,
-                                                modifier = Modifier.size(11.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(3.dp))
-                                            Text(
-                                                text = "Seen",
-                                                style = MaterialTheme.typography.labelSmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 11.sp
-                                                ),
-                                                color = ThornburyPrimaryText
-                                            )
-                                        }
-                                    }
-                                }
-                                isCancelled -> {
-                                    Surface(
-                                        shape = RoundedCornerShape(9999.dp),
-                                        color = ThornburyErrorWash,
-                                        border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.3f))
-                                    ) {
-                                        Text(
-                                            text = "Cancelled",
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp
-                                            ),
-                                            color = ThornburyError
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        // Middle Section: Patient info, OP & room, procedure & clinician
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { onOpenPatientChart(row.patientId) }
-                        ) {
-                            Text(
-                                text = row.patientName,
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "(${calculateAge(row.patientDob)} yrs)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ThornburyMuted
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        Text(
-                            text = "OP: ${row.patientOpNo}",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = FontFamily.Monospace
-                            ),
-                            color = ThornburyMuted
+                    if (nextAppt != null) {
+                        NextPatientSpotlightCard(
+                            nextAppt = nextAppt,
+                            onOpenPatientChart = onOpenPatientChart,
+                            onMarkSeen = { DentalRepository.updateAppointmentStatus(nextAppt.id, "completed") }
                         )
+                    } else {
+                        NoNextPatientSpotlightCard()
+                    }
 
-                        Spacer(modifier = Modifier.height(2.dp))
+                    TodayStatsCard(
+                        confirmedCount = confirmedList.size,
+                        completedCount = completedList.size,
+                        cancelledCount = cancelledList.size,
+                        totalCount = todayAppointments.size
+                    )
+                }
 
-                        Text(
-                            text = "${row.procedure} • ${row.clinicianName}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ThornburyBodyStrong
+                // Right Column: Search + Filter Chips + Scheduled Appointments List
+                Column(
+                    modifier = Modifier
+                        .weight(0.58f)
+                        .fillMaxHeight()
+                ) {
+                    QueueSearchBar(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { searchQuery = it }
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    QueueFilterChips(
+                        filterMode = filterMode,
+                        onFilterModeChange = { filterMode = it },
+                        totalCount = todayAppointments.size,
+                        confirmedCount = confirmedList.size,
+                        completedCount = completedList.size,
+                        cancelledCount = cancelledList.size
+                    )
+
+                    TodayScheduleHeader(count = filteredAppointments.size)
+
+                    if (filteredAppointments.isEmpty()) {
+                        EmptyQueueCard(
+                            searchQuery = searchQuery,
+                            modifier = Modifier.padding(vertical = 12.dp)
                         )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        // Bottom Action Row
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(bottom = 24.dp)
                         ) {
-                            OutlinedButton(
-                                onClick = { onOpenPatientChart(row.patientId) },
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(36.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(15.dp)
+                            items(filteredAppointments, key = { it.id }) { row ->
+                                AppointmentRowCard(
+                                    row = row,
+                                    onOpenPatientChart = onOpenPatientChart,
+                                    onCancelClick = { appointmentToCancel = it }
                                 )
-                                Spacer(modifier = Modifier.width(3.dp))
-                                Text(
-                                    text = "Chart",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
-                                )
-                            }
-
-                            if (isConfirmed) {
-                                OutlinedButton(
-                                    onClick = { DentalRepository.updateAppointmentStatus(row.id, "completed") },
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = ThornburySuccess
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = ThornburySuccess,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "Mark Seen",
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
-                                    )
-                                }
-
-                                OutlinedButton(
-                                    onClick = { appointmentToCancel = row },
-                                    shape = RoundedCornerShape(8.dp),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = ThornburyError
-                                    ),
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = null,
-                                        tint = ThornburyError,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "Cancel",
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
-                                    )
-                                }
                             }
                         }
                     }
@@ -775,7 +299,765 @@ fun TodayQueueScreen(
                 }
             },
             containerColor = ThornburyCanvas,
-            shape = RoundedCornerShape(12.dp)
+            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.adaptiveDialogWidth(480.dp)
         )
+    }
+}
+
+// =============================================================================
+// REUSABLE SUB-COMPONENTS
+// =============================================================================
+
+@Composable
+private fun TodayQueueHeader(
+    greeting: String,
+    clinicianName: String,
+    todayDateLabel: String,
+    remainingCount: Int,
+    seenCount: Int
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = ThornburyCanvas,
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "$greeting, $clinicianName",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = ThornburyInk
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = todayDateLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ThornburyMuted
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(9999.dp),
+                    color = ThornburySurfaceSoft,
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Text(
+                        text = "$remainingCount Remaining • $seenCount Seen",
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyPrimaryText
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NextPatientSpotlightCard(
+    nextAppt: Appointment,
+    onOpenPatientChart: (String) -> Unit,
+    onMarkSeen: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = ThornburySurfaceCard),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(9999.dp),
+                    color = ThornburyPrimary
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(ThornburyOnPrimary)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "NEXT IN CHAIR",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.2.sp
+                            ),
+                            color = ThornburyOnPrimary
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ThornburyCanvas,
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Text(
+                        text = "${formatTimeWithAmPm(nextAppt.time)} • ${nextAppt.durationMin} MIN",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = ThornburyInk
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { onOpenPatientChart(nextAppt.patientId) }
+            ) {
+                Text(
+                    text = nextAppt.patientName,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "(${calculateAge(nextAppt.patientDob)} yrs)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThornburyMuted
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = ThornburySurfaceSoft,
+                    border = BorderStroke(1.dp, ThornburyHairlineSoft)
+                ) {
+                    Text(
+                        text = "OP: ${nextAppt.patientOpNo}",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Medium
+                        ),
+                        color = ThornburyBodyStrong
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = nextAppt.procedure,
+                style = MaterialTheme.typography.bodyMedium,
+                color = ThornburyBodyStrong
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = { onOpenPatientChart(nextAppt.patientId) },
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ThornburyPrimary,
+                        contentColor = ThornburyOnPrimary
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FolderOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Open Chart",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onMarkSeen,
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = ThornburyInk
+                    ),
+                    border = BorderStroke(1.dp, ThornburyHairline),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        tint = ThornburySuccess,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Mark Seen",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoNextPatientSpotlightCard() {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.DoneAll,
+                contentDescription = null,
+                tint = ThornburySuccess,
+                modifier = Modifier.size(36.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Queue Cleared",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = ThornburyInk
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "No upcoming patients remaining in the surgery queue today.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ThornburyMuted,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun TodayStatsCard(
+    confirmedCount: Int,
+    completedCount: Int,
+    cancelledCount: Int,
+    totalCount: Int
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Today's Clinical Progress",
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                color = ThornburyInk
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val progress = if (totalCount > 0) completedCount.toFloat() / totalCount.toFloat() else 0f
+            LinearProgressIndicator(
+                progress = { progress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = ThornburyPrimary,
+                trackColor = ThornburyHairline
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${(progress * 100).toInt()}% completed",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyPrimaryText
+                )
+                Text(
+                    text = "$totalCount total visits",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = ThornburyMuted
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = ThornburyHairlineSoft)
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                ProgressPill(label = "Upcoming", count = confirmedCount, color = ThornburyPrimaryText)
+                ProgressPill(label = "Seen", count = completedCount, color = ThornburySuccess)
+                ProgressPill(label = "Cancelled", count = cancelledCount, color = ThornburyError)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressPill(label: String, count: Int, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = ThornburyMuted
+        )
+    }
+}
+
+@Composable
+private fun QueueSearchBar(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit
+) {
+    OutlinedTextField(
+        value = searchQuery,
+        onValueChange = onSearchQueryChange,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        placeholder = {
+            Text(
+                text = "Search patient, OP, type...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = ThornburyMuted
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Search",
+                tint = ThornburyMuted,
+                modifier = Modifier.size(20.dp)
+            )
+        },
+        trailingIcon = {
+            if (searchQuery.isNotEmpty()) {
+                IconButton(
+                    onClick = { onSearchQueryChange("") },
+                    modifier = Modifier.size(20.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Clear search",
+                        tint = ThornburyMuted
+                    )
+                }
+            }
+        },
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = ThornburyInk,
+            unfocusedTextColor = ThornburyInk,
+            focusedContainerColor = ThornburyCanvas,
+            unfocusedContainerColor = ThornburyCanvas,
+            focusedBorderColor = ThornburyPrimary,
+            unfocusedBorderColor = ThornburyHairline,
+            cursorColor = ThornburyPrimary
+        )
+    )
+}
+
+@Composable
+private fun QueueFilterChips(
+    filterMode: String,
+    onFilterModeChange: (String) -> Unit,
+    totalCount: Int,
+    confirmedCount: Int,
+    completedCount: Int,
+    cancelledCount: Int
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val filterOptions = listOf(
+            "all" to "All ($totalCount)",
+            "confirmed" to "Upcoming ($confirmedCount)",
+            "completed" to "Seen ($completedCount)",
+            "cancelled" to "Cancelled ($cancelledCount)"
+        )
+
+        filterOptions.forEach { (mode, label) ->
+            val isSelected = filterMode == mode
+            FilterChip(
+                selected = isSelected,
+                onClick = { onFilterModeChange(mode) },
+                label = {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = ThornburySurfaceSoft,
+                    labelColor = ThornburyBody,
+                    selectedContainerColor = ThornburyPrimary,
+                    selectedLabelColor = ThornburyOnPrimary
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = ThornburyHairline,
+                    selectedBorderColor = ThornburyPrimary
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TodayScheduleHeader(
+    count: Int,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Today's Schedule",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = ThornburyInk
+        )
+        Surface(
+            shape = RoundedCornerShape(9999.dp),
+            color = ThornburySurfaceSoft,
+            border = BorderStroke(1.dp, ThornburyHairline)
+        ) {
+            Text(
+                text = "$count scheduled",
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                color = ThornburyPrimaryText
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppointmentRowCard(
+    row: Appointment,
+    onOpenPatientChart: (String) -> Unit,
+    onCancelClick: (Appointment) -> Unit
+) {
+    val isConfirmed = row.status == "confirmed"
+    val isCompleted = row.status == "completed"
+    val isCancelled = row.status == "cancelled"
+
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = if (isConfirmed) ThornburySurfaceCard else ThornburyCanvas
+        ),
+        border = BorderStroke(
+            1.dp,
+            if (isConfirmed) ThornburyHairline else ThornburyHairlineSoft
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ThornburySurfaceSoft,
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Text(
+                        text = "${formatTimeWithAmPm(row.time)} • ${row.durationMin} MIN",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = ThornburyInk
+                    )
+                }
+
+                when {
+                    isConfirmed -> {
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = ThornburySuccessWash,
+                            border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = "Upcoming",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                ),
+                                color = ThornburySuccess
+                            )
+                        }
+                    }
+                    isCompleted -> {
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = ThornburyInfoWash,
+                            border = BorderStroke(1.dp, ThornburyAccentTeal.copy(alpha = 0.3f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = ThornburyPrimaryText,
+                                    modifier = Modifier.size(11.dp)
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text(
+                                    text = "Seen",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    ),
+                                    color = ThornburyPrimaryText
+                                )
+                            }
+                        }
+                    }
+                    isCancelled -> {
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = ThornburyErrorWash,
+                            border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = "Cancelled",
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                ),
+                                color = ThornburyError
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { onOpenPatientChart(row.patientId) }
+            ) {
+                Text(
+                    text = row.patientName,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "(${calculateAge(row.patientDob)} yrs)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ThornburyMuted
+                )
+            }
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = "OP: ${row.patientOpNo}",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontFamily = FontFamily.Monospace
+                ),
+                color = ThornburyMuted
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = "${row.procedure} • ${row.clinicianName}",
+                style = MaterialTheme.typography.bodySmall,
+                color = ThornburyBodyStrong
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = { onOpenPatientChart(row.patientId) },
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.FolderOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text(
+                        text = "Chart",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+
+                if (isConfirmed) {
+                    OutlinedButton(
+                        onClick = { DentalRepository.updateAppointmentStatus(row.id, "completed") },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = ThornburySuccess
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = ThornburySuccess,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "Mark Seen",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { onCancelClick(row) },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = ThornburyError
+                        ),
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = ThornburyError,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "Cancel",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyQueueCard(
+    searchQuery: String,
+    modifier: Modifier = Modifier
+) {
+    OutlinedCard(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft.copy(alpha = 0.5f)),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.EventBusy,
+                contentDescription = null,
+                tint = ThornburyMuted,
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = if (searchQuery.isNotBlank()) "No matching appointments" else "No appointments found",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                color = ThornburyInk
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = if (searchQuery.isNotBlank()) "Try refining your search terms or clearing the search query." else "No appointments match the selected filter tab.",
+                style = MaterialTheme.typography.bodySmall,
+                color = ThornburyMuted,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }

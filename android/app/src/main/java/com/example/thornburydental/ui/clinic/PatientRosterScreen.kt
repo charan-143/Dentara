@@ -5,8 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.util.formatAsDdMmYyyy
 
 @Composable
 fun PatientRosterScreen(
@@ -252,10 +254,12 @@ fun PatientRosterScreen(
                 }
             }
         } else {
-            LazyColumn(
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 340.dp),
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(filteredPatients, key = { it.id }) { patient ->
                     PatientListItemCard(
@@ -316,7 +320,7 @@ private fun PatientListItemCard(
 
             // Clinical Identifiers
             Text(
-                text = "OP: ${patient.opNo} • DOB: ${patient.dob}",
+                text = "OP: ${patient.opNo} • DOB: ${formatAsDdMmYyyy(patient.dob)}",
                 style = ClinicalCodeStyle.copy(fontSize = 11.sp),
                 color = ThornburyMuted
             )

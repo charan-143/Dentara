@@ -119,6 +119,7 @@ fun ReportViewerLightboxDialog(
     ) {
         Card(
             modifier = Modifier
+                .adaptiveDialogWidth(800.dp)
                 .fillMaxWidth(0.96f)
                 .fillMaxHeight(0.92f)
                 .padding(vertical = 10.dp),

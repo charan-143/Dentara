@@ -109,493 +109,105 @@ fun ProfileScreen(
             }
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            // -----------------------------------------------------------------
-            // 1. Clinician Executive Identity Card
-            // -----------------------------------------------------------------
-            ElevatedCard(
+        val windowSizeClass = LocalWindowWidthSizeClass.current
+        val isCompact = windowSizeClass == WindowWidthSizeClass.COMPACT
+
+        if (isCompact) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(16.dp)),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
-                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                ClinicianIdentityCard(
+                    initials = initials,
+                    displayName = displayName,
+                    roleLabel = roleLabel,
+                    onEditClick = { showEditProfileDialog = true }
+                )
+
+                ScheduleRemindersCard(
+                    morningReminderEnabled = morningReminderEnabled,
+                    morningReminderTime = morningReminderTime,
+                    chairsideReminderDefaultMin = chairsideReminderDefaultMin,
+                    onMorningReminderChange = { enabled, time -> DentalRepository.updateMorningReminderSettings(enabled, time) },
+                    onChairsideReminderChange = { min -> DentalRepository.updateChairsideReminderDefault(min) },
+                    context = context
+                )
+
+                ClinicalErgonomicsCard(
+                    isDarkModeEnabled = isDarkModeEnabled,
+                    areNotificationsEnabled = areNotificationsEnabled,
+                    onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
+                    onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
+                )
+
+                SecurityShieldTelemetryCard(
+                    patientsCount = patients.size,
+                    plansCount = treatmentPlans.size,
+                    reportsCount = reports.size,
+                    visitsCount = appointments.size
+                )
+
+                AccountSecurityCard(
+                    onEditProfileClick = { showEditProfileDialog = true }
+                )
+
+                Spacer(modifier = Modifier.height(28.dp))
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .verticalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(76.dp)
-                            .clip(CircleShape)
-                            .background(ThornburyPrimary),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = initials,
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Bold
-                        ),
-                        color = ThornburyInk
+                    ClinicianIdentityCard(
+                        initials = initials,
+                        displayName = displayName,
+                        roleLabel = roleLabel,
+                        onEditClick = { showEditProfileDialog = true }
                     )
 
-                    Spacer(modifier = Modifier.height(2.dp))
-
-                    Text(
-                        text = "BDS, MSc Oral Surgery & Implantology",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                        color = ThornburyPrimaryText
+                    ClinicalErgonomicsCard(
+                        isDarkModeEnabled = isDarkModeEnabled,
+                        areNotificationsEnabled = areNotificationsEnabled,
+                        onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
+                        onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = ThornburyPrimaryWash,
-                            border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
-                        ) {
-                            Text(
-                                text = "GDC #284910",
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyPrimaryText
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = ThornburySuccessWash,
-                            border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .clip(CircleShape)
-                                        .background(ThornburySuccess)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "In Surgery • Active",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = ThornburySuccess
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    HorizontalDivider(color = ThornburyHairlineSoft)
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f, fill = false)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.MedicalServices,
-                                contentDescription = null,
-                                tint = ThornburyPrimary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Clinical Role:",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = ThornburyMuted
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = roleLabel,
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyInk,
-                                maxLines = 1
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        TextButton(
-                            onClick = { showEditProfileDialog = true },
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = ThornburyPrimary
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Edit Name & Info",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyPrimary
-                            )
-                        }
-                    }
+                    AccountSecurityCard(
+                        onEditProfileClick = { showEditProfileDialog = true }
+                    )
                 }
-            }
 
-            // -----------------------------------------------------------------
-            // 2. Schedule Reminders & Daily Briefing
-            // -----------------------------------------------------------------
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.NotificationsActive, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Schedule Reminders & Daily Briefing", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(text = "Automated morning patient briefing and chairside arrival alerts", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 1. Morning Schedule Briefing
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Daily Morning Briefing", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                            Text(text = "Receive an agenda notification every morning with today's booked patients", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-                        }
-                        Switch(
-                            checked = morningReminderEnabled,
-                            onCheckedChange = { enabled ->
-                                DentalRepository.updateMorningReminderSettings(enabled, morningReminderTime)
-                            }
-                        )
-                    }
-
-                    if (morningReminderEnabled) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = ThornburyCanvas,
-                            border = BorderStroke(1.dp, ThornburyHairlineSoft),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Alarm, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(text = "Briefing Time", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                                    }
-
-                                    OutlinedButton(
-                                        onClick = {
-                                            val parts = morningReminderTime.split(":")
-                                            val initialHour = parts.getOrNull(0)?.filter { it.isDigit() }?.toIntOrNull() ?: 8
-                                            val initialMinute = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-                                            TimePickerDialog(
-                                                context,
-                                                { _, hourOfDay, minute ->
-                                                    val formatted = String.format(java.util.Locale.US, "%02d:%02d", hourOfDay, minute)
-                                                    DentalRepository.updateMorningReminderSettings(true, formatted)
-                                                },
-                                                initialHour,
-                                                initialMinute,
-                                                false
-                                            ).show()
-                                        },
-                                        shape = RoundedCornerShape(8.dp),
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                        border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.4f))
-                                    ) {
-                                        Text(
-                                            text = ReminderManager.formatTime12Hour(morningReminderTime),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                            color = ThornburyPrimary
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = ThornburyPrimary)
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                // Quick presets
-                                LazyRow(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    items(listOf("07:00", "07:30", "08:00", "08:30", "09:00")) { presetTime ->
-                                        val isSelected = morningReminderTime == presetTime
-                                        FilterChip(
-                                            selected = isSelected,
-                                            onClick = { DentalRepository.updateMorningReminderSettings(true, presetTime) },
-                                            label = {
-                                                Text(
-                                                    text = ReminderManager.formatTime12Hour(presetTime),
-                                                    style = MaterialTheme.typography.labelSmall.copy(
-                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                                    ),
-                                                    maxLines = 1,
-                                                    softWrap = false
-                                                )
-                                            },
-                                            colors = FilterChipDefaults.filterChipColors(
-                                                selectedContainerColor = ThornburyPrimaryWash,
-                                                selectedLabelColor = ThornburyPrimaryText
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 12.dp))
-
-                    // 2. Patient Chairside Arrival Alert Lead Time
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(text = "Patient Arrival Alert Lead Time", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                        Text(text = "Default notification window before appointment time when patient arrival reminder is enabled", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(
-                                listOf(
-                                    10 to "10 min",
-                                    15 to "15 min",
-                                    30 to "30 min",
-                                    45 to "45 min",
-                                    60 to "1 hour"
-                                )
-                            ) { (leadMin, label) ->
-                                val isSelected = chairsideReminderDefaultMin == leadMin
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { DentalRepository.updateChairsideReminderDefault(leadMin) },
-                                    label = {
-                                        Text(
-                                            text = label,
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            ),
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
-                                    },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = ThornburyPrimaryWash,
-                                        selectedLabelColor = ThornburyPrimaryText
-                                    )
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // -----------------------------------------------------------------
-            // 3. Clinical Ergonomics & Practice Preferences
-            // -----------------------------------------------------------------
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Clinical Ergonomics & Interface", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Dark Mode
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Operatory Dark Mode", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                            Text(text = "High-contrast theme optimized for darkened operatory suites", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-                        }
-                        Switch(
-                            checked = isDarkModeEnabled,
-                            onCheckedChange = { DentalRepository.setDarkModeEnabled(it) }
-                        )
-                    }
-
-                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
-
-                    // Chairside Alerts
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Chairside Arrival Alerts", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                            Text(text = "Notify when the next patient checks in at reception", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-                        }
-                        Switch(
-                            checked = areNotificationsEnabled,
-                            onCheckedChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
-                        )
-                    }
-
-                    HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
-
-                    // Notation System Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(text = "Dental Charting Notation", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                            Text(text = "Universal System (#1 to #32) active with FDI cross-reference", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = ThornburyPrimaryWash,
-                            border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
-                        ) {
-                            Text(
-                                text = "Universal 1-32",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyPrimaryText,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // -----------------------------------------------------------------
-            // 4. Clinical Database & Security Shield Telemetry
-            // -----------------------------------------------------------------
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = "Data Security & Local Database", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        color = ThornburySuccessWash,
-                        border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(text = "FLAG_SECURE Active", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
-                                Text(text = "Task-switcher screenshot protection enabled to safeguard patient records.", style = MaterialTheme.typography.bodySmall, color = ThornburyBodyStrong)
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Text(text = "Local Clinic Database Telemetry", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        TelemetryStatBadge(label = "PATIENTS", value = "${patients.size}", icon = Icons.Default.Groups)
-                        TelemetryStatBadge(label = "PLANS", value = "${treatmentPlans.size}", icon = Icons.Default.Assignment)
-                        TelemetryStatBadge(label = "REPORTS", value = "${reports.size}", icon = Icons.Default.Image)
-                        TelemetryStatBadge(label = "VISITS", value = "${appointments.size}", icon = Icons.Default.Event)
-                    }
-                }
-            }
-
-            // -----------------------------------------------------------------
-            // 5. Account & Security Settings
-            // -----------------------------------------------------------------
-            OutlinedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
-                border = BorderStroke(1.dp, ThornburyHairline)
-            ) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    Text(text = "Account & Authentication", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    ScheduleRemindersCard(
+                        morningReminderEnabled = morningReminderEnabled,
+                        morningReminderTime = morningReminderTime,
+                        chairsideReminderDefaultMin = chairsideReminderDefaultMin,
+                        onMorningReminderChange = { enabled, time -> DentalRepository.updateMorningReminderSettings(enabled, time) },
+                        onChairsideReminderChange = { min -> DentalRepository.updateChairsideReminderDefault(min) },
+                        context = context
+                    )
 
-                    OutlinedButton(
-                        onClick = { showEditProfileDialog = true },
-                        modifier = Modifier.fillMaxWidth().height(46.dp),
-                        shape = RoundedCornerShape(10.dp)
-                    ) {
-                        Icon(imageVector = Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Edit Clinician Profile Details", style = MaterialTheme.typography.labelMedium)
-                    }
+                    SecurityShieldTelemetryCard(
+                        patientsCount = patients.size,
+                        plansCount = treatmentPlans.size,
+                        reportsCount = reports.size,
+                        visitsCount = appointments.size
+                    )
                 }
             }
-
-            Spacer(modifier = Modifier.height(28.dp))
         }
     }
 
@@ -615,6 +227,7 @@ fun ProfileScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth(0.92f)
+                    .adaptiveDialogWidth(500.dp)
                     .wrapContentHeight()
                     .padding(vertical = 16.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -685,6 +298,509 @@ fun ProfileScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClinicianIdentityCard(
+    initials: String,
+    displayName: String,
+    roleLabel: String,
+    onEditClick: () -> Unit
+) {
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .clip(CircleShape)
+                    .background(ThornburyPrimary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = initials,
+                    style = MaterialTheme.typography.headlineMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = displayName,
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontWeight = FontWeight.Bold
+                ),
+                color = ThornburyInk
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = "BDS, MSc Oral Surgery & Implantology",
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = ThornburyPrimaryText
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ThornburyPrimaryWash,
+                    border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
+                ) {
+                    Text(
+                        text = "GDC #284910",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyPrimaryText
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ThornburySuccessWash,
+                    border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(ThornburySuccess)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "In Surgery • Active",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = ThornburySuccess
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = ThornburyHairlineSoft)
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f, fill = false)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MedicalServices,
+                        contentDescription = null,
+                        tint = ThornburyPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Clinical Role:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ThornburyMuted
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = roleLabel,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk,
+                        maxLines = 1
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                TextButton(
+                    onClick = onEditClick,
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = ThornburyPrimary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Edit Name & Info",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyPrimary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleRemindersCard(
+    morningReminderEnabled: Boolean,
+    morningReminderTime: String,
+    chairsideReminderDefaultMin: Int,
+    onMorningReminderChange: (Boolean, String) -> Unit,
+    onChairsideReminderChange: (Int) -> Unit,
+    context: android.content.Context
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = Icons.Default.NotificationsActive, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Schedule Reminders & Daily Briefing", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = "Automated morning patient briefing and chairside arrival alerts", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // 1. Morning Schedule Briefing
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Daily Morning Briefing", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    Text(text = "Receive an agenda notification every morning with today's booked patients", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                }
+                Switch(
+                    checked = morningReminderEnabled,
+                    onCheckedChange = { enabled ->
+                        onMorningReminderChange(enabled, morningReminderTime)
+                    }
+                )
+            }
+
+            if (morningReminderEnabled) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = ThornburyCanvas,
+                    border = BorderStroke(1.dp, ThornburyHairlineSoft),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Alarm, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(text = "Briefing Time", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    val parts = morningReminderTime.split(":")
+                                    val initialHour = parts.getOrNull(0)?.filter { it.isDigit() }?.toIntOrNull() ?: 8
+                                    val initialMinute = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
+                                    TimePickerDialog(
+                                        context,
+                                        { _, hourOfDay, minute ->
+                                            val formatted = String.format(java.util.Locale.US, "%02d:%02d", hourOfDay, minute)
+                                            onMorningReminderChange(true, formatted)
+                                        },
+                                        initialHour,
+                                        initialMinute,
+                                        false
+                                    ).show()
+                                },
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = ReminderManager.formatTime12Hour(morningReminderTime),
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburyPrimary
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = ThornburyPrimary)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Quick presets
+                        LazyRow(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(listOf("07:00", "07:30", "08:00", "08:30", "09:00")) { presetTime ->
+                                val isSelected = morningReminderTime == presetTime
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { onMorningReminderChange(true, presetTime) },
+                                    label = {
+                                        Text(
+                                            text = ReminderManager.formatTime12Hour(presetTime),
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            ),
+                                            maxLines = 1,
+                                            softWrap = false
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = ThornburyPrimaryWash,
+                                        selectedLabelColor = ThornburyPrimaryText
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 12.dp))
+
+            // 2. Patient Chairside Arrival Alert Lead Time
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(text = "Patient Arrival Alert Lead Time", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                Text(text = "Default notification window before appointment time when patient arrival reminder is enabled", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(
+                        listOf(
+                            10 to "10 min",
+                            15 to "15 min",
+                            30 to "30 min",
+                            45 to "45 min",
+                            60 to "1 hour"
+                        )
+                    ) { (leadMin, label) ->
+                        val isSelected = chairsideReminderDefaultMin == leadMin
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onChairsideReminderChange(leadMin) },
+                            label = {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    ),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = ThornburyPrimaryWash,
+                                selectedLabelColor = ThornburyPrimaryText
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ClinicalErgonomicsCard(
+    isDarkModeEnabled: Boolean,
+    areNotificationsEnabled: Boolean,
+    onDarkModeChange: (Boolean) -> Unit,
+    onNotificationsChange: (Boolean) -> Unit
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = Icons.Default.Tune, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Clinical Ergonomics & Interface", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Dark Mode
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Operatory Dark Mode", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    Text(text = "High-contrast theme optimized for darkened operatory suites", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                }
+                Switch(
+                    checked = isDarkModeEnabled,
+                    onCheckedChange = onDarkModeChange
+                )
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
+
+            // Chairside Alerts
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Chairside Arrival Alerts", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    Text(text = "Notify when the next patient checks in at reception", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                }
+                Switch(
+                    checked = areNotificationsEnabled,
+                    onCheckedChange = onNotificationsChange
+                )
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
+
+            // Notation System Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = "Dental Charting Notation", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    Text(text = "Universal System (#1 to #32) active with FDI cross-reference", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                }
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = ThornburyPrimaryWash,
+                    border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
+                ) {
+                    Text(
+                        text = "Universal 1-32",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyPrimaryText,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SecurityShieldTelemetryCard(
+    patientsCount: Int,
+    plansCount: Int,
+    reportsCount: Int,
+    visitsCount: Int
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(imageVector = Icons.Default.Security, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = "Data Security & Local Database", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                color = ThornburySuccessWash,
+                border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(text = "FLAG_SECURE Active", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
+                        Text(text = "Task-switcher screenshot protection enabled to safeguard patient records.", style = MaterialTheme.typography.bodySmall, color = ThornburyBodyStrong)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(text = "Local Clinic Database Telemetry", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TelemetryStatBadge(label = "PATIENTS", value = "$patientsCount", icon = Icons.Default.Groups)
+                TelemetryStatBadge(label = "PLANS", value = "$plansCount", icon = Icons.Default.Assignment)
+                TelemetryStatBadge(label = "REPORTS", value = "$reportsCount", icon = Icons.Default.Image)
+                TelemetryStatBadge(label = "VISITS", value = "$visitsCount", icon = Icons.Default.Event)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccountSecurityCard(
+    onEditProfileClick: () -> Unit
+) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
+        border = BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(text = "Account & Authentication", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+
+            OutlinedButton(
+                onClick = onEditProfileClick,
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Icon(imageVector = Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Edit Clinician Profile Details", style = MaterialTheme.typography.labelMedium)
             }
         }
     }

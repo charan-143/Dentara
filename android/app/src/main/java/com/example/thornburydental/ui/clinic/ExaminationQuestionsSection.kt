@@ -146,6 +146,7 @@ fun ExaminationQuestionsSection(
     Column(
         modifier = modifier
             .fillMaxSize()
+            .adaptiveContentContainer(860.dp)
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .padding(bottom = 64.dp)

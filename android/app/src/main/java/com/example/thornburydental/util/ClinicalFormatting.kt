@@ -9,10 +9,14 @@ import java.util.Calendar
  */
 fun calculateAge(dobStr: String): Int {
     return try {
-        val parts = dobStr.split("-").map { it.toInt() }
-        val birthYear = parts[0]
-        val birthMonth = parts[1] - 1
-        val birthDay = parts[2]
+        val trimmed = dobStr.trim()
+        val (birthYear, birthMonth, birthDay) = if (trimmed.contains("/")) {
+            val parts = trimmed.split("/").map { it.toInt() }
+            Triple(parts[2], parts[1] - 1, parts[0])
+        } else {
+            val parts = trimmed.split("-").map { it.toInt() }
+            Triple(parts[0], parts[1] - 1, parts[2])
+        }
 
         val today = Calendar.getInstance()
         var age = today.get(Calendar.YEAR) - birthYear
