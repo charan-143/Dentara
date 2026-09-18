@@ -7,12 +7,31 @@ plugins {
 android {
     namespace = "com.example.thornburydental"
     compileSdk = 36
+
+    // Pinned so every machine and CI runner builds libdentara_whisper.so with the same
+    // toolchain. Bumping this changes generated machine code, so treat it as a real change.
+    ndkVersion = "28.2.13676358"
+
     defaultConfig {
         applicationId = "com.dentara.dental"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        ndk {
+            // arm64-v8a covers the clinical handsets; x86_64 keeps the emulator usable
+            // for development. armeabi-v7a is omitted deliberately: 32-bit ARM is scarce
+            // on devices sold since minSdk 24 and each extra ABI is a full whisper build.
+            abiFilters += listOf("arm64-v8a", "x86_64")
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.31.6"
+        }
     }
 
     signingConfigs {

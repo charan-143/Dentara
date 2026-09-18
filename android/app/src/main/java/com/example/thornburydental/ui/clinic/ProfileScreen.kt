@@ -67,6 +67,7 @@ fun ProfileScreen(
 
     val isDarkModeEnabled by DentalRepository.isDarkModeEnabled.collectAsState()
     val isBiometricAuthEnabled by DentalRepository.isBiometricAuthEnabled.collectAsState()
+    val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
     val biometricLockTimeoutMinutes by DentalRepository.biometricLockTimeoutMinutes.collectAsState()
     val areNotificationsEnabled by DentalRepository.appointmentRemindersEnabled.collectAsState()
     val morningReminderEnabled by DentalRepository.morningReminderEnabled.collectAsState()
@@ -141,8 +142,10 @@ fun ProfileScreen(
                 ClinicalErgonomicsCard(
                     isDarkModeEnabled = isDarkModeEnabled,
                     areNotificationsEnabled = areNotificationsEnabled,
+                    isVoiceChartingEnabled = isVoiceChartingEnabled,
                     onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
-                    onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
+                    onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
+                    onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) }
                 )
 
                 SecurityShieldTelemetryCard(
@@ -184,8 +187,10 @@ fun ProfileScreen(
                     ClinicalErgonomicsCard(
                         isDarkModeEnabled = isDarkModeEnabled,
                         areNotificationsEnabled = areNotificationsEnabled,
+                        isVoiceChartingEnabled = isVoiceChartingEnabled,
                         onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
-                        onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) }
+                        onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
+                        onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) }
                     )
 
                     AccountSecurityCard(
@@ -647,8 +652,10 @@ private fun ScheduleRemindersCard(
 private fun ClinicalErgonomicsCard(
     isDarkModeEnabled: Boolean,
     areNotificationsEnabled: Boolean,
+    isVoiceChartingEnabled: Boolean,
     onDarkModeChange: (Boolean) -> Unit,
-    onNotificationsChange: (Boolean) -> Unit
+    onNotificationsChange: (Boolean) -> Unit,
+    onVoiceChartingChange: (Boolean) -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -678,6 +685,29 @@ private fun ClinicalErgonomicsCard(
                 Switch(
                     checked = isDarkModeEnabled,
                     onCheckedChange = onDarkModeChange
+                )
+            }
+
+            HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
+
+            // Hands-Free Voice Charting (off by default; opt in per device)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(imageVector = Icons.Default.Mic, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(text = "Hands-Free Voice Charting", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                    }
+                    Text(text = "On-device dictation for periodontal depths and clinical notes. Needs a one-time 57 MB language download; audio never leaves this device.", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = isVoiceChartingEnabled,
+                    onCheckedChange = onVoiceChartingChange
                 )
             }
 

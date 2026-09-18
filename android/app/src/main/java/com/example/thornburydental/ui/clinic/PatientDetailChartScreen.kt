@@ -32,6 +32,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import com.example.thornburydental.data.*
+import com.example.thornburydental.speech.DictationTargetMode
+import com.example.thornburydental.speech.ParsedVoiceCommand
+import com.example.thornburydental.speech.VoiceChartingController
+import com.example.thornburydental.speech.VoiceDictationState
+import com.example.thornburydental.ui.components.speech.HandsFreeVoiceDictationBar
+import com.example.thornburydental.ui.components.speech.ParsedCommandPreviewSheet
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.AnatomicalToothView
 import com.example.thornburydental.ui.components.AnatomicalToothCanvas
@@ -45,6 +51,16 @@ fun PatientDetailChartScreen(
     onOpenAddReportScreen: (Patient) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val voiceController = remember { VoiceChartingController() }
+    val voiceState by voiceController.uiState.collectAsState()
+    val targetMode by voiceController.targetMode.collectAsState()
+    val voiceModelState by voiceController.modelState.collectAsState()
+    val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
+
+    LaunchedEffect(Unit) {
+        voiceController.initialize()
+    }
+
     val patients by DentalRepository.patients.collectAsState()
     // Only ever resolve to the requested patient — never silently substitute a
     // different one just because the roster happens to be non-empty. If
@@ -79,11 +95,14 @@ fun PatientDetailChartScreen(
     val patientReports = diagnosticReports.filter { it.patientId == patient.id }
     val patientAppointments = allAppointments.filter { it.patientId == patient.id }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(ThornburyCanvas)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // --- Top App Bar ---
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -243,6 +262,48 @@ fun PatientDetailChartScreen(
                     onBookAppointmentClick = { showBookAppointmentDialog = true },
                     onUpdateStatus = { apptId, newStatus -> DentalRepository.updateAppointmentStatus(apptId, newStatus) }
                 )
+            }
+        }
+        }
+
+        // Docked Floating Hands-Free Voice Dictation Overlay (Enabled via Profile Settings)
+        if (isVoiceChartingEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 12.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (voiceState is VoiceDictationState.CommandParsed) {
+                        val parsedState = voiceState as VoiceDictationState.CommandParsed
+                        ParsedCommandPreviewSheet(
+                            rawTranscript = parsedState.rawTranscript,
+                            parsedCommand = parsedState.parsedCommand,
+                            onConfirmApply = { cmd ->
+                                voiceController.applyParsedCommand(patient.id, cmd)
+                                voiceController.resetState()
+                            },
+                            onDismiss = {
+                                voiceController.resetState()
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    HandsFreeVoiceDictationBar(
+                        state = voiceState,
+                        targetMode = targetMode,
+                        onStartListening = { mode -> voiceController.startDictation(coroutineScope, mode) },
+                        onStopListening = { voiceController.stopDictationAndProcess(coroutineScope) },
+                        onSelectTargetMode = { mode -> voiceController.setTargetMode(mode) },
+                        modelState = voiceModelState,
+                        onProvisionModel = { coroutineScope.launch { voiceController.provisionModel() } }
+                    )
+                }
             }
         }
     }

@@ -23,7 +23,15 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.ExaminationAnswers
+import com.example.thornburydental.speech.DictationTargetMode
+import com.example.thornburydental.speech.ParsedVoiceCommand
+import com.example.thornburydental.speech.VoiceChartingController
+import kotlinx.coroutines.launch
+import com.example.thornburydental.speech.VoiceDictationState
+import com.example.thornburydental.ui.components.speech.HandsFreeVoiceDictationBar
+import com.example.thornburydental.ui.components.speech.ParsedCommandPreviewSheet
 import com.example.thornburydental.theme.*
 
 // =============================================================================
@@ -38,6 +46,16 @@ fun ExaminationQuestionsSection(
     onSaveAnswers: (ExaminationAnswers) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
+    val voiceController = remember { VoiceChartingController() }
+    val voiceState by voiceController.uiState.collectAsState()
+    val targetMode by voiceController.targetMode.collectAsState()
+    val voiceModelState by voiceController.modelState.collectAsState()
+    val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
+
+    LaunchedEffect(Unit) {
+        voiceController.initialize()
+    }
     // Current questionnaire state initialized from passed answers or empty defaults
     var chiefComplaints by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.chiefComplaints ?: emptyList())
@@ -232,6 +250,70 @@ fun ExaminationQuestionsSection(
 
             if (isExpanded) {
                 HorizontalDivider(color = ThornburyHairline, modifier = Modifier.padding(bottom = 16.dp))
+
+                // Hands-Free Voice Dictation Overlay (Enabled via Profile Settings)
+                if (isVoiceChartingEnabled) {
+                    if (voiceState is VoiceDictationState.CommandParsed) {
+                        val parsedState = voiceState as VoiceDictationState.CommandParsed
+                        ParsedCommandPreviewSheet(
+                            rawTranscript = parsedState.rawTranscript,
+                            parsedCommand = parsedState.parsedCommand,
+                            onConfirmApply = { cmd ->
+                                voiceController.applyParsedCommand(patientId, cmd)
+                                when (cmd) {
+                                    is ParsedVoiceCommand.SinglePocketDepth -> {
+                                        val entry = cmd.entry
+                                        val pStr = "Tooth ${entry.toothNumber}: ${entry.depthMm}mm" + if (entry.isBleeding) " (Bleeding)" else ""
+                                        val updatedP = (periodontalPockets.filterNot { it.startsWith("Tooth ${entry.toothNumber}:") } + pStr).distinct()
+                                        periodontalPockets = updatedP
+                                        if (entry.isBleeding) {
+                                            periodontalBleeding = (periodontalBleeding + "Tooth ${entry.toothNumber} bleeding").distinct()
+                                        }
+                                        emitChanges(newPeriodontalPockets = updatedP, newPeriodontalBleeding = periodontalBleeding)
+                                    }
+                                    is ParsedVoiceCommand.MultiplePocketDepths -> {
+                                        var updatedP = periodontalPockets
+                                        var updatedB = periodontalBleeding
+                                        for (entry in cmd.entries) {
+                                            val pStr = "Tooth ${entry.toothNumber}: ${entry.depthMm}mm" + if (entry.isBleeding) " (Bleeding)" else ""
+                                            updatedP = (updatedP.filterNot { it.startsWith("Tooth ${entry.toothNumber}:") } + pStr).distinct()
+                                            if (entry.isBleeding) {
+                                                updatedB = (updatedB + "Tooth ${entry.toothNumber} bleeding").distinct()
+                                            }
+                                        }
+                                        periodontalPockets = updatedP
+                                        periodontalBleeding = updatedB
+                                        emitChanges(newPeriodontalPockets = updatedP, newPeriodontalBleeding = updatedB)
+                                    }
+                                    is ParsedVoiceCommand.ClinicalNote -> {
+                                        val existingN = clinicianNotes
+                                        val newNote = if (existingN.isBlank()) cmd.entry.noteText else "$existingN\n• ${cmd.entry.noteText}"
+                                        clinicianNotes = newNote
+                                        emitChanges(newClinicianNotes = newNote)
+                                    }
+                                    else -> {}
+                                }
+                                voiceController.resetState()
+                            },
+                            onDismiss = {
+                                voiceController.resetState()
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+
+                    HandsFreeVoiceDictationBar(
+                        state = voiceState,
+                        targetMode = targetMode,
+                        onStartListening = { mode -> voiceController.startDictation(scope, mode) },
+                        onStopListening = { voiceController.stopDictationAndProcess(scope) },
+                        onSelectTargetMode = { mode -> voiceController.setTargetMode(mode) },
+                        modelState = voiceModelState,
+                        onProvisionModel = { scope.launch { voiceController.provisionModel() } }
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 // Section 1: Chief Complaints
                 ChiefComplaintsSubSection(

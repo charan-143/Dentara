@@ -67,6 +67,16 @@ object DentalRepository {
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.lockTimeoutMs = minutes * 60 * 1000L
     }
 
+    private val _isVoiceChartingEnabled = MutableStateFlow(false)
+    val isVoiceChartingEnabled: StateFlow<Boolean> = _isVoiceChartingEnabled.asStateFlow()
+    fun setVoiceChartingEnabled(enabled: Boolean) {
+        _isVoiceChartingEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("voice_charting_enabled", enabled)
+            ?.apply()
+    }
+
     fun initializePreferencesSynchronously(context: android.content.Context) {
         val prefs = context.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
         val savedDarkMode = prefs.getBoolean("dark_mode_enabled", false)
@@ -77,6 +87,9 @@ object DentalRepository {
 
         val savedTimeoutMin = prefs.getInt("biometric_lock_timeout_min", 0)
         _biometricLockTimeoutMinutes.value = savedTimeoutMin
+
+        val savedVoiceCharting = prefs.getBoolean("voice_charting_enabled", false)
+        _isVoiceChartingEnabled.value = savedVoiceCharting
 
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.initPreferences(context)
     }
@@ -580,14 +593,32 @@ object DentalRepository {
         reminderLeadTimeMin = reminderLeadTimeMin
     )
 
+    fun universalToFdi(universalNum: Int): Int {
+        return when (universalNum) {
+            in 1..8 -> 19 - universalNum
+            in 9..16 -> 12 + universalNum
+            in 17..24 -> 55 - universalNum
+            in 25..32 -> 16 + universalNum
+            else -> universalNum
+        }
+    }
+
     fun updateToothCondition(patientId: String, toothNumber: Int, newCondition: ToothCondition, notes: String) {
         _patients.update { list ->
             list.map { p ->
                 if (p.id == patientId) {
                     val updatedTeeth = p.teeth.toMutableMap()
-                    val current = updatedTeeth[toothNumber]
-                    if (current != null) {
-                        updatedTeeth[toothNumber] = current.copy(
+                    val fdiKey = universalToFdi(toothNumber)
+                    val targetKey = if (updatedTeeth.containsKey(toothNumber)) {
+                        toothNumber
+                    } else if (updatedTeeth.containsKey(fdiKey)) {
+                        fdiKey
+                    } else {
+                        updatedTeeth.entries.firstOrNull { it.value.number == toothNumber || it.value.fdiNumber == toothNumber }?.key
+                    }
+                    if (targetKey != null) {
+                        val current = updatedTeeth[targetKey]!!
+                        updatedTeeth[targetKey] = current.copy(
                             condition = newCondition,
                             notes = if (notes.isNotBlank()) notes else current.notes
                         )
@@ -601,6 +632,79 @@ object DentalRepository {
         repositoryScope.launch {
             if (LocalDatabaseManager.isInitialized) {
                 LocalDatabaseManager.toothDao.updateToothCondition(patientId, toothNumber, newCondition, notes)
+            }
+        }
+    }
+
+    /**
+     * Updates patient's periodontal pocket depths and bleeding status from voice dictation.
+     */
+    fun applyVoicePeriodontalPocket(
+        patientId: String,
+        toothNumber: Int,
+        depthMm: Int,
+        isBleeding: Boolean = false
+    ) {
+        _patients.update { list ->
+            list.map { patient ->
+                if (patient.id == patientId) {
+                    val currentExam = patient.examAnswers ?: ExaminationAnswers()
+                    val pocketStr = "Tooth $toothNumber: ${depthMm}mm" + if (isBleeding) " (Bleeding)" else ""
+
+                    val updatedPockets = (currentExam.periodontalPockets.filterNot { it.startsWith("Tooth $toothNumber:") } + pocketStr).distinct()
+                    val bleedingTag = "Tooth $toothNumber bleeding"
+                    val updatedBleeding = if (isBleeding) {
+                        (currentExam.periodontalBleeding + bleedingTag).distinct()
+                    } else {
+                        currentExam.periodontalBleeding
+                    }
+
+                    val updatedExam = currentExam.copy(
+                        periodontalPockets = updatedPockets,
+                        periodontalBleeding = updatedBleeding
+                    )
+
+                    // Also update ToothRecord notes
+                    val updatedTeeth = patient.teeth.toMutableMap()
+                    val targetKey = if (updatedTeeth.containsKey(toothNumber)) {
+                        toothNumber
+                    } else {
+                        updatedTeeth.entries.firstOrNull { it.value.number == toothNumber || it.value.fdiNumber == toothNumber }?.key
+                    }
+                    if (targetKey != null) {
+                        val currentTooth = updatedTeeth[targetKey]!!
+                        val updatedNote = (currentTooth.notes + " Pocket: ${depthMm}mm" + if (isBleeding) " [BOP]" else "").trim()
+                        updatedTeeth[targetKey] = currentTooth.copy(notes = updatedNote)
+                    }
+
+                    updateExaminationAnswers(patientId, updatedExam)
+                    patient.copy(examAnswers = updatedExam, teeth = updatedTeeth)
+                } else {
+                    patient
+                }
+            }
+        }
+    }
+
+    /**
+     * Appends voice-dictated clinical examination notes to patient record.
+     */
+    fun appendVoiceClinicalNote(patientId: String, noteText: String) {
+        if (noteText.isBlank()) return
+
+        _patients.update { list ->
+            list.map { patient ->
+                if (patient.id == patientId) {
+                    val currentExam = patient.examAnswers ?: ExaminationAnswers()
+                    val existing = currentExam.clinicianNotes.trim()
+                    val updatedNotes = if (existing.isEmpty()) noteText.trim() else "$existing\n• ${noteText.trim()}"
+
+                    val updatedExam = currentExam.copy(clinicianNotes = updatedNotes)
+                    updateExaminationAnswers(patientId, updatedExam)
+                    patient.copy(examAnswers = updatedExam)
+                } else {
+                    patient
+                }
             }
         }
     }
