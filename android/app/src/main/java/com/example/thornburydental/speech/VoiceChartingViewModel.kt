@@ -2,6 +2,8 @@ package com.example.thornburydental.speech
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.thornburydental.data.DentalRepository
+import com.example.thornburydental.data.VoiceUndoPoint
 import com.example.thornburydental.speech.model.SpeechModelState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,7 +53,11 @@ class VoiceChartingViewModel internal constructor(
      * Recording is scoped to the ViewModel, not to a composable, so switching tabs mid-dictation
      * does not silently truncate the recording.
      */
-    fun startDictation(mode: DictationTargetMode) = controller.startDictation(viewModelScope, mode)
+    fun startDictation(
+        mode: DictationTargetMode,
+        continuousHandsFree: Boolean = true,
+        patientId: String? = null
+    ) = controller.startDictation(viewModelScope, mode, continuousHandsFree, patientId)
 
     fun stopDictationAndProcess() = controller.stopDictationAndProcess(viewModelScope)
 
@@ -67,6 +73,18 @@ class VoiceChartingViewModel internal constructor(
     ): Boolean = controller.applyParsedCommand(patientId, command, transcript)
 
     fun resetState() = controller.resetState()
+
+    /** Whether the clinic has opted into continuous hands-free auto-commit. */
+    val autoApplyEnabled: StateFlow<Boolean> = DentalRepository.isVoiceAutoApplyEnabled
+
+    /** Persistent undo points for voice charting. */
+    val undoableEntry: StateFlow<List<VoiceUndoPoint>> = DentalRepository.voiceUndoPoints
+
+    fun loadPersistedVoiceUndoPoints(patientId: String) =
+        DentalRepository.loadPersistedVoiceUndoPoints(patientId)
+
+    /** @return what was undone, for read-back, or null when there was nothing to undo. */
+    fun undoLastVoiceEntry(patientId: String? = null): String? = controller.undoLastVoiceEntry(patientId)
 
     /**
      * Drops the microphone when the app stops. Android cuts background mic access anyway, and

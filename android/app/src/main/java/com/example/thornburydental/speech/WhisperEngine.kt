@@ -1,12 +1,13 @@
 package com.example.thornburydental.speech
 
 import android.util.Log
+import java.io.File
+import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Raised when dictation is attempted without a working offline speech recognition model.
@@ -31,11 +32,23 @@ class SpeechEngineUnavailableException(
 class WhisperEngine(
     private val bridge: WhisperNativeBridge? = if (WhisperNative.libraryAvailable) WhisperNative else null,
     private val threads: Int = defaultThreadCount(),
-    private val decodeDispatcher: CoroutineDispatcher = Dispatchers.Default
+    private val decodeDispatcher: CoroutineDispatcher = defaultDecodeDispatcher
 ) {
 
     companion object {
         private const val TAG = "WhisperEngine"
+
+        /**
+         * Dedicated single-threaded dispatcher for native decoding to avoid competing with
+         * the UI thread or coroutine pool on big cores.
+         */
+        val defaultDecodeDispatcher: CoroutineDispatcher by lazy {
+            Executors.newSingleThreadExecutor { runnable ->
+                Thread(runnable, "dentara-whisper-decoder").apply {
+                    priority = Thread.NORM_PRIORITY + 1
+                }
+            }.asCoroutineDispatcher()
+        }
 
         /** Audio contract the decoder consumes: 16 kHz, 16-bit, mono. */
         const val SAMPLE_RATE = 16000

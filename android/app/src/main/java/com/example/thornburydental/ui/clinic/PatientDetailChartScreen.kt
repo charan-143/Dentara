@@ -39,9 +39,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.thornburydental.speech.ChartReadBack
 import com.example.thornburydental.speech.DictationTargetMode
 import com.example.thornburydental.speech.ParsedVoiceCommand
+import com.example.thornburydental.speech.VoiceChartingService
 import com.example.thornburydental.speech.VoiceChartingViewModel
+import com.example.thornburydental.speech.rememberChartReadBackSpeaker
 import com.example.thornburydental.speech.rememberMicrophonePermissionState
 import com.example.thornburydental.speech.VoiceDictationState
 import com.example.thornburydental.ui.components.speech.HandsFreeVoiceDictationBar
@@ -59,40 +62,47 @@ fun PatientDetailChartScreen(
     onOpenAddReportScreen: (Patient) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // One dictation owner for the whole activity. The examination section nested below
-    // used to build a second one, so both were live at once on the examination tab.
+    val context = LocalContext.current
+    // One dictation owner for the whole activity.
     val voiceViewModel: VoiceChartingViewModel = viewModel()
     val voiceState by voiceViewModel.uiState.collectAsState()
     val targetMode by voiceViewModel.targetMode.collectAsState()
     val voiceModelState by voiceViewModel.modelState.collectAsState()
+    val voiceAutoApply by voiceViewModel.autoApplyEnabled.collectAsState()
+    val voiceUndoPoints by voiceViewModel.undoableEntry.collectAsState()
+    val chartReadBack = rememberChartReadBackSpeaker()
     val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
+
+    // Load persistent undo points from SQLite for this patient
+    LaunchedEffect(patientId) {
+        voiceViewModel.loadPersistedVoiceUndoPoints(patientId)
+    }
+
+    // Read the parse back aloud: a clinician with a probe in the mouth is not looking at the
+    // screen, so an unspoken value is one they cannot check.
+    LaunchedEffect(voiceState) {
+        val parsed = voiceState as? VoiceDictationState.CommandParsed ?: return@LaunchedEffect
+        chartReadBack.speak(ChartReadBack.spokenSummary(parsed.parsedCommand))
+    }
 
     var pendingDictationMode by remember { mutableStateOf<DictationTargetMode?>(null) }
     var showMicrophoneSettingsPrompt by remember { mutableStateOf(false) }
 
     val microphonePermission = rememberMicrophonePermissionState(
         onGranted = {
-            // Resume the tap that triggered the request; granting should not cost a
-            // second tap with gloved hands mid-examination.
             pendingDictationMode?.let { mode ->
-                voiceViewModel.startDictation(mode)
+                try { VoiceChartingService.start(context) } catch (_: Throwable) {}
+                voiceViewModel.startDictation(mode, continuousHandsFree = true, patientId = patientId)
                 pendingDictationMode = null
             }
         }
     )
 
-    // Drop the microphone when the app stops. Android revokes background capture
-    // anyway, and an open stream blocks other apps from recording.
-    val voiceLifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(voiceLifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                voiceViewModel.releaseMicrophone()
-                pendingDictationMode = null
-            }
+    // Stop foreground service on disposal
+    DisposableEffect(Unit) {
+        onDispose {
+            try { VoiceChartingService.stop(context) } catch (_: Throwable) {}
         }
-        voiceLifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { voiceLifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val patients by DentalRepository.patients.collectAsState()
@@ -327,7 +337,8 @@ fun PatientDetailChartScreen(
                             },
                             onDismiss = {
                                 voiceViewModel.resetState()
-                            }
+                            },
+                            autoApplyEnabled = voiceAutoApply
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -337,8 +348,10 @@ fun PatientDetailChartScreen(
                         targetMode = targetMode,
                         onStartListening = { mode ->
                             when {
-                                microphonePermission.isGranted -> voiceViewModel.startDictation(mode)
-                                // Android will not show the dialog again; settings is the only route.
+                                microphonePermission.isGranted -> {
+                                    try { VoiceChartingService.start(context) } catch (_: Throwable) {}
+                                    voiceViewModel.startDictation(mode, continuousHandsFree = true, patientId = patient.id)
+                                }
                                 microphonePermission.permanentlyDenied -> showMicrophoneSettingsPrompt = true
                                 else -> {
                                     pendingDictationMode = mode
@@ -346,10 +359,20 @@ fun PatientDetailChartScreen(
                                 }
                             }
                         },
-                        onStopListening = { voiceViewModel.stopDictationAndProcess() },
+                        onStopListening = {
+                            try { VoiceChartingService.stop(context) } catch (_: Throwable) {}
+                            voiceViewModel.stopDictationAndProcess()
+                        },
                         onSelectTargetMode = { mode -> voiceViewModel.setTargetMode(mode) },
                         modelState = voiceModelState,
-                        onProvisionModel = { voiceViewModel.provisionModel() }
+                        onProvisionModel = { voiceViewModel.provisionModel() },
+                        undoDescription = voiceUndoPoints.lastOrNull()?.description,
+                        onUndoLastEntry = {
+                            val undone = voiceViewModel.undoLastVoiceEntry(patient.id)
+                            if (undone != null) {
+                                chartReadBack.speak("Undone. " + undone + ".")
+                            }
+                        }
                     )
                 }
             }

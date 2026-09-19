@@ -70,6 +70,7 @@ fun ProfileScreen(
     val isBiometricAuthEnabled by DentalRepository.isBiometricAuthEnabled.collectAsState()
     val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
     val toothNumberingSystem by DentalRepository.toothNumberingSystem.collectAsState()
+    val isVoiceAutoApplyEnabled by DentalRepository.isVoiceAutoApplyEnabled.collectAsState()
     val biometricLockTimeoutMinutes by DentalRepository.biometricLockTimeoutMinutes.collectAsState()
     val areNotificationsEnabled by DentalRepository.appointmentRemindersEnabled.collectAsState()
     val morningReminderEnabled by DentalRepository.morningReminderEnabled.collectAsState()
@@ -146,10 +147,12 @@ fun ProfileScreen(
                     areNotificationsEnabled = areNotificationsEnabled,
                     isVoiceChartingEnabled = isVoiceChartingEnabled,
                     toothNumberingSystem = toothNumberingSystem,
+                    isVoiceAutoApplyEnabled = isVoiceAutoApplyEnabled,
                     onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
                     onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
                     onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) },
-                    onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) }
+                    onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) },
+                    onVoiceAutoApplyChange = { DentalRepository.setVoiceAutoApplyEnabled(it) }
                 )
 
                 SecurityShieldTelemetryCard(
@@ -193,10 +196,12 @@ fun ProfileScreen(
                         areNotificationsEnabled = areNotificationsEnabled,
                         isVoiceChartingEnabled = isVoiceChartingEnabled,
                         toothNumberingSystem = toothNumberingSystem,
+                        isVoiceAutoApplyEnabled = isVoiceAutoApplyEnabled,
                         onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
                         onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
                         onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) },
-                        onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) }
+                        onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) },
+                        onVoiceAutoApplyChange = { DentalRepository.setVoiceAutoApplyEnabled(it) }
                     )
 
                     AccountSecurityCard(
@@ -660,10 +665,12 @@ private fun ClinicalErgonomicsCard(
     areNotificationsEnabled: Boolean,
     isVoiceChartingEnabled: Boolean,
     toothNumberingSystem: ToothNumberingSystem,
+    isVoiceAutoApplyEnabled: Boolean,
     onDarkModeChange: (Boolean) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
     onVoiceChartingChange: (Boolean) -> Unit,
-    onToothNumberingChange: (ToothNumberingSystem) -> Unit
+    onToothNumberingChange: (ToothNumberingSystem) -> Unit,
+    onVoiceAutoApplyChange: (Boolean) -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -744,6 +751,36 @@ private fun ClinicalErgonomicsCard(
                         )
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Unattended apply. Off by default: a dictated value nobody confirmed is the
+            // core hazard of voice charting, so skipping confirmation is a deliberate
+            // clinic decision, not a default.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Apply dictation without confirming",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                        color = ThornburyInk
+                    )
+                    Text(
+                        text = "Writes confident readings straight to the chart. Readings are still " +
+                            "read back aloud and can be undone.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ThornburyMuted
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Switch(
+                    checked = isVoiceAutoApplyEnabled,
+                    onCheckedChange = onVoiceAutoApplyChange
+                )
             }
 
             HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))

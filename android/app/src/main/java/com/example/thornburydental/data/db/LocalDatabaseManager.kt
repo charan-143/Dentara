@@ -55,6 +55,9 @@ object LocalDatabaseManager {
     lateinit var medicationPresetDao: MedicationPresetDao
         private set
 
+    lateinit var voiceUndoDao: VoiceUndoDao
+        private set
+
     @Synchronized
     fun initialize(context: Context) {
         if (isInitialized) return
@@ -70,6 +73,7 @@ object LocalDatabaseManager {
         userDao = UserDao(dbHelper)
         userPreferencesDao = UserPreferencesDao(dbHelper)
         medicationPresetDao = MedicationPresetDao(dbHelper)
+        voiceUndoDao = VoiceUndoDao(dbHelper)
         ensureMedicationPresetsTable()
         userDao.seedDefaultUsersIfEmpty()
         sanitizeClinicianNames()

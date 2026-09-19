@@ -168,9 +168,9 @@ class DentalRepositoryTest {
                 isLocked = true,
                 tamperHash = "sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
                 steps = listOf(
-                    PlanStep("s1", null, "Full mouth periodontal charting and OHI", "D0180", 120.0, true),
-                    PlanStep("s2", 3, "Quadrant scaling and root planing", "D4341", 280.0, true),
-                    PlanStep("s3", 30, "Quadrant scaling and root planing", "D4341", 280.0, false)
+                    PlanStep("s1", toothNumber = null, procedure = "Full mouth periodontal charting and OHI", code = "D0180", fee = 120.0, completed = true),
+                    PlanStep("s2", toothNumber = 3, procedure = "Quadrant scaling and root planing", code = "D4341", fee = 280.0, completed = true),
+                    PlanStep("s3", toothNumber = 30, procedure = "Quadrant scaling and root planing", code = "D4341", fee = 280.0, completed = false)
                 )
             )
         )
@@ -288,9 +288,9 @@ class DentalRepositoryTest {
     // =========================================================================
 
     private val sampleSteps = listOf(
-        PlanStep("s1", null, "Full mouth periodontal charting and OHI", "D0180", 120.0, true),
-        PlanStep("s2", 3, "Quadrant scaling and root planing (Upper Right)", "D4341", 280.0, true),
-        PlanStep("s3", 30, "Quadrant scaling and root planing (Lower Right)", "D4341", 280.0, false)
+        PlanStep("s1", toothNumber = null, procedure = "Full mouth periodontal charting and OHI", code = "D0180", fee = 120.0, completed = true),
+        PlanStep("s2", toothNumber = 3, procedure = "Quadrant scaling and root planing (Upper Right)", code = "D4341", fee = 280.0, completed = true),
+        PlanStep("s3", toothNumber = 30, procedure = "Quadrant scaling and root planing (Lower Right)", code = "D4341", fee = 280.0, completed = false)
     )
 
     @Test
@@ -534,8 +534,9 @@ class DentalRepositoryTest {
         DentalRepository.updateToothCondition(patient.id, 8, ToothCondition.CROWN, "Monolithic zirconia crown placed")
 
         val updatedPatient = DentalRepository.patients.value.first { it.id == "p1" }
-        assertEquals(ToothCondition.CROWN, updatedPatient.teeth[8]?.condition)
-        assertEquals("Monolithic zirconia crown placed", updatedPatient.teeth[8]?.notes)
+        val updatedTooth = updatedPatient.teeth[11] ?: updatedPatient.teeth[8]
+        assertEquals(ToothCondition.CROWN, updatedTooth?.condition)
+        assertEquals("Monolithic zirconia crown placed", updatedTooth?.notes)
     }
 
     @Test

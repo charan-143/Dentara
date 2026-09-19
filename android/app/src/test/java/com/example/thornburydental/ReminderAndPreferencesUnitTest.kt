@@ -188,7 +188,7 @@ class ReminderAndPreferencesUnitTest {
 
     @Test
     fun testDatabaseSchema_v5MigrationConstants() {
-        assertEquals("Database version must be upgraded to 5", 5, ThornburyDbHelper.DATABASE_VERSION)
+        assertEquals("Database version must be upgraded to 7", 7, ThornburyDbHelper.DATABASE_VERSION)
         assertEquals("reminder_enabled", ThornburyDbHelper.COL_APPTS_REMINDER_ENABLED)
         assertEquals("reminder_lead_min", ThornburyDbHelper.COL_APPTS_REMINDER_LEAD_MIN)
         assertEquals("morning_reminder_enabled", ThornburyDbHelper.COL_PREF_MORNING_REMINDER_ENABLED)

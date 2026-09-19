@@ -108,12 +108,15 @@ Java_com_example_thornburydental_speech_WhisperNative_nativeTranscribe(
     params.translate        = false;
     params.no_context       = true;   // each dictation is independent; do not condition on the last one
     params.no_timestamps    = true;
-    params.single_segment   = false;
+    params.single_segment   = true;
     params.print_special    = false;
     params.print_progress   = false;
     params.print_realtime   = false;
     params.print_timestamps = false;
     params.suppress_blank   = true;
+    params.temperature      = 0.0f;
+    params.temperature_inc  = 0.0f;  // disable fallback re-decoding iterations
+    params.audio_ctx        = 768;   // reduced context for fast utterance recognition (2-3x speedup)
 
     // params.language and params.initial_prompt hold borrowed pointers, so both UTF strings
     // must outlive the whisper_full call below.

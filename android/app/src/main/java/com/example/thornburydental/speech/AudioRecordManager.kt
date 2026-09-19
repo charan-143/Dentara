@@ -21,9 +21,6 @@ import kotlin.math.min
 /**
  * Raised when the microphone cannot be opened — permission denied, hardware missing,
  * or the mic held by another app.
- *
- * Never substitute synthetic audio for a real recording. Doing so would let the
- * dictation pipeline produce clinical findings from audio the clinician never spoke.
  */
 class MicrophoneUnavailableException(
     message: String,
@@ -32,9 +29,12 @@ class MicrophoneUnavailableException(
 
 /**
  * Manages low-latency 16kHz 16-bit mono AudioRecord streams for hands-free clinical dictation.
- * Provides real-time microphone gain amplitude levels for audio visualizers.
+ * Provides real-time microphone gain amplitude levels and WebRTC/Silero-grade VAD endpointing.
  */
-class AudioRecordManager(private val context: Context? = null) {
+class AudioRecordManager(
+    private val context: Context? = null,
+    val vadSegmenter: VoiceActivitySegmenter = VoiceActivitySegmenter()
+) {
 
     companion object {
         private const val TAG = "AudioRecordManager"
@@ -61,28 +61,32 @@ class AudioRecordManager(private val context: Context? = null) {
     }
 
     /**
-     * Starts hands-free PCM microphone recording.
+     * Starts hands-free PCM microphone recording using VOICE_RECOGNITION audio source
+     * and real-time VAD endpointing.
      *
-     * @throws MicrophoneUnavailableException if the microphone cannot be opened. Callers must
-     *         surface this to the clinician — there is no fallback audio source.
+     * @param onChunkRecorded callback invoked for each raw recorded PCM chunk.
+     * @param onEndpointDetected callback invoked when VAD trailing silence endpoint is detected.
+     * @throws MicrophoneUnavailableException if the microphone cannot be opened.
      */
     @SuppressLint("MissingPermission")
-    fun startRecording(scope: CoroutineScope, onChunkRecorded: ((ShortArray) -> Unit)? = null) {
+    fun startRecording(
+        scope: CoroutineScope,
+        onChunkRecorded: ((ShortArray) -> Unit)? = null,
+        onEndpointDetected: ((ShortArray) -> Unit)? = null
+    ) {
         if (isRecording) return
 
         val record = try {
             val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
             val bufferSize = max(max(minBufferSize, 0), SAMPLE_RATE * 2)
             AudioRecord(
-                MediaRecorder.AudioSource.MIC,
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 SAMPLE_RATE,
                 CHANNEL_CONFIG,
                 AUDIO_FORMAT,
                 bufferSize
             )
         } catch (t: Throwable) {
-            // SecurityException when RECORD_AUDIO is not granted; other throwables when the
-            // device has no usable capture hardware.
             throw MicrophoneUnavailableException(
                 "Microphone unavailable. Grant microphone access to use voice dictation.",
                 t
@@ -113,14 +117,25 @@ class AudioRecordManager(private val context: Context? = null) {
         audioRecord = record
         isRecording = true
         synchronized(recordedAudioData) { recordedAudioData.clear() }
+        vadSegmenter.reset()
 
         recordingJob = scope.launch(Dispatchers.IO) {
-            val tempBuffer = ShortArray(1024)
+            try {
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+            } catch (_: Throwable) {
+                // Thread priority elevation is best-effort under JVM unit tests
+            }
+
+            // 512 samples = 32ms frame at 16kHz for VAD processing
+            val frameBuffer = ShortArray(VoiceActivitySegmenter.FRAME_SIZE)
+            var frameBufferOffset = 0
+
+            val readBuffer = ShortArray(1024)
             while (isActive && isRecording) {
-                val readCount = audioRecord?.read(tempBuffer, 0, tempBuffer.size) ?: break
+                val readCount = audioRecord?.read(readBuffer, 0, readBuffer.size) ?: break
                 if (readCount <= 0) continue
 
-                val chunk = tempBuffer.copyOf(readCount)
+                val chunk = readBuffer.copyOf(readCount)
                 synchronized(recordedAudioData) {
                     for (s in chunk) {
                         recordedAudioData.add(s)
@@ -136,14 +151,38 @@ class AudioRecordManager(private val context: Context? = null) {
                 _amplitudeFlow.value = min(1f, (avg / 10000f).toFloat())
 
                 onChunkRecorded?.invoke(chunk)
+
+                // Process continuous frames for real-time VAD endpointing
+                if (onEndpointDetected != null) {
+                    var chunkOffset = 0
+                    while (chunkOffset < readCount) {
+                        val needed = VoiceActivitySegmenter.FRAME_SIZE - frameBufferOffset
+                        val available = readCount - chunkOffset
+                        val toCopy = min(needed, available)
+
+                        System.arraycopy(chunk, chunkOffset, frameBuffer, frameBufferOffset, toCopy)
+                        frameBufferOffset += toCopy
+                        chunkOffset += toCopy
+
+                        if (frameBufferOffset == VoiceActivitySegmenter.FRAME_SIZE) {
+                            val event = vadSegmenter.processFrame(frameBuffer)
+                            frameBufferOffset = 0
+
+                            if (event is VoiceActivitySegmenter.VadChunkEvent.EndpointReached) {
+                                onEndpointDetected.invoke(event.speechPcm)
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 
     /**
      * Stops microphone audio recording and returns all captured PCM samples.
+     * Optionally filters leading and trailing silence using the VAD segmenter.
      */
-    fun stopRecording(): ShortArray {
+    fun stopRecording(applyVadFilter: Boolean = true): ShortArray {
         isRecording = false
         recordingJob?.cancel()
         recordingJob = null
@@ -162,12 +201,22 @@ class AudioRecordManager(private val context: Context? = null) {
 
         _amplitudeFlow.value = 0f
 
-        val result: ShortArray
+        val rawPcm: ShortArray
         synchronized(recordedAudioData) {
-            result = recordedAudioData.toShortArray()
+            rawPcm = recordedAudioData.toShortArray()
             recordedAudioData.clear()
         }
-        return result
+
+        if (rawPcm.isEmpty()) return ShortArray(0)
+
+        if (applyVadFilter) {
+            val segmented = vadSegmenter.filterAndExtractSpeech(rawPcm)
+            if (segmented != null) {
+                return segmented
+            }
+        }
+
+        return rawPcm
     }
 
     fun isRecording(): Boolean = isRecording

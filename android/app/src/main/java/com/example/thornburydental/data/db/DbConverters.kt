@@ -111,6 +111,18 @@ object DbConverters {
             null
         }
     }
+    // --- Map<Int, ToothRecord> ---
+    fun teethMapToJson(map: Map<Int, com.example.thornburydental.data.ToothRecord>?): String =
+        if (map == null) "{}" else json.encodeToString(map)
+
+    fun jsonToTeethMap(raw: String?): Map<Int, com.example.thornburydental.data.ToothRecord> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return try {
+            json.decodeFromString(raw)
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
 }
 
 // Extension functions for idiomatic Kotlin usage
@@ -122,6 +134,9 @@ fun String?.toStringList(): List<String> = DbConverters.jsonToStringList(this)
 
 fun ExaminationAnswers?.toDbJson(): String? = DbConverters.examAnswersToJson(this)
 fun String?.toExamAnswers(): ExaminationAnswers? = DbConverters.jsonToExamAnswers(this)
+
+fun Map<Int, com.example.thornburydental.data.ToothRecord>?.toTeethMapDbJson(): String = DbConverters.teethMapToJson(this)
+fun String?.toTeethMap(): Map<Int, com.example.thornburydental.data.ToothRecord> = DbConverters.jsonToTeethMap(this)
 
 fun PatientDiagnosis?.toPatientDiagnosisDbJson(): String? = DbConverters.diagnosisToJson(this)
 fun String?.toPatientDiagnosis(): PatientDiagnosis? = DbConverters.jsonToDiagnosis(this)
