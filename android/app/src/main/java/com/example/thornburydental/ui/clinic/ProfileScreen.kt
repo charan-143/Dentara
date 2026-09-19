@@ -30,6 +30,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.thornburydental.data.AuthRepository
 import com.example.thornburydental.data.DentalRepository
+import com.example.thornburydental.data.ToothNumberingSystem
 import com.example.thornburydental.data.UserRole
 import com.example.thornburydental.reminder.ReminderManager
 import com.example.thornburydental.theme.*
@@ -68,6 +69,7 @@ fun ProfileScreen(
     val isDarkModeEnabled by DentalRepository.isDarkModeEnabled.collectAsState()
     val isBiometricAuthEnabled by DentalRepository.isBiometricAuthEnabled.collectAsState()
     val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
+    val toothNumberingSystem by DentalRepository.toothNumberingSystem.collectAsState()
     val biometricLockTimeoutMinutes by DentalRepository.biometricLockTimeoutMinutes.collectAsState()
     val areNotificationsEnabled by DentalRepository.appointmentRemindersEnabled.collectAsState()
     val morningReminderEnabled by DentalRepository.morningReminderEnabled.collectAsState()
@@ -143,9 +145,11 @@ fun ProfileScreen(
                     isDarkModeEnabled = isDarkModeEnabled,
                     areNotificationsEnabled = areNotificationsEnabled,
                     isVoiceChartingEnabled = isVoiceChartingEnabled,
+                    toothNumberingSystem = toothNumberingSystem,
                     onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
                     onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
-                    onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) }
+                    onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) },
+                    onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) }
                 )
 
                 SecurityShieldTelemetryCard(
@@ -188,9 +192,11 @@ fun ProfileScreen(
                         isDarkModeEnabled = isDarkModeEnabled,
                         areNotificationsEnabled = areNotificationsEnabled,
                         isVoiceChartingEnabled = isVoiceChartingEnabled,
+                        toothNumberingSystem = toothNumberingSystem,
                         onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
                         onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
-                        onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) }
+                        onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) },
+                        onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) }
                     )
 
                     AccountSecurityCard(
@@ -653,9 +659,11 @@ private fun ClinicalErgonomicsCard(
     isDarkModeEnabled: Boolean,
     areNotificationsEnabled: Boolean,
     isVoiceChartingEnabled: Boolean,
+    toothNumberingSystem: ToothNumberingSystem,
     onDarkModeChange: (Boolean) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
-    onVoiceChartingChange: (Boolean) -> Unit
+    onVoiceChartingChange: (Boolean) -> Unit,
+    onToothNumberingChange: (ToothNumberingSystem) -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -709,6 +717,33 @@ private fun ClinicalErgonomicsCard(
                     checked = isVoiceChartingEnabled,
                     onCheckedChange = onVoiceChartingChange
                 )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Tooth numbering. Dictation refuses to guess between the schemes: 14 is the
+            // upper-left first molar in Universal and the upper-right first premolar in FDI.
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Dictated tooth numbering",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = ThornburyInk
+                )
+                Text(
+                    text = "Voice charting reads spoken tooth numbers in this scheme only.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ThornburyMuted
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ToothNumberingSystem.entries.forEach { system ->
+                        FilterChip(
+                            selected = system == toothNumberingSystem,
+                            onClick = { onToothNumberingChange(system) },
+                            label = { Text(system.displayName + " (" + system.example + ")") }
+                        )
+                    }
+                }
             }
 
             HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))

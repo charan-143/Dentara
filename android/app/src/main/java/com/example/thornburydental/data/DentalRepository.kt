@@ -67,6 +67,20 @@ object DentalRepository {
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.lockTimeoutMs = minutes * 60 * 1000L
     }
 
+    /**
+     * Which numbering scheme voice dictation interprets spoken tooth numbers in. Never inferred:
+     * the schemes overlap, so guessing charts findings against the wrong tooth.
+     */
+    private val _toothNumberingSystem = MutableStateFlow(ToothNumberingSystem.DEFAULT)
+    val toothNumberingSystem: StateFlow<ToothNumberingSystem> = _toothNumberingSystem.asStateFlow()
+    fun setToothNumberingSystem(system: ToothNumberingSystem) {
+        _toothNumberingSystem.value = system
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString("tooth_numbering_system", system.name)
+            ?.apply()
+    }
+
     private val _isVoiceChartingEnabled = MutableStateFlow(false)
     val isVoiceChartingEnabled: StateFlow<Boolean> = _isVoiceChartingEnabled.asStateFlow()
     fun setVoiceChartingEnabled(enabled: Boolean) {
@@ -90,6 +104,9 @@ object DentalRepository {
 
         val savedVoiceCharting = prefs.getBoolean("voice_charting_enabled", false)
         _isVoiceChartingEnabled.value = savedVoiceCharting
+
+        _toothNumberingSystem.value =
+            ToothNumberingSystem.fromNameOrDefault(prefs.getString("tooth_numbering_system", null))
 
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.initPreferences(context)
     }

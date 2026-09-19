@@ -209,7 +209,13 @@ class VoiceChartingController(
                     return@launch
                 }
 
-                val parsedCommand = commandParser.parseTranscript(transcript, activeMode)
+                val parsedCommand = commandParser.parseTranscript(
+                    transcript = transcript,
+                    mode = activeMode,
+                    // Read at parse time: the clinician can change the scheme in settings and
+                    // the very next dictation has to honour it.
+                    numberingSystem = DentalRepository.toothNumberingSystem.value
+                )
 
                 _uiState.value = VoiceDictationState.CommandParsed(
                     rawTranscript = transcript,

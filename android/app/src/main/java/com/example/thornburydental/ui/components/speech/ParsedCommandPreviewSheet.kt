@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.speech.ClinicalNoteResult
 import com.example.thornburydental.speech.ParsedVoiceCommand
 import com.example.thornburydental.speech.PocketDepthResult
+import com.example.thornburydental.speech.VoiceCommandParser
 import kotlinx.coroutines.delay
 
 @Composable
@@ -56,9 +57,14 @@ fun ParsedCommandPreviewSheet(
 ) {
     var countdownSeconds by remember { mutableIntStateOf(autoCommitSeconds) }
 
+    // A reading the parser is unsure about is never written to the chart on its own; the
+    // clinician has to look at it and accept it.
+    val needsReview = parsedCommand.confidence < VoiceCommandParser.AUTO_APPLY_CONFIDENCE
+    val autoApplyEligible = parsedCommand !is ParsedVoiceCommand.Unrecognized && !needsReview
+
     // Hands-free auto-commit countdown timer
     LaunchedEffect(parsedCommand) {
-        if (parsedCommand !is ParsedVoiceCommand.Unrecognized) {
+        if (autoApplyEligible) {
             while (countdownSeconds > 0) {
                 delay(1000L)
                 countdownSeconds -= 1
@@ -100,7 +106,7 @@ fun ParsedCommandPreviewSheet(
                     )
                 }
 
-                if (countdownSeconds > 0 && parsedCommand !is ParsedVoiceCommand.Unrecognized) {
+                if (countdownSeconds > 0 && autoApplyEligible) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
@@ -172,11 +178,45 @@ fun ParsedCommandPreviewSheet(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "Could not parse dental numbers or notes from speech. Please repeat dictation.",
+                            // The parser says why, so the clinician can rephrase rather than guess.
+                            text = parsedCommand.reason,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.padding(12.dp)
                         )
+                    }
+                }
+            }
+
+            if (needsReview && parsedCommand !is ParsedVoiceCommand.Unrecognized) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Check this before accepting",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE65100)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        parsedCommand.warnings.forEach { warning ->
+                            Text(
+                                text = warning,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6D4C41)
+                            )
+                        }
+                        if (parsedCommand.warnings.isEmpty()) {
+                            Text(
+                                text = "Some of the dictation could not be matched to a tooth or a depth.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6D4C41)
+                            )
+                        }
                     }
                 }
             }
@@ -239,7 +279,7 @@ private fun PocketDepthItemCard(entry: PocketDepthResult) {
         ) {
             Column {
                 Text(
-                    text = "Tooth #${entry.toothNumber} (${entry.surface.capitalize()})",
+                    text = "Tooth #${entry.toothNumber} (${entry.site.label})",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -301,8 +341,4 @@ private fun ClinicalNoteItemCard(entry: ClinicalNoteResult) {
             )
         }
     }
-}
-
-private fun String.capitalize(): String {
-    return replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
