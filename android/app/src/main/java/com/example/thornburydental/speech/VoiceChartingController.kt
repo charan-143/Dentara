@@ -2,6 +2,7 @@ package com.example.thornburydental.speech
 
 import android.util.Log
 import com.example.thornburydental.data.DentalRepository
+import com.example.thornburydental.data.VoiceChartEntry
 import com.example.thornburydental.speech.model.SpeechModelProvider
 import com.example.thornburydental.speech.model.SpeechModelSpec
 import com.example.thornburydental.speech.model.SpeechModelState
@@ -234,35 +235,41 @@ class VoiceChartingController(
 
     /**
      * Applies the parsed voice command to the patient record in DentalRepository.
+     *
+     * @param transcript what the decoder actually produced. Stored as provenance beside every
+     *        value this writes, so a dictated reading can later be told apart from one a
+     *        clinician typed - and checked against what was said.
      */
-    fun applyParsedCommand(patientId: String, command: ParsedVoiceCommand): Boolean {
+    fun applyParsedCommand(
+        patientId: String,
+        command: ParsedVoiceCommand,
+        transcript: String = ""
+    ): Boolean {
+        val provenance = VoiceChartEntry(
+            clinicianName = DentalRepository.clinicianDisplayName.value,
+            transcript = transcript,
+            confidence = command.confidence,
+            reviewRequired = command.confidence < VoiceCommandParser.AUTO_APPLY_CONFIDENCE
+        )
+
         return try {
             when (command) {
                 is ParsedVoiceCommand.SinglePocketDepth -> {
-                    val entry = command.entry
-                    DentalRepository.applyVoicePeriodontalPocket(
-                        patientId = patientId,
-                        toothNumber = entry.toothNumber,
-                        depthMm = entry.depthMm,
-                        isBleeding = entry.isBleeding
-                    )
+                    applyPocket(patientId, command.entry, provenance)
                     true
                 }
                 is ParsedVoiceCommand.MultiplePocketDepths -> {
                     for (entry in command.entries) {
-                        DentalRepository.applyVoicePeriodontalPocket(
-                            patientId = patientId,
-                            toothNumber = entry.toothNumber,
-                            depthMm = entry.depthMm,
-                            isBleeding = entry.isBleeding
-                        )
+                        applyPocket(patientId, entry, provenance)
                     }
                     true
                 }
                 is ParsedVoiceCommand.ClinicalNote -> {
                     DentalRepository.appendVoiceClinicalNote(
                         patientId = patientId,
-                        noteText = command.entry.noteText
+                        noteText = command.entry.noteText,
+                        targetSection = command.entry.targetSection,
+                        provenance = provenance
                     )
                     true
                 }
@@ -272,6 +279,23 @@ class VoiceChartingController(
             safeLogE("Failed to apply parsed command to DentalRepository", e)
             false
         }
+    }
+
+    private fun applyPocket(
+        patientId: String,
+        entry: PocketDepthResult,
+        provenance: VoiceChartEntry
+    ) {
+        DentalRepository.applyVoicePeriodontalPocket(
+            patientId = patientId,
+            toothNumber = entry.toothNumber,
+            depthMm = entry.depthMm,
+            isBleeding = entry.isBleeding,
+            // The site the clinician stated. Previously parsed and then discarded here, so
+            // buccal and mesial readings on one tooth overwrote each other.
+            siteLabel = if (entry.site == PerioSite.UNSPECIFIED) "" else entry.site.label,
+            provenance = provenance
+        )
     }
 
     /**

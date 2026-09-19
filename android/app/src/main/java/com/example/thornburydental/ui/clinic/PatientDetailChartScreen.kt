@@ -318,7 +318,11 @@ fun PatientDetailChartScreen(
                             rawTranscript = parsedState.rawTranscript,
                             parsedCommand = parsedState.parsedCommand,
                             onConfirmApply = { cmd ->
-                                voiceViewModel.applyParsedCommand(patient.id, cmd)
+                                voiceViewModel.applyParsedCommand(
+                                    patient.id,
+                                    cmd,
+                                    parsedState.rawTranscript
+                                )
                                 voiceViewModel.resetState()
                             },
                             onDismiss = {

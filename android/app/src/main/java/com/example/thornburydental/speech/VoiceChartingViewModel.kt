@@ -59,8 +59,12 @@ class VoiceChartingViewModel internal constructor(
         viewModelScope.launch { controller.provisionModel() }
     }
 
-    fun applyParsedCommand(patientId: String, command: ParsedVoiceCommand): Boolean =
-        controller.applyParsedCommand(patientId, command)
+    /** @param transcript what was dictated, stored as provenance beside the written value. */
+    fun applyParsedCommand(
+        patientId: String,
+        command: ParsedVoiceCommand,
+        transcript: String = ""
+    ): Boolean = controller.applyParsedCommand(patientId, command, transcript)
 
     fun resetState() = controller.resetState()
 

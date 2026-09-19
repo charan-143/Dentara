@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.thornburydental.util.addDaysToIsoDate
@@ -656,74 +657,167 @@ object DentalRepository {
     /**
      * Updates patient's periodontal pocket depths and bleeding status from voice dictation.
      */
+    /**
+     * Records one dictated probing reading.
+     *
+     * @param siteLabel the probing site, e.g. "Buccal". Empty when none was stated. Part of
+     *        the entry identity, so recording buccal and mesial for one tooth keeps both
+     *        rather than the second overwriting the first.
+     * @param provenance audit record for this value. Null only for non-voice callers.
+     */
     fun applyVoicePeriodontalPocket(
         patientId: String,
         toothNumber: Int,
         depthMm: Int,
-        isBleeding: Boolean = false
+        isBleeding: Boolean = false,
+        siteLabel: String = "",
+        provenance: VoiceChartEntry? = null
     ) {
-        _patients.update { list ->
+        val sitePart = if (siteLabel.isBlank()) "" else " $siteLabel"
+        val entryPrefix = "Tooth $toothNumber$sitePart:"
+        val pocketStr = "$entryPrefix ${depthMm}mm" + if (isBleeding) " (Bleeding)" else ""
+
+        // The lambda must stay free of side effects. StateFlow.update re-runs it whenever
+        // the compare-and-set loses, and the previous version called updateExaminationAnswers
+        // from inside it - which guaranteed that loss and ran the non-idempotent tooth-note
+        // append twice.
+        val committed = _patients.updateAndGet { list ->
             list.map { patient ->
-                if (patient.id == patientId) {
-                    val currentExam = patient.examAnswers ?: ExaminationAnswers()
-                    val pocketStr = "Tooth $toothNumber: ${depthMm}mm" + if (isBleeding) " (Bleeding)" else ""
+                if (patient.id != patientId) return@map patient
 
-                    val updatedPockets = (currentExam.periodontalPockets.filterNot { it.startsWith("Tooth $toothNumber:") } + pocketStr).distinct()
-                    val bleedingTag = "Tooth $toothNumber bleeding"
-                    val updatedBleeding = if (isBleeding) {
-                        (currentExam.periodontalBleeding + bleedingTag).distinct()
-                    } else {
-                        currentExam.periodontalBleeding
-                    }
+                val currentExam = patient.examAnswers ?: ExaminationAnswers()
 
-                    val updatedExam = currentExam.copy(
-                        periodontalPockets = updatedPockets,
-                        periodontalBleeding = updatedBleeding
-                    )
+                val updatedPockets =
+                    (currentExam.periodontalPockets.filterNot { it.startsWith(entryPrefix) } + pocketStr)
+                        .distinct()
 
-                    // Also update ToothRecord notes
-                    val updatedTeeth = patient.teeth.toMutableMap()
-                    val targetKey = if (updatedTeeth.containsKey(toothNumber)) {
-                        toothNumber
-                    } else {
-                        updatedTeeth.entries.firstOrNull { it.value.number == toothNumber || it.value.fdiNumber == toothNumber }?.key
-                    }
-                    if (targetKey != null) {
-                        val currentTooth = updatedTeeth[targetKey]!!
-                        val updatedNote = (currentTooth.notes + " Pocket: ${depthMm}mm" + if (isBleeding) " [BOP]" else "").trim()
-                        updatedTeeth[targetKey] = currentTooth.copy(notes = updatedNote)
-                    }
-
-                    updateExaminationAnswers(patientId, updatedExam)
-                    patient.copy(examAnswers = updatedExam, teeth = updatedTeeth)
+                val bleedingTag = "Tooth $toothNumber bleeding"
+                val updatedBleeding = if (isBleeding) {
+                    (currentExam.periodontalBleeding + bleedingTag).distinct()
                 } else {
-                    patient
+                    currentExam.periodontalBleeding
                 }
+
+                val updatedExam = currentExam.copy(
+                    periodontalPockets = updatedPockets,
+                    periodontalBleeding = updatedBleeding,
+                    voiceEntries = if (provenance == null) {
+                        currentExam.voiceEntries
+                    } else {
+                        currentExam.voiceEntries + provenance.copy(applied = pocketStr)
+                    }
+                )
+
+                val updatedTeeth = patient.teeth.toMutableMap()
+                val targetKey = resolveToothKey(updatedTeeth, toothNumber)
+                if (targetKey != null) {
+                    val currentTooth = updatedTeeth.getValue(targetKey)
+                    val noteEntry = "Pocket$sitePart: ${depthMm}mm" + if (isBleeding) " [BOP]" else ""
+                    // Replace rather than append: re-probing the same site during one visit
+                    // should correct the reading, not accumulate a history in a notes string.
+                    val keptNotes = currentTooth.notes
+                        .split(" | ")
+                        .filter { it.isNotBlank() && !it.startsWith("Pocket$sitePart:") }
+                    val updatedNote = (keptNotes + noteEntry).joinToString(" | ")
+                    updatedTeeth[targetKey] = currentTooth.copy(notes = updatedNote)
+                }
+
+                patient.copy(examAnswers = updatedExam, teeth = updatedTeeth)
+            }
+        }
+
+        // Persist from the committed state, once, outside the update loop.
+        val patient = committed.firstOrNull { it.id == patientId } ?: return
+        val exam = patient.examAnswers ?: return
+        repositoryScope.launch {
+            if (!LocalDatabaseManager.isInitialized) return@launch
+            LocalDatabaseManager.patientDao.updateExaminationAnswers(patientId, exam)
+            // Tooth notes used to be dropped here, so a dictated reading disappeared from the
+            // tooth record on restart while surviving in the exam answers.
+            val toothKey = resolveToothKey(patient.teeth, toothNumber)
+            if (toothKey != null) {
+                val tooth = patient.teeth.getValue(toothKey)
+                LocalDatabaseManager.toothDao.updateToothCondition(
+                    patientId, toothKey, tooth.condition, tooth.notes
+                )
             }
         }
     }
 
     /**
-     * Appends voice-dictated clinical examination notes to patient record.
+     * Finds the teeth-map key for a spoken tooth number, whichever scheme the map is keyed in.
      */
-    fun appendVoiceClinicalNote(patientId: String, noteText: String) {
-        if (noteText.isBlank()) return
+    private fun resolveToothKey(teeth: Map<Int, ToothRecord>, toothNumber: Int): Int? =
+        if (teeth.containsKey(toothNumber)) {
+            toothNumber
+        } else {
+            teeth.entries.firstOrNull {
+                it.value.number == toothNumber || it.value.fdiNumber == toothNumber
+            }?.key
+        }
 
-        _patients.update { list ->
+    /**
+     * Appends a dictated narrative note to the section it was addressed to.
+     *
+     * @param targetSection which field the note belongs in. The parser routes a spoken
+     *        "Diagnosis:" heading here; this parameter did not exist before, so the parser
+     *        computed a target section that the repository then ignored, and every dictated
+     *        note landed in clinicianNotes regardless.
+     * @param provenance audit record for this note. Null only for non-voice callers.
+     */
+    fun appendVoiceClinicalNote(
+        patientId: String,
+        noteText: String,
+        targetSection: String = "clinicianNotes",
+        provenance: VoiceChartEntry? = null
+    ) {
+        val trimmed = noteText.trim()
+        if (trimmed.isBlank()) return
+
+        val toDiagnosis = targetSection == "diagnosis"
+        val sectionLabel = if (toDiagnosis) "diagnosis notes" else "clinical notes"
+
+        // Side-effect-free lambda; persistence happens once, after the state is committed.
+        val committed = _patients.updateAndGet { list ->
             list.map { patient ->
-                if (patient.id == patientId) {
-                    val currentExam = patient.examAnswers ?: ExaminationAnswers()
-                    val existing = currentExam.clinicianNotes.trim()
-                    val updatedNotes = if (existing.isEmpty()) noteText.trim() else "$existing\n• ${noteText.trim()}"
+                if (patient.id != patientId) return@map patient
 
-                    val updatedExam = currentExam.copy(clinicianNotes = updatedNotes)
-                    updateExaminationAnswers(patientId, updatedExam)
-                    patient.copy(examAnswers = updatedExam)
+                val currentExam = patient.examAnswers ?: ExaminationAnswers()
+                val sectionApplied = if (toDiagnosis) {
+                    currentExam.copy(
+                        otherDiagnosesNotes = appendNoteLine(currentExam.otherDiagnosesNotes, trimmed)
+                    )
                 } else {
-                    patient
+                    currentExam.copy(
+                        clinicianNotes = appendNoteLine(currentExam.clinicianNotes, trimmed)
+                    )
                 }
+
+                val updatedExam = if (provenance == null) {
+                    sectionApplied
+                } else {
+                    sectionApplied.copy(
+                        voiceEntries = sectionApplied.voiceEntries + provenance.copy(
+                            applied = "Added to " + sectionLabel + ": " + trimmed
+                        )
+                    )
+                }
+
+                patient.copy(examAnswers = updatedExam)
             }
         }
+
+        val exam = committed.firstOrNull { it.id == patientId }?.examAnswers ?: return
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.patientDao.updateExaminationAnswers(patientId, exam)
+            }
+        }
+    }
+
+    private fun appendNoteLine(existing: String, addition: String): String {
+        val current = existing.trim()
+        return if (current.isEmpty()) addition else current + "\n• " + addition
     }
 
     fun issuePrescription(
