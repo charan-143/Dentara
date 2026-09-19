@@ -25,6 +25,23 @@ android {
             // on devices sold since minSdk 24 and each extra ABI is a full whisper build.
             abiFilters += listOf("arm64-v8a", "x86_64")
         }
+
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DGGML_LTO=ON",
+                    "-DWHISPER_BUILD_EXAMPLES=OFF",
+                    "-DWHISPER_BUILD_TESTS=OFF"
+                )
+                cppFlags += listOf(
+                    "-O3",
+                    "-ffunction-sections",
+                    "-fdata-sections",
+                    "-fvisibility=hidden"
+                )
+            }
+        }
     }
 
     externalNativeBuild {
@@ -67,6 +84,9 @@ android {
     }
 
     packaging {
+      jniLibs {
+        useLegacyPackaging = false
+      }
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }

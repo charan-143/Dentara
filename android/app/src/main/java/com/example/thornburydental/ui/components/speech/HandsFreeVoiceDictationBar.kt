@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -43,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -78,6 +80,8 @@ fun HandsFreeVoiceDictationBar(
     onSelectTargetMode: (DictationTargetMode) -> Unit,
     modelState: SpeechModelState = SpeechModelState.Absent,
     onProvisionModel: () -> Unit = {},
+    undoDescription: String? = null,
+    onUndoLastEntry: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isListening = state is VoiceDictationState.Listening
@@ -242,6 +246,27 @@ fun HandsFreeVoiceDictationBar(
                         }
                     }
 
+                    // Undo the last dictated entry. Always reachable while there is history,
+                    // because a wrong reading needs reverting more urgently than it needed
+                    // entering, and hunting it down inside a notes string is not an option
+                    // mid-examination.
+                    if (undoDescription != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        OutlinedButton(
+                            onClick = onUndoLastEntry,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Undo,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Undo " + undoDescription)
+                        }
+                    }
+
                     // One-time model provisioning. The download is tens of megabytes,
                     // so it is never started implicitly - the clinician asks for it.
                     if (downloading != null || verifying) {
@@ -293,13 +318,15 @@ fun HandsFreeVoiceDictationBar(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            val partialText = (state as? VoiceDictationState.Listening)?.streamingPartialTranscript ?: ""
                             Text(
                                 text = when {
-                                    isListening -> "Listening... Dictate pocket depth (e.g. 'Tooth 14 pocket 3mm')"
+                                    isListening && partialText.isNotBlank() -> "Heard: \"$partialText\""
+                                    isListening -> "Listening... Dictate 6-site probing or tooth depths hands-free"
                                     isTranscribing -> "Transcribing dictation locally..."
                                     unavailableReason != null -> unavailableReason
                                     state is VoiceDictationState.Error -> state.message
-                                    else -> "Hands-free dictation ready. Tap mic without breaking glove sterility."
+                                    else -> "Hands-free dictation ready. VAD endpointing and 6-site sequences active."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = when {

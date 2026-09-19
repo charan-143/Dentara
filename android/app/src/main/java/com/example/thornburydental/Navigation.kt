@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
+import com.example.thornburydental.ui.cds.ClinicalDecisionSupportScreen
 import com.example.thornburydental.ui.clinic.AddReportDialog
 import com.example.thornburydental.ui.clinic.IssuePrescriptionDialog
 import com.example.thornburydental.ui.clinic.PatientDetailChartScreen
@@ -41,6 +42,7 @@ enum class RootDestination {
 enum class AppDestination(val label: String, val icon: ImageVector) {
     TODAY("Today", Icons.Default.CalendarToday),
     PATIENTS("Patients", Icons.Default.Groups),
+    CDS("Clinical AI", Icons.Default.Psychology),
     SCHEDULE("Schedule", Icons.Default.Event),
     PROFILE("Profile", Icons.Default.AccountCircle)
 }
@@ -205,6 +207,9 @@ fun MainNavigation() {
                                     AppDestination.PATIENTS -> PatientRosterScreen(
                                         onSelectPatient = { patientId -> activePatientId = patientId },
                                         onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
+                                    )
+                                    AppDestination.CDS -> ClinicalDecisionSupportScreen(
+                                        onBack = { currentTab = AppDestination.TODAY }
                                     )
                                     AppDestination.SCHEDULE -> ScheduleScreen(
                                         onOpenPatientChart = { patientId -> activePatientId = patientId },

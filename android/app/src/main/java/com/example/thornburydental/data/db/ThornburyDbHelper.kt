@@ -98,7 +98,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
-        const val DATABASE_VERSION = 6
+        const val DATABASE_VERSION = 7
 
         // Table Names
         const val TABLE_PATIENTS = "patients"
@@ -110,6 +110,15 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
         const val TABLE_USERS = "users"
         const val TABLE_USER_PREFERENCES = "user_preferences"
         const val TABLE_MEDICATION_PRESETS = "medication_presets"
+        const val TABLE_VOICE_UNDO_POINTS = "voice_undo_points"
+
+        // Voice Undo Points columns
+        const val COL_UNDO_ID = "id"
+        const val COL_UNDO_PATIENT_ID = "patient_id"
+        const val COL_UNDO_DESCRIPTION = "description"
+        const val COL_UNDO_CAPTURED_AT = "captured_at_epoch_ms"
+        const val COL_UNDO_EXAM_ANSWERS_JSON = "exam_answers_json"
+        const val COL_UNDO_TEETH_JSON = "teeth_json"
 
         // Medication Presets columns
         const val COL_PRESET_ID = "id"
@@ -427,24 +436,42 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             """.trimIndent()
         )
 
-        // 9. Medication Presets Table
+        // 10. Voice Undo Points Table
         db.execSQL(
             """
-            CREATE TABLE IF NOT EXISTS $TABLE_MEDICATION_PRESETS (
-                $COL_PRESET_ID TEXT PRIMARY KEY,
-                $COL_PRESET_NAME TEXT NOT NULL,
-                $COL_PRESET_DOSAGE TEXT NOT NULL,
-                $COL_PRESET_FREQUENCY TEXT NOT NULL,
-                $COL_PRESET_DURATION TEXT NOT NULL,
-                $COL_PRESET_INSTRUCTIONS TEXT NOT NULL,
-                $COL_PRESET_CATEGORY TEXT NOT NULL DEFAULT 'General',
-                $COL_PRESET_IS_CUSTOM INTEGER NOT NULL DEFAULT 0
+            CREATE TABLE IF NOT EXISTS $TABLE_VOICE_UNDO_POINTS (
+                $COL_UNDO_ID TEXT PRIMARY KEY,
+                $COL_UNDO_PATIENT_ID TEXT NOT NULL,
+                $COL_UNDO_DESCRIPTION TEXT NOT NULL,
+                $COL_UNDO_CAPTURED_AT INTEGER NOT NULL,
+                $COL_UNDO_EXAM_ANSWERS_JSON TEXT,
+                $COL_UNDO_TEETH_JSON TEXT NOT NULL,
+                FOREIGN KEY ($COL_UNDO_PATIENT_ID) REFERENCES $TABLE_PATIENTS ($COL_PATIENTS_ID) ON DELETE CASCADE
             );
             """.trimIndent()
         )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_undo_patient ON $TABLE_VOICE_UNDO_POINTS ($COL_UNDO_PATIENT_ID);")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 7) {
+            try {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS $TABLE_VOICE_UNDO_POINTS (
+                        $COL_UNDO_ID TEXT PRIMARY KEY,
+                        $COL_UNDO_PATIENT_ID TEXT NOT NULL,
+                        $COL_UNDO_DESCRIPTION TEXT NOT NULL,
+                        $COL_UNDO_CAPTURED_AT INTEGER NOT NULL,
+                        $COL_UNDO_EXAM_ANSWERS_JSON TEXT,
+                        $COL_UNDO_TEETH_JSON TEXT NOT NULL,
+                        FOREIGN KEY ($COL_UNDO_PATIENT_ID) REFERENCES $TABLE_PATIENTS ($COL_PATIENTS_ID) ON DELETE CASCADE
+                    );
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_undo_patient ON $TABLE_VOICE_UNDO_POINTS ($COL_UNDO_PATIENT_ID);")
+            } catch (_: Exception) {}
+        }
         if (oldVersion < 6) {
             try {
                 db.execSQL("ALTER TABLE $TABLE_PATIENTS ADD COLUMN $COL_PATIENTS_IS_CHILD INTEGER NOT NULL DEFAULT 0")

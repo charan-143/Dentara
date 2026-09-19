@@ -120,7 +120,7 @@ class LocalDatabaseTest {
     @Test
     fun testDatabaseSchemaConstants() {
         assertEquals("thornbury_dental.db", ThornburyDbHelper.DATABASE_NAME)
-        assertEquals(5, ThornburyDbHelper.DATABASE_VERSION)
+        assertEquals(7, ThornburyDbHelper.DATABASE_VERSION)
         assertEquals("patients", ThornburyDbHelper.TABLE_PATIENTS)
         assertEquals("teeth", ThornburyDbHelper.TABLE_TEETH)
         assertEquals("appointments", ThornburyDbHelper.TABLE_APPOINTMENTS)
@@ -129,6 +129,7 @@ class LocalDatabaseTest {
         assertEquals("diagnostic_reports", ThornburyDbHelper.TABLE_DIAGNOSTIC_REPORTS)
         assertEquals("users", ThornburyDbHelper.TABLE_USERS)
         assertEquals("user_preferences", ThornburyDbHelper.TABLE_USER_PREFERENCES)
+        assertEquals("voice_undo_points", ThornburyDbHelper.TABLE_VOICE_UNDO_POINTS)
     }
 
     // =========================================================================
@@ -158,7 +159,7 @@ class LocalDatabaseTest {
         assertEquals(initialCount + 1, DentalRepository.patients.value.size)
 
         // Verify tooth condition default
-        assertEquals(ToothCondition.SOUND, newPatient.teeth[1]?.condition)
+        assertEquals(ToothCondition.SOUND, newPatient.teeth.values.first().condition)
 
         // Test demographics update
         DentalRepository.updatePatientDemographics(
@@ -180,7 +181,17 @@ class LocalDatabaseTest {
 
     @Test
     fun testDiagnosticReportsWorkflow() {
-        val patient = DentalRepository.patients.value.first()
+        val patient = DentalRepository.patients.value.firstOrNull() ?: DentalRepository.registerPatient(
+            name = "Test Diagnostic Patient",
+            opNo = "OP-TEST",
+            dob = "1990-01-01",
+            phone = "",
+            email = "",
+            address = "",
+            allergies = emptyList(),
+            medicalAlerts = emptyList(),
+            medicalHistory = ""
+        )
         val initialReportsCount = DentalRepository.reports.value.size
 
         val report = DentalRepository.addReport(

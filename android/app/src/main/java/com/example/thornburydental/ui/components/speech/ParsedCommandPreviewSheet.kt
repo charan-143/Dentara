@@ -14,11 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Healing
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -52,26 +48,18 @@ fun ParsedCommandPreviewSheet(
     parsedCommand: ParsedVoiceCommand,
     onConfirmApply: (ParsedVoiceCommand) -> Unit,
     onDismiss: () -> Unit,
-    autoCommitSeconds: Int = 5,
+    autoApplyEnabled: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    var countdownSeconds by remember { mutableIntStateOf(autoCommitSeconds) }
-
     // A reading the parser is unsure about is never written to the chart on its own; the
     // clinician has to look at it and accept it.
-    val needsReview = parsedCommand.confidence < VoiceCommandParser.AUTO_APPLY_CONFIDENCE
-    val autoApplyEligible = parsedCommand !is ParsedVoiceCommand.Unrecognized && !needsReview
-
-    // Hands-free auto-commit countdown timer
-    LaunchedEffect(parsedCommand) {
-        if (autoApplyEligible) {
-            while (countdownSeconds > 0) {
-                delay(1000L)
-                countdownSeconds -= 1
-            }
-            onConfirmApply(parsedCommand)
-        }
+    val hasImplausibleDepth = when (parsedCommand) {
+        is ParsedVoiceCommand.SinglePocketDepth -> parsedCommand.entry.depthMm > VoiceCommandParser.MAX_ORDINARY_DEPTH_MM
+        is ParsedVoiceCommand.MultiplePocketDepths -> parsedCommand.entries.any { it.depthMm > VoiceCommandParser.MAX_ORDINARY_DEPTH_MM }
+        else -> false
     }
+
+    val needsReview = hasImplausibleDepth || parsedCommand.confidence < VoiceCommandParser.AUTO_APPLY_CONFIDENCE
 
     Surface(
         modifier = modifier
@@ -93,43 +81,42 @@ fun ParsedCommandPreviewSheet(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Verified,
+                        imageVector = if (hasImplausibleDepth) Icons.Default.Warning else Icons.Default.Verified,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = if (hasImplausibleDepth) Color(0xFFE65100) else MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Voice Dictation Recognized",
+                        text = if (hasImplausibleDepth) "Review Required (>12mm)" else "Voice Dictation Recognized",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = if (hasImplausibleDepth) Color(0xFFE65100) else MaterialTheme.colorScheme.onSurface
                     )
                 }
 
-                if (countdownSeconds > 0 && autoApplyEligible) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                            modifier = Modifier.size(16.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            color = MaterialTheme.colorScheme.secondaryContainer,
+                            shape = RoundedCornerShape(12.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Auto-applying in ${countdownSeconds}s",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Say 'Confirm' or tap Apply",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
                 }
             }
 
@@ -171,6 +158,32 @@ fun ParsedCommandPreviewSheet(
                 }
                 is ParsedVoiceCommand.ClinicalNote -> {
                     ClinicalNoteItemCard(parsedCommand.entry)
+                }
+                is ParsedVoiceCommand.SpokenConfirmation -> {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = if (parsedCommand.confirmed) "Spoken confirmation: \"${parsedCommand.rawTranscript}\"" else "Spoken cancellation: \"${parsedCommand.rawTranscript}\"",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+                is ParsedVoiceCommand.SpokenUndo -> {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Spoken undo requested",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
                 }
                 is ParsedVoiceCommand.Unrecognized -> {
                     Card(
@@ -256,14 +269,16 @@ fun ParsedCommandPreviewSheet(
 
 @Composable
 private fun PocketDepthItemCard(entry: PocketDepthResult) {
-    val isWarningDepth = entry.depthMm >= 4
+    val isImplausibleDepth = entry.depthMm > VoiceCommandParser.MAX_ORDINARY_DEPTH_MM
     val isCriticalDepth = entry.depthMm >= 6
+    val isWarningDepth = entry.depthMm >= 4
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
             containerColor = when {
+                isImplausibleDepth -> Color(0xFFFFE0B2)
                 isCriticalDepth -> Color(0xFFFFEBEE)
                 isWarningDepth -> Color(0xFFFFF3E0)
                 else -> Color(0xFFE8F5E9)
@@ -284,13 +299,19 @@ private fun PocketDepthItemCard(entry: PocketDepthResult) {
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Probing Pocket Depth: ${entry.depthMm} mm",
+                    text = if (isImplausibleDepth) {
+                        "Probing Pocket Depth: ${entry.depthMm} mm (Implausible >12mm)"
+                    } else {
+                        "Probing Pocket Depth: ${entry.depthMm} mm"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = when {
+                        isImplausibleDepth -> Color(0xFFBF360C)
                         isCriticalDepth -> Color(0xFFC62828)
                         isWarningDepth -> Color(0xFFE65100)
                         else -> Color(0xFF2E7D32)
-                    }
+                    },
+                    fontWeight = if (isImplausibleDepth) FontWeight.Bold else FontWeight.Normal
                 )
             }
 

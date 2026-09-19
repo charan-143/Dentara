@@ -25,6 +25,23 @@ import java.util.Locale
 // Single source of truth containing realistic clinical seed data backed by SQLite
 // =============================================================================
 
+/**
+ * A patient's chart as it stood immediately before one voice command wrote to it.
+ *
+ * Held in memory only, for the length of the session. Undo exists so a misheard reading can
+ * be reverted in one action; without it the only remedy is to find the wrong value inside a
+ * notes string and correct it by hand, which is exactly the situation hands-free charting is
+ * supposed to avoid.
+ */
+data class VoiceUndoPoint(
+    val patientId: String,
+    /** What will be reverted, phrased for a button label. */
+    val description: String,
+    val capturedAtEpochMs: Long,
+    internal val examAnswers: ExaminationAnswers?,
+    internal val teeth: Map<Int, ToothRecord>
+)
+
 object DentalRepository {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -82,6 +99,25 @@ object DentalRepository {
             ?.apply()
     }
 
+    /**
+     * Whether a confidently parsed dictation may be written to the chart without the
+     * clinician confirming it.
+     *
+     * Off by default. Unattended writing is the whole hazard of voice charting: a misheard
+     * reading nobody looked at is indistinguishable from a measured one. A clinic that wants
+     * true hands-free operation can turn this on, accepting that read-back and undo are then
+     * the only safeguards.
+     */
+    private val _isVoiceAutoApplyEnabled = MutableStateFlow(false)
+    val isVoiceAutoApplyEnabled: StateFlow<Boolean> = _isVoiceAutoApplyEnabled.asStateFlow()
+    fun setVoiceAutoApplyEnabled(enabled: Boolean) {
+        _isVoiceAutoApplyEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("voice_auto_apply_enabled", enabled)
+            ?.apply()
+    }
+
     private val _isVoiceChartingEnabled = MutableStateFlow(false)
     val isVoiceChartingEnabled: StateFlow<Boolean> = _isVoiceChartingEnabled.asStateFlow()
     fun setVoiceChartingEnabled(enabled: Boolean) {
@@ -108,6 +144,8 @@ object DentalRepository {
 
         _toothNumberingSystem.value =
             ToothNumberingSystem.fromNameOrDefault(prefs.getString("tooth_numbering_system", null))
+
+        _isVoiceAutoApplyEnabled.value = prefs.getBoolean("voice_auto_apply_enabled", false)
 
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.initPreferences(context)
     }
@@ -657,6 +695,92 @@ object DentalRepository {
     /**
      * Updates patient's periodontal pocket depths and bleeding status from voice dictation.
      */
+    /** Deepest undo history kept, so a long charting session cannot grow unboundedly. */
+    private const val MAX_VOICE_UNDO_DEPTH = 20
+
+    private val _voiceUndoPoints = MutableStateFlow<List<VoiceUndoPoint>>(emptyList())
+    val voiceUndoPoints: StateFlow<List<VoiceUndoPoint>> = _voiceUndoPoints.asStateFlow()
+
+    /**
+     * Snapshots a patient's chart before a voice command writes to it.
+     *
+     * Called once per utterance, not per reading, so undoing a multi-tooth dictation reverts
+     * the whole thing rather than peeling it back one tooth at a time.
+     */
+    fun captureVoiceUndoPoint(patientId: String, description: String) {
+        val patient = _patients.value.firstOrNull { it.id == patientId } ?: return
+        val point = VoiceUndoPoint(
+            patientId = patientId,
+            description = description,
+            capturedAtEpochMs = System.currentTimeMillis(),
+            examAnswers = patient.examAnswers,
+            teeth = patient.teeth
+        )
+        _voiceUndoPoints.value = (_voiceUndoPoints.value + point).takeLast(MAX_VOICE_UNDO_DEPTH)
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.voiceUndoDao.insertUndoPoint(point)
+            }
+        }
+    }
+
+    /**
+     * Loads persisted voice undo snapshots from SQLite for a patient upon opening their chart.
+     */
+    fun loadPersistedVoiceUndoPoints(patientId: String) {
+        if (!LocalDatabaseManager.isInitialized) return
+        val persisted = LocalDatabaseManager.voiceUndoDao.getUndoPointsForPatient(patientId)
+        if (persisted.isNotEmpty()) {
+            _voiceUndoPoints.value = persisted.takeLast(MAX_VOICE_UNDO_DEPTH)
+        }
+    }
+
+    /**
+     * Reverts the most recent voice entry, restoring the chart to its state just before it.
+     *
+     * @return what was undone, for confirmation back to the clinician, or null when the undo
+     *         history is empty.
+     */
+    fun undoLastVoiceEntry(patientId: String? = null): String? {
+        val point = _voiceUndoPoints.value.lastOrNull()
+            ?: (if (patientId != null && LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.voiceUndoDao.getUndoPointsForPatient(patientId).lastOrNull()
+            } else null)
+            ?: return null
+
+        _voiceUndoPoints.value = _voiceUndoPoints.value.filterNot { it.capturedAtEpochMs == point.capturedAtEpochMs }
+
+        var changedTeeth: Map<Int, ToothRecord> = emptyMap()
+        _patients.update { list ->
+            list.map { patient ->
+                if (patient.id != point.patientId) return@map patient
+                // Only the teeth the write actually altered need restoring, so undo does not
+                // rewrite a whole dentition.
+                changedTeeth = point.teeth.filter { (number, before) ->
+                    patient.teeth[number] != before
+                }
+                patient.copy(examAnswers = point.examAnswers, teeth = point.teeth)
+            }
+        }
+
+        // A patient with no prior answers restores to empty ones: the JSON column cannot hold
+        // the absence of a record, and empty is what nothing-recorded reads as.
+        val restoredExam = point.examAnswers ?: ExaminationAnswers()
+        val teethToRestore = changedTeeth
+        repositoryScope.launch {
+            if (!LocalDatabaseManager.isInitialized) return@launch
+            LocalDatabaseManager.voiceUndoDao.popLatestUndoPoint(point.patientId)
+            LocalDatabaseManager.patientDao.updateExaminationAnswers(point.patientId, restoredExam)
+            teethToRestore.forEach { (number, tooth) ->
+                LocalDatabaseManager.toothDao.updateToothCondition(
+                    point.patientId, number, tooth.condition, tooth.notes
+                )
+            }
+        }
+
+        return point.description
+    }
+
     /**
      * Records one dictated probing reading.
      *

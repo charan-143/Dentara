@@ -278,6 +278,65 @@ class VoiceCommandParserTest {
         assertTrue(entry.noteText.startsWith("Generalised"))
     }
 
+    // ---------------------------------------------------------------- six-site sequences & control commands
+
+    @Test
+    fun continuousSixSitePerioSequenceAssignsStandardAnatomicalSites() {
+        val result = perio("tooth 3 3 2 3 4 3 3")
+
+        assertTrue(result is ParsedVoiceCommand.MultiplePocketDepths)
+        val entries = (result as ParsedVoiceCommand.MultiplePocketDepths).entries
+        assertEquals(6, entries.size)
+        assertEquals(listOf(3, 2, 3, 4, 3, 3), entries.map { it.depthMm })
+        assertEquals(PerioSite.DISTOBUCCAL, entries[0].site)
+        assertEquals(PerioSite.BUCCAL, entries[1].site)
+        assertEquals(PerioSite.MESIOBUCCAL, entries[2].site)
+        assertEquals(PerioSite.DISTOLINGUAL, entries[3].site)
+        assertEquals(PerioSite.LINGUAL, entries[4].site)
+        assertEquals(PerioSite.MESIOLINGUAL, entries[5].site)
+    }
+
+    @Test
+    fun implausiblePocketDepthOverTwelveMmGeneratesWarningAndRequiresReview() {
+        val result = perio("tooth 14 pocket 13 mm")
+
+        val entries = entriesOf(result)
+        assertEquals(1, entries.size)
+        assertEquals(13, entries[0].depthMm)
+        assertTrue(
+            "Depths > 12mm must have confidence below auto-apply threshold",
+            result.confidence < VoiceCommandParser.AUTO_APPLY_CONFIDENCE
+        )
+        assertTrue(
+            "Expected warning to explicitly mention >12mm",
+            result.warnings.any { it.contains(">12mm") }
+        )
+    }
+
+    @Test
+    fun spokenConfirmationCommandsAreRecognized() {
+        val confirm = parser.parseTranscript("confirm", DictationTargetMode.PERIODONTAL_CHARTING)
+        assertTrue(confirm is ParsedVoiceCommand.SpokenConfirmation)
+        assertTrue((confirm as ParsedVoiceCommand.SpokenConfirmation).confirmed)
+
+        val accept = parser.parseTranscript("apply to chart", DictationTargetMode.PERIODONTAL_CHARTING)
+        assertTrue(accept is ParsedVoiceCommand.SpokenConfirmation)
+        assertTrue((accept as ParsedVoiceCommand.SpokenConfirmation).confirmed)
+
+        val discard = parser.parseTranscript("discard", DictationTargetMode.PERIODONTAL_CHARTING)
+        assertTrue(discard is ParsedVoiceCommand.SpokenConfirmation)
+        assertFalse((discard as ParsedVoiceCommand.SpokenConfirmation).confirmed)
+    }
+
+    @Test
+    fun spokenUndoCommandsAreRecognized() {
+        val undo = parser.parseTranscript("undo", DictationTargetMode.PERIODONTAL_CHARTING)
+        assertTrue(undo is ParsedVoiceCommand.SpokenUndo)
+
+        val scratch = parser.parseTranscript("scratch that", DictationTargetMode.PERIODONTAL_CHARTING)
+        assertTrue(scratch is ParsedVoiceCommand.SpokenUndo)
+    }
+
     @Test
     fun blankTranscriptIsRejected() {
         val result = parser.parseTranscript("   ", DictationTargetMode.PERIODONTAL_CHARTING)

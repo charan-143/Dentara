@@ -54,7 +54,9 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_link_options(dentara_whisper PRIVATE
         -Wl,--gc-sections
         -Wl,--exclude-libs,ALL
+        -Wl,-z,max-page-size=16384
     )
 endif ()
 
 target_link_libraries(dentara_whisper ${LOG_LIB} android ggml)
+

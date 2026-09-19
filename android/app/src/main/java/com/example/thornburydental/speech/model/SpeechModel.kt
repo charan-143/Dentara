@@ -35,11 +35,24 @@ object SpeechModels {
      */
     val BASE_EN_Q5_1 = SpeechModelSpec(
         id = "ggml-base.en-q5_1",
-        displayName = "English dictation (base, quantised)",
+        displayName = "English dictation (base, quantised - ~55MB)",
         fileName = "ggml-base.en-q5_1.bin",
         downloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en-q5_1.bin",
         sizeBytes = 59_721_011L,
         sha256 = "4baf70dd0d7c4247ba2b81fafd9c01005ac77c2f9ef064e00dcf195d0e2fdd2f"
+    )
+
+    /**
+     * Whisper tiny.en, q5_1 quantised, in ggml format for whisper.cpp (~31 MB).
+     * Fastest latency option for resource-constrained devices.
+     */
+    val TINY_EN_Q5_1 = SpeechModelSpec(
+        id = "ggml-tiny.en-q5_1",
+        displayName = "English dictation (tiny, fast - ~31MB)",
+        fileName = "ggml-tiny.en-q5_1.bin",
+        downloadUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en-q5_1.bin",
+        sizeBytes = 31_213_939L,
+        sha256 = "41f6c770ea002a245d0ed98c4f063e15f6244ab98b67b140409c2a392a8326ba"
     )
 
     /** The model voice charting provisions on first use. */

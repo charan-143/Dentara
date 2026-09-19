@@ -234,6 +234,71 @@ class DentalRepositoryVoiceIntegrationTest {
     }
 
     @Test
+    fun sixSitePerioSequenceWritesAllSixAnatomicalSites() {
+        val entries = listOf(
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.DISTOBUCCAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 2, site = PerioSite.BUCCAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.MESIOBUCCAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 4, site = PerioSite.DISTOLINGUAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.LINGUAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.MESIOLINGUAL)
+        )
+
+        val applied = controller.applyParsedCommand(
+            patientId = patient.id,
+            command = ParsedVoiceCommand.MultiplePocketDepths(entries),
+            transcript = "tooth 14 3 2 3 4 3 3"
+        )
+
+        assertTrue(applied)
+        val recorded = pockets()
+        assertEquals(6, recorded.size)
+        assertTrue(recorded.any { it.contains("Tooth 14 Distobuccal") })
+        assertTrue(recorded.any { it.contains("Tooth 14 Buccal") })
+        assertTrue(recorded.any { it.contains("Tooth 14 Mesiobuccal") })
+        assertTrue(recorded.any { it.contains("Tooth 14 Distolingual") })
+        assertTrue(recorded.any { it.contains("Tooth 14 Lingual") })
+        assertTrue(recorded.any { it.contains("Tooth 14 Mesiolingual") })
+    }
+
+    @Test
+    fun undoLastVoiceEntryRevertsAllSixSitesInOneStep() {
+        val entries = listOf(
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.DISTOBUCCAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 2, site = PerioSite.BUCCAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.MESIOBUCCAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 4, site = PerioSite.DISTOLINGUAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.LINGUAL),
+            PocketDepthResult(toothNumber = 14, depthMm = 3, site = PerioSite.MESIOLINGUAL)
+        )
+
+        controller.applyParsedCommand(
+            patientId = patient.id,
+            command = ParsedVoiceCommand.MultiplePocketDepths(entries),
+            transcript = "tooth 14 3 2 3 4 3 3"
+        )
+        assertEquals(6, pockets().size)
+
+        val undone = controller.undoLastVoiceEntry(patient.id)
+        assertNotNull(undone)
+        assertTrue("All 6 readings should be reverted back to empty", pockets().isEmpty())
+    }
+
+    @Test
+    fun implausibleDepthMarksReviewRequired() {
+        controller.applyParsedCommand(
+            patientId = patient.id,
+            command = ParsedVoiceCommand.SinglePocketDepth(
+                entry = PocketDepthResult(toothNumber = 14, depthMm = 14)
+            ),
+            transcript = "tooth 14 pocket 14 mm"
+        )
+
+        val entry = current().examAnswers!!.voiceEntries.first()
+        assertTrue("Implausible depths (>12mm) must require review", entry.reviewRequired)
+    }
+
+    @Test
     fun registeredPatientHasTeethToRecordAgainst() {
         // Guards the fixture itself: without teeth, the tooth-note assertions above would pass
         // vacuously.
