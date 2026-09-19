@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.example.thornburydental.util.addDaysToIsoDate
@@ -23,6 +24,23 @@ import java.util.Locale
 // Thornbury Dental Repository
 // Single source of truth containing realistic clinical seed data backed by SQLite
 // =============================================================================
+
+/**
+ * A patient's chart as it stood immediately before one voice command wrote to it.
+ *
+ * Held in memory only, for the length of the session. Undo exists so a misheard reading can
+ * be reverted in one action; without it the only remedy is to find the wrong value inside a
+ * notes string and correct it by hand, which is exactly the situation hands-free charting is
+ * supposed to avoid.
+ */
+data class VoiceUndoPoint(
+    val patientId: String,
+    /** What will be reverted, phrased for a button label. */
+    val description: String,
+    val capturedAtEpochMs: Long,
+    internal val examAnswers: ExaminationAnswers?,
+    internal val teeth: Map<Int, ToothRecord>
+)
 
 object DentalRepository {
 
@@ -67,6 +85,49 @@ object DentalRepository {
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.lockTimeoutMs = minutes * 60 * 1000L
     }
 
+    /**
+     * Which numbering scheme voice dictation interprets spoken tooth numbers in. Never inferred:
+     * the schemes overlap, so guessing charts findings against the wrong tooth.
+     */
+    private val _toothNumberingSystem = MutableStateFlow(ToothNumberingSystem.DEFAULT)
+    val toothNumberingSystem: StateFlow<ToothNumberingSystem> = _toothNumberingSystem.asStateFlow()
+    fun setToothNumberingSystem(system: ToothNumberingSystem) {
+        _toothNumberingSystem.value = system
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString("tooth_numbering_system", system.name)
+            ?.apply()
+    }
+
+    /**
+     * Whether a confidently parsed dictation may be written to the chart without the
+     * clinician confirming it.
+     *
+     * Off by default. Unattended writing is the whole hazard of voice charting: a misheard
+     * reading nobody looked at is indistinguishable from a measured one. A clinic that wants
+     * true hands-free operation can turn this on, accepting that read-back and undo are then
+     * the only safeguards.
+     */
+    private val _isVoiceAutoApplyEnabled = MutableStateFlow(false)
+    val isVoiceAutoApplyEnabled: StateFlow<Boolean> = _isVoiceAutoApplyEnabled.asStateFlow()
+    fun setVoiceAutoApplyEnabled(enabled: Boolean) {
+        _isVoiceAutoApplyEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("voice_auto_apply_enabled", enabled)
+            ?.apply()
+    }
+
+    private val _isVoiceChartingEnabled = MutableStateFlow(false)
+    val isVoiceChartingEnabled: StateFlow<Boolean> = _isVoiceChartingEnabled.asStateFlow()
+    fun setVoiceChartingEnabled(enabled: Boolean) {
+        _isVoiceChartingEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("voice_charting_enabled", enabled)
+            ?.apply()
+    }
+
     fun initializePreferencesSynchronously(context: android.content.Context) {
         val prefs = context.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
         val savedDarkMode = prefs.getBoolean("dark_mode_enabled", false)
@@ -77,6 +138,14 @@ object DentalRepository {
 
         val savedTimeoutMin = prefs.getInt("biometric_lock_timeout_min", 0)
         _biometricLockTimeoutMinutes.value = savedTimeoutMin
+
+        val savedVoiceCharting = prefs.getBoolean("voice_charting_enabled", false)
+        _isVoiceChartingEnabled.value = savedVoiceCharting
+
+        _toothNumberingSystem.value =
+            ToothNumberingSystem.fromNameOrDefault(prefs.getString("tooth_numbering_system", null))
+
+        _isVoiceAutoApplyEnabled.value = prefs.getBoolean("voice_auto_apply_enabled", false)
 
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.initPreferences(context)
     }
@@ -580,14 +649,32 @@ object DentalRepository {
         reminderLeadTimeMin = reminderLeadTimeMin
     )
 
+    fun universalToFdi(universalNum: Int): Int {
+        return when (universalNum) {
+            in 1..8 -> 19 - universalNum
+            in 9..16 -> 12 + universalNum
+            in 17..24 -> 55 - universalNum
+            in 25..32 -> 16 + universalNum
+            else -> universalNum
+        }
+    }
+
     fun updateToothCondition(patientId: String, toothNumber: Int, newCondition: ToothCondition, notes: String) {
         _patients.update { list ->
             list.map { p ->
                 if (p.id == patientId) {
                     val updatedTeeth = p.teeth.toMutableMap()
-                    val current = updatedTeeth[toothNumber]
-                    if (current != null) {
-                        updatedTeeth[toothNumber] = current.copy(
+                    val fdiKey = universalToFdi(toothNumber)
+                    val targetKey = if (updatedTeeth.containsKey(toothNumber)) {
+                        toothNumber
+                    } else if (updatedTeeth.containsKey(fdiKey)) {
+                        fdiKey
+                    } else {
+                        updatedTeeth.entries.firstOrNull { it.value.number == toothNumber || it.value.fdiNumber == toothNumber }?.key
+                    }
+                    if (targetKey != null) {
+                        val current = updatedTeeth[targetKey]!!
+                        updatedTeeth[targetKey] = current.copy(
                             condition = newCondition,
                             notes = if (notes.isNotBlank()) notes else current.notes
                         )
@@ -603,6 +690,258 @@ object DentalRepository {
                 LocalDatabaseManager.toothDao.updateToothCondition(patientId, toothNumber, newCondition, notes)
             }
         }
+    }
+
+    /**
+     * Updates patient's periodontal pocket depths and bleeding status from voice dictation.
+     */
+    /** Deepest undo history kept, so a long charting session cannot grow unboundedly. */
+    private const val MAX_VOICE_UNDO_DEPTH = 20
+
+    private val _voiceUndoPoints = MutableStateFlow<List<VoiceUndoPoint>>(emptyList())
+    val voiceUndoPoints: StateFlow<List<VoiceUndoPoint>> = _voiceUndoPoints.asStateFlow()
+
+    /**
+     * Snapshots a patient's chart before a voice command writes to it.
+     *
+     * Called once per utterance, not per reading, so undoing a multi-tooth dictation reverts
+     * the whole thing rather than peeling it back one tooth at a time.
+     */
+    fun captureVoiceUndoPoint(patientId: String, description: String) {
+        val patient = _patients.value.firstOrNull { it.id == patientId } ?: return
+        val point = VoiceUndoPoint(
+            patientId = patientId,
+            description = description,
+            capturedAtEpochMs = System.currentTimeMillis(),
+            examAnswers = patient.examAnswers,
+            teeth = patient.teeth
+        )
+        _voiceUndoPoints.value = (_voiceUndoPoints.value + point).takeLast(MAX_VOICE_UNDO_DEPTH)
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.voiceUndoDao.insertUndoPoint(point)
+            }
+        }
+    }
+
+    /**
+     * Loads persisted voice undo snapshots from SQLite for a patient upon opening their chart.
+     */
+    fun loadPersistedVoiceUndoPoints(patientId: String) {
+        if (!LocalDatabaseManager.isInitialized) return
+        val persisted = LocalDatabaseManager.voiceUndoDao.getUndoPointsForPatient(patientId)
+        if (persisted.isNotEmpty()) {
+            _voiceUndoPoints.value = persisted.takeLast(MAX_VOICE_UNDO_DEPTH)
+        }
+    }
+
+    /**
+     * Reverts the most recent voice entry, restoring the chart to its state just before it.
+     *
+     * @return what was undone, for confirmation back to the clinician, or null when the undo
+     *         history is empty.
+     */
+    fun undoLastVoiceEntry(patientId: String? = null): String? {
+        val point = _voiceUndoPoints.value.lastOrNull()
+            ?: (if (patientId != null && LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.voiceUndoDao.getUndoPointsForPatient(patientId).lastOrNull()
+            } else null)
+            ?: return null
+
+        _voiceUndoPoints.value = _voiceUndoPoints.value.filterNot { it.capturedAtEpochMs == point.capturedAtEpochMs }
+
+        var changedTeeth: Map<Int, ToothRecord> = emptyMap()
+        _patients.update { list ->
+            list.map { patient ->
+                if (patient.id != point.patientId) return@map patient
+                // Only the teeth the write actually altered need restoring, so undo does not
+                // rewrite a whole dentition.
+                changedTeeth = point.teeth.filter { (number, before) ->
+                    patient.teeth[number] != before
+                }
+                patient.copy(examAnswers = point.examAnswers, teeth = point.teeth)
+            }
+        }
+
+        // A patient with no prior answers restores to empty ones: the JSON column cannot hold
+        // the absence of a record, and empty is what nothing-recorded reads as.
+        val restoredExam = point.examAnswers ?: ExaminationAnswers()
+        val teethToRestore = changedTeeth
+        repositoryScope.launch {
+            if (!LocalDatabaseManager.isInitialized) return@launch
+            LocalDatabaseManager.voiceUndoDao.popLatestUndoPoint(point.patientId)
+            LocalDatabaseManager.patientDao.updateExaminationAnswers(point.patientId, restoredExam)
+            teethToRestore.forEach { (number, tooth) ->
+                LocalDatabaseManager.toothDao.updateToothCondition(
+                    point.patientId, number, tooth.condition, tooth.notes
+                )
+            }
+        }
+
+        return point.description
+    }
+
+    /**
+     * Records one dictated probing reading.
+     *
+     * @param siteLabel the probing site, e.g. "Buccal". Empty when none was stated. Part of
+     *        the entry identity, so recording buccal and mesial for one tooth keeps both
+     *        rather than the second overwriting the first.
+     * @param provenance audit record for this value. Null only for non-voice callers.
+     */
+    fun applyVoicePeriodontalPocket(
+        patientId: String,
+        toothNumber: Int,
+        depthMm: Int,
+        isBleeding: Boolean = false,
+        siteLabel: String = "",
+        provenance: VoiceChartEntry? = null
+    ) {
+        val sitePart = if (siteLabel.isBlank()) "" else " $siteLabel"
+        val entryPrefix = "Tooth $toothNumber$sitePart:"
+        val pocketStr = "$entryPrefix ${depthMm}mm" + if (isBleeding) " (Bleeding)" else ""
+
+        // The lambda must stay free of side effects. StateFlow.update re-runs it whenever
+        // the compare-and-set loses, and the previous version called updateExaminationAnswers
+        // from inside it - which guaranteed that loss and ran the non-idempotent tooth-note
+        // append twice.
+        val committed = _patients.updateAndGet { list ->
+            list.map { patient ->
+                if (patient.id != patientId) return@map patient
+
+                val currentExam = patient.examAnswers ?: ExaminationAnswers()
+
+                val updatedPockets =
+                    (currentExam.periodontalPockets.filterNot { it.startsWith(entryPrefix) } + pocketStr)
+                        .distinct()
+
+                val bleedingTag = "Tooth $toothNumber bleeding"
+                val updatedBleeding = if (isBleeding) {
+                    (currentExam.periodontalBleeding + bleedingTag).distinct()
+                } else {
+                    currentExam.periodontalBleeding
+                }
+
+                val updatedExam = currentExam.copy(
+                    periodontalPockets = updatedPockets,
+                    periodontalBleeding = updatedBleeding,
+                    voiceEntries = if (provenance == null) {
+                        currentExam.voiceEntries
+                    } else {
+                        currentExam.voiceEntries + provenance.copy(applied = pocketStr)
+                    }
+                )
+
+                val updatedTeeth = patient.teeth.toMutableMap()
+                val targetKey = resolveToothKey(updatedTeeth, toothNumber)
+                if (targetKey != null) {
+                    val currentTooth = updatedTeeth.getValue(targetKey)
+                    val noteEntry = "Pocket$sitePart: ${depthMm}mm" + if (isBleeding) " [BOP]" else ""
+                    // Replace rather than append: re-probing the same site during one visit
+                    // should correct the reading, not accumulate a history in a notes string.
+                    val keptNotes = currentTooth.notes
+                        .split(" | ")
+                        .filter { it.isNotBlank() && !it.startsWith("Pocket$sitePart:") }
+                    val updatedNote = (keptNotes + noteEntry).joinToString(" | ")
+                    updatedTeeth[targetKey] = currentTooth.copy(notes = updatedNote)
+                }
+
+                patient.copy(examAnswers = updatedExam, teeth = updatedTeeth)
+            }
+        }
+
+        // Persist from the committed state, once, outside the update loop.
+        val patient = committed.firstOrNull { it.id == patientId } ?: return
+        val exam = patient.examAnswers ?: return
+        repositoryScope.launch {
+            if (!LocalDatabaseManager.isInitialized) return@launch
+            LocalDatabaseManager.patientDao.updateExaminationAnswers(patientId, exam)
+            // Tooth notes used to be dropped here, so a dictated reading disappeared from the
+            // tooth record on restart while surviving in the exam answers.
+            val toothKey = resolveToothKey(patient.teeth, toothNumber)
+            if (toothKey != null) {
+                val tooth = patient.teeth.getValue(toothKey)
+                LocalDatabaseManager.toothDao.updateToothCondition(
+                    patientId, toothKey, tooth.condition, tooth.notes
+                )
+            }
+        }
+    }
+
+    /**
+     * Finds the teeth-map key for a spoken tooth number, whichever scheme the map is keyed in.
+     */
+    private fun resolveToothKey(teeth: Map<Int, ToothRecord>, toothNumber: Int): Int? =
+        if (teeth.containsKey(toothNumber)) {
+            toothNumber
+        } else {
+            teeth.entries.firstOrNull {
+                it.value.number == toothNumber || it.value.fdiNumber == toothNumber
+            }?.key
+        }
+
+    /**
+     * Appends a dictated narrative note to the section it was addressed to.
+     *
+     * @param targetSection which field the note belongs in. The parser routes a spoken
+     *        "Diagnosis:" heading here; this parameter did not exist before, so the parser
+     *        computed a target section that the repository then ignored, and every dictated
+     *        note landed in clinicianNotes regardless.
+     * @param provenance audit record for this note. Null only for non-voice callers.
+     */
+    fun appendVoiceClinicalNote(
+        patientId: String,
+        noteText: String,
+        targetSection: String = "clinicianNotes",
+        provenance: VoiceChartEntry? = null
+    ) {
+        val trimmed = noteText.trim()
+        if (trimmed.isBlank()) return
+
+        val toDiagnosis = targetSection == "diagnosis"
+        val sectionLabel = if (toDiagnosis) "diagnosis notes" else "clinical notes"
+
+        // Side-effect-free lambda; persistence happens once, after the state is committed.
+        val committed = _patients.updateAndGet { list ->
+            list.map { patient ->
+                if (patient.id != patientId) return@map patient
+
+                val currentExam = patient.examAnswers ?: ExaminationAnswers()
+                val sectionApplied = if (toDiagnosis) {
+                    currentExam.copy(
+                        otherDiagnosesNotes = appendNoteLine(currentExam.otherDiagnosesNotes, trimmed)
+                    )
+                } else {
+                    currentExam.copy(
+                        clinicianNotes = appendNoteLine(currentExam.clinicianNotes, trimmed)
+                    )
+                }
+
+                val updatedExam = if (provenance == null) {
+                    sectionApplied
+                } else {
+                    sectionApplied.copy(
+                        voiceEntries = sectionApplied.voiceEntries + provenance.copy(
+                            applied = "Added to " + sectionLabel + ": " + trimmed
+                        )
+                    )
+                }
+
+                patient.copy(examAnswers = updatedExam)
+            }
+        }
+
+        val exam = committed.firstOrNull { it.id == patientId }?.examAnswers ?: return
+        repositoryScope.launch {
+            if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.patientDao.updateExaminationAnswers(patientId, exam)
+            }
+        }
+    }
+
+    private fun appendNoteLine(existing: String, addition: String): String {
+        val current = existing.trim()
+        return if (current.isEmpty()) addition else current + "\n• " + addition
     }
 
     fun issuePrescription(

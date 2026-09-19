@@ -239,6 +239,9 @@ val ThornburySurfaceSoft: Color
 val ThornburySurfaceCard: Color
     get() = if (com.example.thornburydental.data.DentalRepository.isDarkModeEnabled.value) DarkThornburySurfaceCard else LightThornburySurfaceCard
 
+val ThornburySurface: Color
+    get() = ThornburySurfaceCard
+
 val ThornburySurfaceCreamStrong: Color
     get() = if (com.example.thornburydental.data.DentalRepository.isDarkModeEnabled.value) DarkThornburySurfaceCreamStrong else LightThornburySurfaceCreamStrong
 

@@ -109,7 +109,16 @@ data class ExaminationAnswers(
     val cariesRisk: String = "",
     val otherDiagnosesConditions: List<String> = emptyList(),
     val otherDiagnosesNotes: String = "",
-    val clinicianNotes: String = ""
+    val clinicianNotes: String = "",
+
+    /**
+     * Audit trail for values written by voice dictation, so a dictated reading can be told
+     * apart from one a clinician typed and checked.
+     *
+     * Lives in this blob rather than its own table: it serialises into the existing
+     * exam-answers JSON column, so it needs no schema migration.
+     */
+    val voiceEntries: List<VoiceChartEntry> = emptyList()
 )
 
 @Serializable

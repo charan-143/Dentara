@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.ExaminationAnswers
 import com.example.thornburydental.theme.*
 
@@ -38,6 +39,11 @@ fun ExaminationQuestionsSection(
     onSaveAnswers: (ExaminationAnswers) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scope = rememberCoroutineScope()
+
+    // Voice dictation is owned by PatientDetailChartScreen, which hosts this section and
+    // renders the docked dictation bar over it. Dictated findings arrive here through the
+    // repository, which re-keys initialAnswers below.
     // Current questionnaire state initialized from passed answers or empty defaults
     var chiefComplaints by remember(patientId, initialAnswers) {
         mutableStateOf(initialAnswers?.chiefComplaints ?: emptyList())

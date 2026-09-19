@@ -32,6 +32,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.launch
 import com.example.thornburydental.data.*
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.thornburydental.speech.ChartReadBack
+import com.example.thornburydental.speech.DictationTargetMode
+import com.example.thornburydental.speech.ParsedVoiceCommand
+import com.example.thornburydental.speech.VoiceChartingService
+import com.example.thornburydental.speech.VoiceChartingViewModel
+import com.example.thornburydental.speech.rememberChartReadBackSpeaker
+import com.example.thornburydental.speech.rememberMicrophonePermissionState
+import com.example.thornburydental.speech.VoiceDictationState
+import com.example.thornburydental.ui.components.speech.HandsFreeVoiceDictationBar
+import com.example.thornburydental.ui.components.speech.ParsedCommandPreviewSheet
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.AnatomicalToothView
 import com.example.thornburydental.ui.components.AnatomicalToothCanvas
@@ -45,6 +62,49 @@ fun PatientDetailChartScreen(
     onOpenAddReportScreen: (Patient) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    // One dictation owner for the whole activity.
+    val voiceViewModel: VoiceChartingViewModel = viewModel()
+    val voiceState by voiceViewModel.uiState.collectAsState()
+    val targetMode by voiceViewModel.targetMode.collectAsState()
+    val voiceModelState by voiceViewModel.modelState.collectAsState()
+    val voiceAutoApply by voiceViewModel.autoApplyEnabled.collectAsState()
+    val voiceUndoPoints by voiceViewModel.undoableEntry.collectAsState()
+    val chartReadBack = rememberChartReadBackSpeaker()
+    val isVoiceChartingEnabled by DentalRepository.isVoiceChartingEnabled.collectAsState()
+
+    // Load persistent undo points from SQLite for this patient
+    LaunchedEffect(patientId) {
+        voiceViewModel.loadPersistedVoiceUndoPoints(patientId)
+    }
+
+    // Read the parse back aloud: a clinician with a probe in the mouth is not looking at the
+    // screen, so an unspoken value is one they cannot check.
+    LaunchedEffect(voiceState) {
+        val parsed = voiceState as? VoiceDictationState.CommandParsed ?: return@LaunchedEffect
+        chartReadBack.speak(ChartReadBack.spokenSummary(parsed.parsedCommand))
+    }
+
+    var pendingDictationMode by remember { mutableStateOf<DictationTargetMode?>(null) }
+    var showMicrophoneSettingsPrompt by remember { mutableStateOf(false) }
+
+    val microphonePermission = rememberMicrophonePermissionState(
+        onGranted = {
+            pendingDictationMode?.let { mode ->
+                try { VoiceChartingService.start(context) } catch (_: Throwable) {}
+                voiceViewModel.startDictation(mode, continuousHandsFree = true, patientId = patientId)
+                pendingDictationMode = null
+            }
+        }
+    )
+
+    // Stop foreground service on disposal
+    DisposableEffect(Unit) {
+        onDispose {
+            try { VoiceChartingService.stop(context) } catch (_: Throwable) {}
+        }
+    }
+
     val patients by DentalRepository.patients.collectAsState()
     // Only ever resolve to the requested patient — never silently substitute a
     // different one just because the roster happens to be non-empty. If
@@ -79,11 +139,14 @@ fun PatientDetailChartScreen(
     val patientReports = diagnosticReports.filter { it.patientId == patient.id }
     val patientAppointments = allAppointments.filter { it.patientId == patient.id }
 
-    Column(
+    Box(
         modifier = modifier
             .fillMaxSize()
             .background(ThornburyCanvas)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
         // --- Top App Bar ---
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -245,6 +308,105 @@ fun PatientDetailChartScreen(
                 )
             }
         }
+        }
+
+        // Docked Floating Hands-Free Voice Dictation Overlay (Enabled via Profile Settings)
+        if (isVoiceChartingEnabled) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 12.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (voiceState is VoiceDictationState.CommandParsed) {
+                        val parsedState = voiceState as VoiceDictationState.CommandParsed
+                        ParsedCommandPreviewSheet(
+                            rawTranscript = parsedState.rawTranscript,
+                            parsedCommand = parsedState.parsedCommand,
+                            onConfirmApply = { cmd ->
+                                voiceViewModel.applyParsedCommand(
+                                    patient.id,
+                                    cmd,
+                                    parsedState.rawTranscript
+                                )
+                                voiceViewModel.resetState()
+                            },
+                            onDismiss = {
+                                voiceViewModel.resetState()
+                            },
+                            autoApplyEnabled = voiceAutoApply
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    HandsFreeVoiceDictationBar(
+                        state = voiceState,
+                        targetMode = targetMode,
+                        onStartListening = { mode ->
+                            when {
+                                microphonePermission.isGranted -> {
+                                    try { VoiceChartingService.start(context) } catch (_: Throwable) {}
+                                    voiceViewModel.startDictation(mode, continuousHandsFree = true, patientId = patient.id)
+                                }
+                                microphonePermission.permanentlyDenied -> showMicrophoneSettingsPrompt = true
+                                else -> {
+                                    pendingDictationMode = mode
+                                    microphonePermission.request()
+                                }
+                            }
+                        },
+                        onStopListening = {
+                            try { VoiceChartingService.stop(context) } catch (_: Throwable) {}
+                            voiceViewModel.stopDictationAndProcess()
+                        },
+                        onSelectTargetMode = { mode -> voiceViewModel.setTargetMode(mode) },
+                        modelState = voiceModelState,
+                        onProvisionModel = { voiceViewModel.provisionModel() },
+                        undoDescription = voiceUndoPoints.lastOrNull()?.description,
+                        onUndoLastEntry = {
+                            val undone = voiceViewModel.undoLastVoiceEntry(patient.id)
+                            if (undone != null) {
+                                chartReadBack.speak("Undone. " + undone + ".")
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // Microphone permanently denied: the system dialog will not appear again, so offer
+    // the only route that still works.
+    if (showMicrophoneSettingsPrompt) {
+        val appContext = LocalContext.current
+        AlertDialog(
+            onDismissRequest = { showMicrophoneSettingsPrompt = false },
+            title = { Text("Microphone access needed") },
+            text = {
+                Text(
+                    "Voice charting records your dictation on this device. Microphone " +
+                        "access is currently blocked, so it has to be enabled in system settings."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showMicrophoneSettingsPrompt = false
+                    appContext.startActivity(
+                        Intent(
+                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", appContext.packageName, null)
+                        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }) { Text("Open settings") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showMicrophoneSettingsPrompt = false }) { Text("Not now") }
+            }
+        )
     }
 
     // Tooth Edit Dialog
