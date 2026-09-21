@@ -46,6 +46,7 @@ fun RegisterPatientScreen(
     var emergencyName by remember { mutableStateOf("") }
     var emergencyPhone by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isSubmitting by remember { mutableStateOf(false) }
 
     val genders = listOf("Female", "Male", "Other")
 
@@ -520,21 +521,29 @@ fun RegisterPatientScreen(
                 }
 
                 Button(
+                    enabled = !isSubmitting,
                     onClick = {
+                        if (isSubmitting) return@Button
+                        isSubmitting = true
+                        
                         if (name.isBlank()) {
                             errorMessage = "Please enter patient's full name."
+                            isSubmitting = false
                             return@Button
                         }
                         if (phone.isNotBlank() && !ValidationUtils.isValidPhone(phone)) {
                             errorMessage = "Please enter a valid phone number (7-15 digits). Letters like 'parrot' are not allowed."
+                            isSubmitting = false
                             return@Button
                         }
                         if (email.isNotBlank() && !ValidationUtils.isValidEmail(email)) {
                             errorMessage = "Please enter a valid email address with '@' and domain (e.g. name@example.com)."
+                            isSubmitting = false
                             return@Button
                         }
                         if (emergencyPhone.isNotBlank() && !ValidationUtils.isValidPhone(emergencyPhone)) {
                             errorMessage = "Please enter a valid emergency contact phone number (7-15 digits)."
+                            isSubmitting = false
                             return@Button
                         }
 
@@ -550,7 +559,11 @@ fun RegisterPatientScreen(
                             medicalHistory = "",
                             isChild = isChild
                         )
-                        onRegistered(created)
+                        if (created != null) {
+                            onRegistered(created)
+                        } else {
+                            isSubmitting = false
+                        }
                     },
                     modifier = Modifier
                         .weight(1.5f)

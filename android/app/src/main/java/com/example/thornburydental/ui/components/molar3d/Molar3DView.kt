@@ -16,6 +16,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,9 +39,11 @@ fun Molar3DView(
     modifier: Modifier = Modifier,
     showCard: Boolean = true
 ) {
+    val isLocked by com.example.thornburydental.data.security.AppSessionLifecycleObserver.isLocked.collectAsState(initial = false)
     LegacyMolar3DView(
         modifier = modifier,
-        showCard = showCard
+        showCard = showCard,
+        isLocked = isLocked
     )
 }
 
@@ -47,7 +51,8 @@ fun Molar3DView(
 @Composable
 fun LegacyMolar3DView(
     modifier: Modifier = Modifier,
-    showCard: Boolean = true
+    showCard: Boolean = true,
+    isLocked: Boolean = false
 ) {
     val context = LocalContext.current
     var model by remember { mutableStateOf<MolarModel?>(null) }

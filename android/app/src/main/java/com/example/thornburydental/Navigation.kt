@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
 import com.example.thornburydental.theme.*
-import com.example.thornburydental.ui.cds.ClinicalDecisionSupportScreen
+import com.example.thornburydental.ui.cds.CdsCopilotScreen
 import com.example.thornburydental.ui.clinic.AddReportDialog
 import com.example.thornburydental.ui.clinic.IssuePrescriptionDialog
 import com.example.thornburydental.ui.clinic.PatientDetailChartScreen
@@ -208,7 +208,7 @@ fun MainNavigation() {
                                         onSelectPatient = { patientId -> activePatientId = patientId },
                                         onNavigateToRegisterPatient = { showRegisterPatientScreen = true }
                                     )
-                                    AppDestination.CDS -> ClinicalDecisionSupportScreen(
+                                    AppDestination.CDS -> CdsCopilotScreen(
                                         onBack = { currentTab = AppDestination.TODAY }
                                     )
                                     AppDestination.SCHEDULE -> ScheduleScreen(
