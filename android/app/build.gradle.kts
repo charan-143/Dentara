@@ -53,10 +53,10 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("dentara-release-key.jks")
-            storePassword = "dentara2026"
-            keyAlias = "dentara"
-            keyPassword = "dentara2026"
+            storeFile = file("practix-release-key.jks")
+            storePassword = "practix2026"
+            keyAlias = "practix"
+            keyPassword = "practix2026"
         }
     }
 

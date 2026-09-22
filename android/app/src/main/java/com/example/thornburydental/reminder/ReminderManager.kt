@@ -26,11 +26,11 @@ object ReminderManager {
 
     private const val TAG = "ReminderManager"
 
-    const val CHANNEL_DAILY_BRIEFING = "dentara_daily_briefing"
-    const val CHANNEL_PATIENT_ARRIVAL = "dentara_patient_arrival"
+    const val CHANNEL_DAILY_BRIEFING = "practix_daily_briefing"
+    const val CHANNEL_PATIENT_ARRIVAL = "practix_patient_arrival"
 
-    const val ACTION_DAILY_MORNING_BRIEFING = "com.dentara.dental.ACTION_DAILY_MORNING_BRIEFING"
-    const val ACTION_PATIENT_ARRIVAL = "com.dentara.dental.ACTION_PATIENT_ARRIVAL"
+    const val ACTION_DAILY_MORNING_BRIEFING = "com.practix.dental.ACTION_DAILY_MORNING_BRIEFING"
+    const val ACTION_PATIENT_ARRIVAL = "com.practix.dental.ACTION_PATIENT_ARRIVAL"
 
     const val EXTRA_APPT_ID = "extra_appt_id"
     const val EXTRA_PATIENT_NAME = "extra_patient_name"

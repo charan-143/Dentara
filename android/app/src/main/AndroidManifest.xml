@@ -54,8 +54,8 @@
             android:name=".reminder.DentaraAlarmReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="com.dentara.dental.ACTION_DAILY_MORNING_BRIEFING" />
-                <action android:name="com.dentara.dental.ACTION_PATIENT_ARRIVAL" />
+                <action android:name="com.practix.dental.ACTION_DAILY_MORNING_BRIEFING" />
+                <action android:name="com.practix.dental.ACTION_PATIENT_ARRIVAL" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
