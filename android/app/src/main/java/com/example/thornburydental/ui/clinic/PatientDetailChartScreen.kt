@@ -49,6 +49,7 @@ import com.example.thornburydental.speech.rememberMicrophonePermissionState
 import com.example.thornburydental.speech.VoiceDictationState
 import com.example.thornburydental.ui.components.speech.HandsFreeVoiceDictationBar
 import com.example.thornburydental.ui.components.speech.ParsedCommandPreviewSheet
+import com.example.thornburydental.ui.components.speech.ClinicalFindingsPreviewSheet
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.AnatomicalToothView
 import com.example.thornburydental.ui.components.AnatomicalToothCanvas
@@ -81,8 +82,18 @@ fun PatientDetailChartScreen(
     // Read the parse back aloud: a clinician with a probe in the mouth is not looking at the
     // screen, so an unspoken value is one they cannot check.
     LaunchedEffect(voiceState) {
-        val parsed = voiceState as? VoiceDictationState.CommandParsed ?: return@LaunchedEffect
-        chartReadBack.speak(ChartReadBack.spokenSummary(parsed.parsedCommand))
+        when (val state = voiceState) {
+            is VoiceDictationState.CommandParsed -> {
+                chartReadBack.speak(ChartReadBack.spokenSummary(state.parsedCommand))
+            }
+            is VoiceDictationState.FindingsExtracted -> {
+                chartReadBack.speak(ChartReadBack.spokenSummary(state.findings))
+            }
+            is VoiceDictationState.Success -> {
+                chartReadBack.speak(state.message)
+            }
+            else -> {}
+        }
     }
 
     var pendingDictationMode by remember { mutableStateOf<DictationTargetMode?>(null) }
@@ -322,7 +333,22 @@ fun PatientDetailChartScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (voiceState is VoiceDictationState.CommandParsed) {
+                    if (voiceState is VoiceDictationState.FindingsExtracted) {
+                        val findingsState = voiceState as VoiceDictationState.FindingsExtracted
+                        ClinicalFindingsPreviewSheet(
+                            findings = findingsState.findings,
+                            onConfirmApply = { findings ->
+                                voiceViewModel.applyClinicalFindings(patient.id, findings)
+                                chartReadBack.speak("Logged ${findings.totalCount} findings to chart.")
+                                voiceViewModel.resetState()
+                            },
+                            onDismiss = {
+                                voiceViewModel.resetState()
+                            },
+                            autoApplyEnabled = voiceAutoApply
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                    } else if (voiceState is VoiceDictationState.CommandParsed) {
                         val parsedState = voiceState as VoiceDictationState.CommandParsed
                         ParsedCommandPreviewSheet(
                             rawTranscript = parsedState.rawTranscript,
@@ -361,7 +387,7 @@ fun PatientDetailChartScreen(
                         },
                         onStopListening = {
                             try { VoiceChartingService.stop(context) } catch (_: Throwable) {}
-                            voiceViewModel.stopDictationAndProcess()
+                            voiceViewModel.stopDictationAndProcess(patient.id)
                         },
                         onSelectTargetMode = { mode -> voiceViewModel.setTargetMode(mode) },
                         modelState = voiceModelState,
@@ -798,6 +824,8 @@ fun getToothColor(condition: ToothCondition): Color {
         ToothCondition.ROOT_CANAL -> ToothRootCanal
         ToothCondition.IMPLANT -> ToothImplant
         ToothCondition.MISSING -> ToothMissing
+        ToothCondition.EXFOLIATED -> ToothMissing
+        ToothCondition.UNERUPTED -> ToothSound.copy(alpha = 0.5f)
     }
 }
 

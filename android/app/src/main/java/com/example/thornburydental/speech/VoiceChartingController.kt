@@ -1,6 +1,8 @@
 package com.example.thornburydental.speech
 
+import android.content.Context
 import android.util.Log
+import com.example.thornburydental.ThornburyApplication
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.VoiceChartEntry
 import com.example.thornburydental.speech.model.SpeechModelProvider
@@ -18,17 +20,28 @@ import kotlinx.coroutines.launch
 
 sealed interface VoiceDictationState {
     object Idle : VoiceDictationState
+
     data class Listening(
-        val amplitude: Float,
-        val targetMode: DictationTargetMode,
+        val amplitude: Float = 0f,
+        val targetMode: DictationTargetMode = DictationTargetMode.PERIODONTAL_CHARTING,
         val streamingPartialTranscript: String = ""
     ) : VoiceDictationState
+
     data class Transcribing(val partialTranscript: String = "") : VoiceDictationState
+
+    data class FindingsExtracted(
+        val rawTranscript: String,
+        val findings: ClinicalFindings,
+        val targetMode: DictationTargetMode = DictationTargetMode.PERIODONTAL_CHARTING
+    ) : VoiceDictationState
+
     data class CommandParsed(
         val rawTranscript: String,
         val parsedCommand: ParsedVoiceCommand,
         val targetMode: DictationTargetMode
     ) : VoiceDictationState
+
+    data class Success(val message: String) : VoiceDictationState
 
     /** A single dictation attempt failed. The clinician can retry. */
     data class Error(val message: String) : VoiceDictationState
@@ -41,15 +54,16 @@ sealed interface VoiceDictationState {
 }
 
 /**
- * Orchestrates hands-free audio recording, offline transcription, continuous six-site periodontal
- * command parsing, real-time VAD endpointing, and updating patient records in DentalRepository.
+ * Orchestrates full-utterance speech capture, transcription (Android SpeechRecognizer / Whisper),
+ * AI clinical entity extraction, and updates to the patient record in DentalRepository.
  */
 class VoiceChartingController(
     private val whisperEngine: WhisperEngine = WhisperEngine(),
     private val audioRecordManager: AudioRecordManager = AudioRecordManager(),
     private val commandParser: VoiceCommandParser = VoiceCommandParser(),
     private val modelStore: SpeechModelStore? = SpeechModelProvider.storeOrNull(),
-    private val modelSpec: SpeechModelSpec = SpeechModels.DEFAULT
+    private val modelSpec: SpeechModelSpec = SpeechModels.DEFAULT,
+    private val context: Context? = try { ThornburyApplication.instance } catch (_: Throwable) { null }
 ) {
     companion object {
         private const val TAG = "VoiceChartingController"
@@ -78,14 +92,29 @@ class VoiceChartingController(
     private var activeMode = DictationTargetMode.PERIODONTAL_CHARTING
     private var listeningScopeJob: Job? = null
     private var lastParsedCommand: ParsedVoiceCommand? = null
+    private var lastFindings: ClinicalFindings? = null
     private var lastRawTranscript: String = ""
 
+    private var speechRecognizerManager: AndroidSpeechRecognizerManager? = null
+
+    init {
+        context?.let { ctx ->
+            if (AndroidSpeechRecognizerManager.isAvailable(ctx)) {
+                speechRecognizerManager = AndroidSpeechRecognizerManager(ctx)
+            }
+        }
+    }
+
     /**
-     * Loads an already-installed model, if there is one.
+     * Loads an already-installed Whisper model if available.
      */
     suspend fun initialize(): Boolean {
         val store = modelStore
         if (store == null) {
+            if (speechRecognizerManager != null) {
+                _uiState.value = VoiceDictationState.Idle
+                return true
+            }
             _uiState.value = VoiceDictationState.Unavailable(STORE_UNAVAILABLE)
             return false
         }
@@ -93,12 +122,16 @@ class VoiceChartingController(
         store.refreshState(modelSpec)
         val installed = store.installedModel(modelSpec)
         if (installed == null) {
+            if (speechRecognizerManager != null) {
+                _uiState.value = VoiceDictationState.Idle
+                return true
+            }
             _uiState.value = VoiceDictationState.Unavailable(MODEL_NOT_INSTALLED, canProvision = true)
             return false
         }
 
         val loaded = whisperEngine.initialize(installed)
-        if (!loaded) {
+        if (!loaded && speechRecognizerManager == null) {
             _uiState.value = VoiceDictationState.Unavailable(ENGINE_LOAD_FAILED)
             return false
         }
@@ -141,7 +174,7 @@ class VoiceChartingController(
     }
 
     /**
-     * Starts hands-free audio recording with WebRTC/Silero-grade real-time VAD endpointing.
+     * Starts listening to clinician speech (capturing the entire utterance).
      */
     fun startDictation(
         scope: CoroutineScope,
@@ -149,6 +182,49 @@ class VoiceChartingController(
         continuousHandsFree: Boolean = true,
         patientId: String? = null
     ) {
+        activeMode = mode
+        _targetMode.value = mode
+
+        // Check if Android SpeechRecognizer is available on this device
+        val recognizer = speechRecognizerManager
+        if (recognizer != null) {
+            _uiState.value = VoiceDictationState.Listening(0f, mode)
+            recognizer.startListening(
+                continuous = continuousHandsFree,
+                onPartialResult = { partial ->
+                    val current = _uiState.value
+                    if (current is VoiceDictationState.Listening) {
+                        _uiState.value = current.copy(streamingPartialTranscript = partial)
+                    }
+                },
+                onFinalResult = { fullTranscript ->
+                    if (fullTranscript.isNotBlank()) {
+                        processFullUtterance(scope, fullTranscript, patientId)
+                    } else {
+                        if (_uiState.value is VoiceDictationState.Listening) {
+                            _uiState.value = VoiceDictationState.Idle
+                        }
+                    }
+                },
+                onError = { err ->
+                    safeLogE("SpeechRecognizer error: $err")
+                    _uiState.value = VoiceDictationState.Error(err)
+                }
+            )
+
+            listeningScopeJob?.cancel()
+            listeningScopeJob = scope.launch {
+                recognizer.amplitudeFlow.collect { amp ->
+                    val current = _uiState.value
+                    if (current is VoiceDictationState.Listening) {
+                        _uiState.value = current.copy(amplitude = amp)
+                    }
+                }
+            }
+            return
+        }
+
+        // Fallback to raw AudioRecord + WhisperEngine
         if (!whisperEngine.isReady()) {
             _uiState.value = VoiceDictationState.Unavailable(
                 MODEL_NOT_INSTALLED,
@@ -157,14 +233,11 @@ class VoiceChartingController(
             return
         }
 
-        activeMode = mode
-        _targetMode.value = mode
-
         try {
             audioRecordManager.startRecording(
                 scope = scope,
                 onEndpointDetected = if (continuousHandsFree) {
-                    { speechPcm -> processSpeechUtterance(scope, speechPcm, patientId) }
+                    { speechPcm -> processPcmSpeechUtterance(scope, speechPcm, patientId) }
                 } else null
             )
         } catch (e: MicrophoneUnavailableException) {
@@ -191,9 +264,9 @@ class VoiceChartingController(
     }
 
     /**
-     * Processes a segmented speech utterance detected automatically by the real-time VAD endpoint.
+     * Processes PCM audio detected from offline microphone capture.
      */
-    private fun processSpeechUtterance(
+    private fun processPcmSpeechUtterance(
         scope: CoroutineScope,
         speechPcm: ShortArray,
         patientId: String?
@@ -215,47 +288,9 @@ class VoiceChartingController(
                     return@launch
                 }
 
-                val parsed = commandParser.parseTranscript(
-                    transcript = transcript,
-                    mode = activeMode,
-                    numberingSystem = DentalRepository.toothNumberingSystem.value
-                )
-
-                when (parsed) {
-                    is ParsedVoiceCommand.SpokenUndo -> {
-                        val undone = DentalRepository.undoLastVoiceEntry(patientId)
-                        _uiState.value = VoiceDictationState.CommandParsed(
-                            rawTranscript = transcript,
-                            parsedCommand = parsed,
-                            targetMode = activeMode
-                        )
-                    }
-
-                    is ParsedVoiceCommand.SpokenConfirmation -> {
-                        if (parsed.confirmed && patientId != null && lastParsedCommand != null) {
-                            applyParsedCommand(patientId, lastParsedCommand!!, lastRawTranscript)
-                            lastParsedCommand = null
-                            lastRawTranscript = ""
-                        }
-                        _uiState.value = VoiceDictationState.CommandParsed(
-                            rawTranscript = transcript,
-                            parsedCommand = parsed,
-                            targetMode = activeMode
-                        )
-                    }
-
-                    else -> {
-                        lastParsedCommand = parsed
-                        lastRawTranscript = transcript
-                        _uiState.value = VoiceDictationState.CommandParsed(
-                            rawTranscript = transcript,
-                            parsedCommand = parsed,
-                            targetMode = activeMode
-                        )
-                    }
-                }
+                processFullUtterance(scope, transcript, patientId)
             } catch (e: Exception) {
-                safeLogE("Error transcribing real-time utterance", e)
+                safeLogE("Error transcribing PCM utterance", e)
                 if (audioRecordManager.isRecording()) {
                     _uiState.value = VoiceDictationState.Listening(0f, activeMode)
                 }
@@ -264,9 +299,104 @@ class VoiceChartingController(
     }
 
     /**
-     * Stops audio recording and triggers offline transcription and command parsing for manual capture.
+     * Complete full-utterance processor:
+     * 1. Uses AI / deterministic clinical extractor to parse multi-entity findings.
+     * 2. Checks for undo / confirmation commands.
+     * 3. Sets state to FindingsExtracted / CommandParsed.
+     * 4. Auto-applies if enabled.
      */
-    fun stopDictationAndProcess(scope: CoroutineScope) {
+    fun processFullUtterance(
+        scope: CoroutineScope,
+        transcript: String,
+        patientId: String?
+    ) {
+        scope.launch(Dispatchers.Default) {
+            try {
+                _uiState.value = VoiceDictationState.Transcribing(partialTranscript = transcript)
+
+                // 1. Spoken Undo / Spoken Confirmation check
+                val parsedCommand = commandParser.parseTranscript(
+                    transcript = transcript,
+                    mode = activeMode,
+                    numberingSystem = DentalRepository.toothNumberingSystem.value
+                )
+
+                when (parsedCommand) {
+                    is ParsedVoiceCommand.SpokenUndo -> {
+                        val undone = DentalRepository.undoLastVoiceEntry(patientId)
+                        _uiState.value = VoiceDictationState.CommandParsed(
+                            rawTranscript = transcript,
+                            parsedCommand = parsedCommand,
+                            targetMode = activeMode
+                        )
+                        return@launch
+                    }
+                    is ParsedVoiceCommand.SpokenConfirmation -> {
+                        if (parsedCommand.confirmed && patientId != null) {
+                            lastFindings?.let { findings ->
+                                DentalRepository.applyClinicalFindings(patientId, findings)
+                                lastFindings = null
+                            }
+                            lastParsedCommand?.let { cmd ->
+                                applyParsedCommand(patientId, cmd, lastRawTranscript)
+                                lastParsedCommand = null
+                            }
+                        }
+                        _uiState.value = VoiceDictationState.CommandParsed(
+                            rawTranscript = transcript,
+                            parsedCommand = parsedCommand,
+                            targetMode = activeMode
+                        )
+                        return@launch
+                    }
+                    else -> {}
+                }
+
+                // 2. AI & Rule-based multi-entity clinical extraction
+                val findings = ClinicalVoiceExtractor.extract(transcript, context)
+                lastFindings = findings
+                lastParsedCommand = parsedCommand
+                lastRawTranscript = transcript
+
+                if (findings.isEmpty && parsedCommand is ParsedVoiceCommand.Unrecognized) {
+                    _uiState.value = VoiceDictationState.CommandParsed(
+                        rawTranscript = transcript,
+                        parsedCommand = parsedCommand,
+                        targetMode = activeMode
+                    )
+                    return@launch
+                }
+
+                // Check auto-apply
+                val autoApply = DentalRepository.isVoiceAutoApplyEnabled.value
+                if (autoApply && !findings.requiresReview && patientId != null && !findings.isEmpty) {
+                    DentalRepository.applyClinicalFindings(patientId, findings)
+                    _uiState.value = VoiceDictationState.Success("Applied ${findings.totalCount} findings to patient chart")
+                } else {
+                    _uiState.value = VoiceDictationState.FindingsExtracted(
+                        rawTranscript = transcript,
+                        findings = findings,
+                        targetMode = activeMode
+                    )
+                }
+            } catch (e: Exception) {
+                safeLogE("Error processing full speech utterance", e)
+                _uiState.value = VoiceDictationState.Error(e.message ?: "Failed to process dictation")
+            }
+        }
+    }
+
+    /**
+     * Stops audio recording and triggers transcription for manual capture.
+     */
+    fun stopDictationAndProcess(scope: CoroutineScope, patientId: String? = null) {
+        val recognizer = speechRecognizerManager
+        if (recognizer != null && recognizer.isListening.value) {
+            _uiState.value = VoiceDictationState.Transcribing()
+            recognizer.stopListening()
+            return
+        }
+
         if (!audioRecordManager.isRecording() && _uiState.value !is VoiceDictationState.Listening) {
             return
         }
@@ -285,20 +415,7 @@ class VoiceChartingController(
                     return@launch
                 }
 
-                val parsedCommand = commandParser.parseTranscript(
-                    transcript = transcript,
-                    mode = activeMode,
-                    numberingSystem = DentalRepository.toothNumberingSystem.value
-                )
-
-                lastParsedCommand = parsedCommand
-                lastRawTranscript = transcript
-
-                _uiState.value = VoiceDictationState.CommandParsed(
-                    rawTranscript = transcript,
-                    parsedCommand = parsedCommand,
-                    targetMode = activeMode
-                )
+                processFullUtterance(scope, transcript, patientId)
             } catch (e: SpeechEngineUnavailableException) {
                 safeLogE("Transcription unavailable", e)
                 _uiState.value = VoiceDictationState.Unavailable(e.message ?: ENGINE_LOAD_FAILED)
@@ -310,6 +427,16 @@ class VoiceChartingController(
     }
 
     /**
+     * Applies extracted clinical findings directly to the patient chart in DentalRepository.
+     */
+    fun applyClinicalFindings(
+        patientId: String,
+        findings: ClinicalFindings
+    ): Boolean {
+        return DentalRepository.applyClinicalFindings(patientId, findings)
+    }
+
+    /**
      * Applies the parsed voice command to the patient record in DentalRepository.
      */
     fun applyParsedCommand(
@@ -317,7 +444,6 @@ class VoiceChartingController(
         command: ParsedVoiceCommand,
         transcript: String = ""
     ): Boolean {
-        // One persistent undo point per utterance, taken before anything is written
         DentalRepository.captureVoiceUndoPoint(patientId, undoDescriptionFor(command))
 
         val hasImplausible = when (command) {
@@ -402,6 +528,7 @@ class VoiceChartingController(
      */
     fun resetState() {
         try {
+            speechRecognizerManager?.cancel()
             audioRecordManager.stopRecording()
         } catch (e: Exception) {
             safeLogE("Error stopping recording during reset", e)

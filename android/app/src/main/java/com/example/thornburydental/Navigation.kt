@@ -78,6 +78,8 @@ fun MainNavigation() {
             )
         }
         RootDestination.CLINIC -> {
+            val context = androidx.compose.ui.platform.LocalContext.current
+
             // Centralized tab click handler: handles pop-to-root and seamless branch transitions
             fun navigateToTab(destination: AppDestination) {
                 if (currentTab == destination) {

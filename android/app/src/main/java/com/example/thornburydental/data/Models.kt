@@ -41,17 +41,22 @@ enum class ToothCondition(val label: String, val code: String) {
     CROWN("Full Crown", "Cr"),
     MISSING("Missing", "M"),
     IMPLANT("Dental Implant", "Imp"),
-    ROOT_CANAL("Endodontic / Root Canal", "RCT")
+    ROOT_CANAL("Endodontic / Root Canal", "RCT"),
+    EXFOLIATED("Exfoliated / Primary Shed", "Exf"),
+    UNERUPTED("Unerupted / Developing Crypt", "Une")
 }
 
 @Serializable
 data class ToothRecord(
-    val number: Int,             // Universal numbering 1-32
-    val fdiNumber: Int,          // FDI numbering (11-48)
+    val number: Int,             // Universal numbering 1-32 (or pediatric letter code index)
+    val fdiNumber: Int,          // FDI numbering (11-48 permanent, 51-85 primary)
     val name: String,
     val arch: String,            // "Maxillary (Upper)" or "Mandibular (Lower)"
     val condition: ToothCondition = ToothCondition.SOUND,
-    val notes: String = ""
+    val notes: String = "",
+    val isPrimary: Boolean = false,
+    val isExfoliated: Boolean = false,
+    val permanentSuccessorFdi: Int? = null
 )
 
 @Serializable

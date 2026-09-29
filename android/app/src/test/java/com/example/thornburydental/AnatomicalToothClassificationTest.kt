@@ -3,7 +3,7 @@ package com.example.thornburydental
 import com.example.thornburydental.data.ToothAnatomyType
 import com.example.thornburydental.data.ToothCondition
 import com.example.thornburydental.data.ToothRecord
-import com.example.thornburydental.ui.components.getToothAnatomyType
+import com.example.thornburydental.data.getToothAnatomyType
 import com.example.thornburydental.ui.components.isMaxillaryTooth
 import org.junit.Assert.*
 import org.junit.Test

@@ -24,6 +24,58 @@ object ChartReadBack {
     /** Beyond this many readings, the tail is summarised rather than recited one by one. */
     private const val MAX_SPOKEN_READINGS = 6
 
+    fun spokenSummary(findings: ClinicalFindings): String {
+        if (findings.isEmpty) {
+            return "No clinical findings recognised."
+        }
+
+        val parts = mutableListOf<String>()
+
+        if (findings.warnings.isNotEmpty()) {
+            parts.add("Warning: " + findings.warnings.first())
+        }
+
+        // Tooth conditions
+        for (cond in findings.toothConditions.take(3)) {
+            val surfaceStr = if (cond.surface.isNotBlank()) " surface ${cond.surface}" else ""
+            val condLabel = cond.condition.label.lowercase(Locale.US)
+            parts.add("Tooth ${cond.toothNumber} $condLabel$surfaceStr")
+        }
+        if (findings.toothConditions.size > 3) {
+            parts.add("plus ${findings.toothConditions.size - 3} more teeth")
+        }
+
+        // Perio probing
+        for (perio in findings.perioMeasurements.take(3)) {
+            val siteStr = if (perio.site.isNotBlank()) " ${perio.site}" else ""
+            val bopStr = if (perio.isBleeding) " with bleeding" else ""
+            parts.add("Tooth ${perio.toothNumber}$siteStr, ${perio.depthMm} millimetres$bopStr")
+        }
+        if (findings.perioMeasurements.size > 3) {
+            parts.add("plus ${findings.perioMeasurements.size - 3} more perio sites")
+        }
+
+        // Treatment plans
+        for (tx in findings.treatmentPlanItems.take(2)) {
+            val toothStr = if (tx.toothNumber != null) " on tooth ${tx.toothNumber}" else ""
+            parts.add("Plan ${tx.procedure}$toothStr")
+        }
+
+        // Examination questions
+        val exam = findings.examFindings
+        if (exam.chiefComplaints.isNotEmpty()) {
+            parts.add("Complaint: ${exam.chiefComplaints.first()}")
+        }
+        if (exam.diagnosis.isNotBlank()) {
+            parts.add("Diagnosis: ${exam.diagnosis}")
+        }
+        if (exam.functionalHabits.isNotEmpty()) {
+            parts.add("Habits: ${exam.functionalHabits.joinToString(", ")}")
+        }
+
+        return parts.joinToString(". ") + "."
+    }
+
     fun spokenSummary(command: ParsedVoiceCommand): String = when (command) {
         is ParsedVoiceCommand.Unrecognized ->
             "Not recognised. " + command.reason

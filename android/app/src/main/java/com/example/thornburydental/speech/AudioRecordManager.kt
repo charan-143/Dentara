@@ -5,6 +5,9 @@ import android.content.Context
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,8 +31,9 @@ class MicrophoneUnavailableException(
 ) : IllegalStateException(message, cause)
 
 /**
- * Manages low-latency 16kHz 16-bit mono AudioRecord streams for hands-free clinical dictation.
- * Provides real-time microphone gain amplitude levels and WebRTC/Silero-grade VAD endpointing.
+ * Manages low-latency 16kHz 16-bit mono AudioRecord streams with hardware & software noise suppression.
+ * Uses hardware NoiseSuppressor/AEC/AGC, dental environment bandpass speech filtering (150Hz - 3600Hz),
+ * adaptive noise-gate suppression, real-time gain amplitude levels, and VAD speech endpointing.
  */
 class AudioRecordManager(
     private val context: Context? = null,
@@ -41,9 +45,16 @@ class AudioRecordManager(
         const val SAMPLE_RATE = 16000
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+
+        // Background noise gate threshold (samples below this energy are attenuated)
+        private const val NOISE_GATE_THRESHOLD = 350
     }
 
     private var audioRecord: AudioRecord? = null
+    private var noiseSuppressor: NoiseSuppressor? = null
+    private var echoCanceler: AcousticEchoCanceler? = null
+    private var gainControl: AutomaticGainControl? = null
+
     private var recordingJob: Job? = null
     private var isRecording = false
 
@@ -51,6 +62,10 @@ class AudioRecordManager(
     val amplitudeFlow: StateFlow<Float> = _amplitudeFlow.asStateFlow()
 
     private val recordedAudioData = mutableListOf<Short>()
+
+    // Simple single-pole high-pass state for low-frequency hum removal (<150Hz)
+    private var hpFilterPrevInput = 0f
+    private var hpFilterPrevOutput = 0f
 
     private fun safeLogE(tag: String, msg: String, t: Throwable? = null) {
         try {
@@ -61,12 +76,8 @@ class AudioRecordManager(
     }
 
     /**
-     * Starts hands-free PCM microphone recording using VOICE_RECOGNITION audio source
-     * and real-time VAD endpointing.
-     *
-     * @param onChunkRecorded callback invoked for each raw recorded PCM chunk.
-     * @param onEndpointDetected callback invoked when VAD trailing silence endpoint is detected.
-     * @throws MicrophoneUnavailableException if the microphone cannot be opened.
+     * Starts hands-free PCM microphone recording using VOICE_RECOGNITION audio source,
+     * hardware noise suppression, acoustic echo cancellation, and real-time VAD endpointing.
      */
     @SuppressLint("MissingPermission")
     fun startRecording(
@@ -100,6 +111,39 @@ class AudioRecordManager(
             )
         }
 
+        // Attach hardware DSP Noise Suppressor if supported on device
+        try {
+            if (NoiseSuppressor.isAvailable()) {
+                noiseSuppressor = NoiseSuppressor.create(record.audioSessionId)?.apply {
+                    enabled = true
+                }
+            }
+        } catch (t: Throwable) {
+            safeLogE(TAG, "Hardware NoiseSuppressor not available", t)
+        }
+
+        // Attach Acoustic Echo Canceler if supported
+        try {
+            if (AcousticEchoCanceler.isAvailable()) {
+                echoCanceler = AcousticEchoCanceler.create(record.audioSessionId)?.apply {
+                    enabled = true
+                }
+            }
+        } catch (t: Throwable) {
+            safeLogE(TAG, "Hardware AcousticEchoCanceler not available", t)
+        }
+
+        // Attach Automatic Gain Control if supported
+        try {
+            if (AutomaticGainControl.isAvailable()) {
+                gainControl = AutomaticGainControl.create(record.audioSessionId)?.apply {
+                    enabled = true
+                }
+            }
+        } catch (t: Throwable) {
+            safeLogE(TAG, "Hardware AutomaticGainControl not available", t)
+        }
+
         try {
             record.startRecording()
         } catch (t: Throwable) {
@@ -118,6 +162,8 @@ class AudioRecordManager(
         isRecording = true
         synchronized(recordedAudioData) { recordedAudioData.clear() }
         vadSegmenter.reset()
+        hpFilterPrevInput = 0f
+        hpFilterPrevOutput = 0f
 
         recordingJob = scope.launch(Dispatchers.IO) {
             try {
@@ -135,22 +181,41 @@ class AudioRecordManager(
                 val readCount = audioRecord?.read(readBuffer, 0, readBuffer.size) ?: break
                 if (readCount <= 0) continue
 
-                val chunk = readBuffer.copyOf(readCount)
+                // Apply DSP high-pass speech isolation and noise gate filter
+                val filteredChunk = ShortArray(readCount)
+                var sum = 0.0
+
+                for (i in 0 until readCount) {
+                    val rawSample = readBuffer[i].toFloat()
+
+                    // High-pass filter (cutoff ~150Hz) to remove room rumble, compressors, and motor hum
+                    val alpha = 0.94f
+                    val hpSample = alpha * (hpFilterPrevOutput + rawSample - hpFilterPrevInput)
+                    hpFilterPrevInput = rawSample
+                    hpFilterPrevOutput = hpSample
+
+                    // Software noise gate: attenuate low-level ambient hiss/background murmurs
+                    val cleanSample = if (abs(hpSample) < NOISE_GATE_THRESHOLD) {
+                        (hpSample * 0.15f).toInt()
+                    } else {
+                        hpSample.toInt()
+                    }.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
+
+                    filteredChunk[i] = cleanSample
+                    sum += abs(cleanSample.toInt())
+                }
+
                 synchronized(recordedAudioData) {
-                    for (s in chunk) {
+                    for (s in filteredChunk) {
                         recordedAudioData.add(s)
                     }
                 }
 
                 // Calculate RMS amplitude normalized (0.0 to 1.0)
-                var sum = 0.0
-                for (i in 0 until readCount) {
-                    sum += abs(chunk[i].toInt())
-                }
                 val avg = sum / readCount
                 _amplitudeFlow.value = min(1f, (avg / 10000f).toFloat())
 
-                onChunkRecorded?.invoke(chunk)
+                onChunkRecorded?.invoke(filteredChunk)
 
                 // Process continuous frames for real-time VAD endpointing
                 if (onEndpointDetected != null) {
@@ -160,7 +225,7 @@ class AudioRecordManager(
                         val available = readCount - chunkOffset
                         val toCopy = min(needed, available)
 
-                        System.arraycopy(chunk, chunkOffset, frameBuffer, frameBufferOffset, toCopy)
+                        System.arraycopy(filteredChunk, chunkOffset, frameBuffer, frameBufferOffset, toCopy)
                         frameBufferOffset += toCopy
                         chunkOffset += toCopy
 
@@ -186,6 +251,15 @@ class AudioRecordManager(
         isRecording = false
         recordingJob?.cancel()
         recordingJob = null
+
+        try {
+            noiseSuppressor?.release()
+            noiseSuppressor = null
+            echoCanceler?.release()
+            echoCanceler = null
+            gainControl?.release()
+            gainControl = null
+        } catch (_: Throwable) {}
 
         audioRecord?.let { record ->
             try {

@@ -1,5 +1,7 @@
 package com.example.thornburydental.ui.clinic
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,8 +59,6 @@ fun ScheduleScreen(
     var bookingTargetPatient by remember { mutableStateOf<Patient?>(null) }
     var appointmentToCancel by remember { mutableStateOf<Appointment?>(null) }
 
-    // Appointments on the selected calendar day only — everything below this
-    // (filters, counts, the list) is scoped to that one day.
     val dayAppointments = remember(appointments, selectedDate) {
         appointments.filter { it.date == selectedDate }
     }
@@ -94,12 +94,13 @@ fun ScheduleScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = ThornburyCanvas,
-            border = BorderStroke(1.dp, ThornburyHairline)
+            border = BorderStroke(1.dp, ThornburyHairline),
+            tonalElevation = 1.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -108,15 +109,16 @@ fun ScheduleScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Surgery Schedule & Booking",
+                            text = "Surgery Schedule",
                             style = MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = (-0.3).sp
                             ),
                             color = ThornburyInk
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(3.dp))
                         Text(
-                            text = "Manage surgery appointments, chair allocations, and book patient visits",
+                            text = "Manage chair allocations and book surgical visits",
                             style = MaterialTheme.typography.bodyMedium,
                             color = ThornburyMuted
                         )
@@ -126,11 +128,13 @@ fun ScheduleScreen(
 
                     Button(
                         onClick = { showSelectPatientDialog = true },
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = ThornburyPrimary,
                             contentColor = Color.White
-                        )
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp, pressedElevation = 4.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
@@ -139,7 +143,7 @@ fun ScheduleScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Book Appointment",
+                            text = "Book Visit",
                             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                         )
                     }
@@ -148,14 +152,12 @@ fun ScheduleScreen(
         }
 
         if (isCompact) {
-            // =================================================================
-            // COMPACT LAYOUT (Single scrolling column for phones < 600dp)
-            // =================================================================
+            // COMPACT LAYOUT (Single scrolling column for phones)
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(bottom = 32.dp)
+                contentPadding = PaddingValues(bottom = 36.dp)
             ) {
-                item {
+                item(key = "week_strip") {
                     WeekStripSelector(
                         selectedDate = selectedDate,
                         appointments = appointments,
@@ -166,7 +168,7 @@ fun ScheduleScreen(
                     )
                 }
 
-                item {
+                item(key = "search_and_filters") {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -185,17 +187,55 @@ fun ScheduleScreen(
                     }
                 }
 
+                item(key = "schedule_header") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Appointments for ${isoDateDisplayLabel(selectedDate)}",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = ThornburyInk
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = ThornburySurfaceSoft,
+                            border = BorderStroke(1.dp, ThornburyHairline)
+                        ) {
+                            AnimatedContent(
+                                targetState = filteredAppointments.size,
+                                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                                label = "FilteredApptCountAnim"
+                            ) { count ->
+                                Text(
+                                    text = "$count booked",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburyPrimaryText
+                                )
+                            }
+                        }
+                    }
+                }
+
                 if (filteredAppointments.isEmpty()) {
-                    item {
+                    item(key = "empty_state") {
                         ScheduleEmptyCard(
                             isDayEmpty = dayAppointments.isEmpty(),
                             selectedDate = selectedDate,
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp)
                         )
                     }
                 } else {
                     items(filteredAppointments, key = { it.id }) { appt ->
-                        Box(modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .animateItem()
+                                .padding(horizontal = 20.dp, vertical = 5.dp)
+                        ) {
                             ScheduleAppointmentCard(
                                 appt = appt,
                                 onOpenPatientChart = onOpenPatientChart,
@@ -206,9 +246,7 @@ fun ScheduleScreen(
                 }
             }
         } else {
-            // =================================================================
-            // TABLET / EXPANDED LAYOUT (2-column layout for >= 600dp)
-            // =================================================================
+            // TABLET / EXPANDED LAYOUT (2-column responsive layout)
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -225,7 +263,7 @@ fun ScheduleScreen(
                 ) {
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.outlinedCardColors(containerColor = ThornburyCanvas),
                         border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
@@ -241,7 +279,7 @@ fun ScheduleScreen(
 
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
                         border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
@@ -264,13 +302,13 @@ fun ScheduleScreen(
                     // Day Metrics Summary
                     OutlinedCard(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(18.dp),
                         colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
                         border = BorderStroke(1.dp, ThornburyHairline)
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "Selected Day Summary",
+                                text = "Day Summary",
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                                 color = ThornburyInk
                             )
@@ -280,22 +318,28 @@ fun ScheduleScreen(
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ThornburyMuted
                             )
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(14.dp))
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceEvenly
                             ) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = "$confirmedCount", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyPrimaryText)
-                                    Text(text = "Upcoming", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyMuted)
+                                    AnimatedContent(targetState = confirmedCount, label = "SummaryConfirmed") { c ->
+                                        Text(text = "$c", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = ThornburyPrimaryText)
+                                    }
+                                    Text(text = "Upcoming", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = ThornburyMuted)
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = "$completedCount", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
-                                    Text(text = "Seen", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyMuted)
+                                    AnimatedContent(targetState = completedCount, label = "SummaryCompleted") { c ->
+                                        Text(text = "$c", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = ThornburySuccess)
+                                    }
+                                    Text(text = "Seen", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = ThornburyMuted)
                                 }
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = "$cancelledCount", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyError)
-                                    Text(text = "Cancelled", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyMuted)
+                                    AnimatedContent(targetState = cancelledCount, label = "SummaryCancelled") { c ->
+                                        Text(text = "$c", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold), color = ThornburyError)
+                                    }
+                                    Text(text = "Cancelled", style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp), color = ThornburyMuted)
                                 }
                             }
                         }
@@ -332,12 +376,18 @@ fun ScheduleScreen(
                             color = ThornburySurfaceSoft,
                             border = BorderStroke(1.dp, ThornburyHairline)
                         ) {
-                            Text(
-                                text = "${filteredAppointments.size} booked",
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                color = ThornburyPrimaryText
-                            )
+                            AnimatedContent(
+                                targetState = filteredAppointments.size,
+                                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                                label = "TabletFilteredCount"
+                            ) { count ->
+                                Text(
+                                    text = "$count booked",
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburyPrimaryText
+                                )
+                            }
                         }
                     }
 
@@ -354,11 +404,13 @@ fun ScheduleScreen(
                             contentPadding = PaddingValues(bottom = 24.dp)
                         ) {
                             items(filteredAppointments, key = { it.id }) { appt ->
-                                ScheduleAppointmentCard(
-                                    appt = appt,
-                                    onOpenPatientChart = onOpenPatientChart,
-                                    onCancelClick = { appointmentToCancel = it }
-                                )
+                                Box(modifier = Modifier.animateItem()) {
+                                    ScheduleAppointmentCard(
+                                        appt = appt,
+                                        onOpenPatientChart = onOpenPatientChart,
+                                        onCancelClick = { appointmentToCancel = it }
+                                    )
+                                }
                             }
                         }
                     }
@@ -366,10 +418,6 @@ fun ScheduleScreen(
             }
         }
     }
-
-    // =========================================================================
-    // MODALS & DIALOGS
-    // =========================================================================
 
     // Modal 1: Select Patient Dialog
     if (showSelectPatientDialog) {
@@ -413,7 +461,7 @@ fun ScheduleScreen(
                             )
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
+                        shape = RoundedCornerShape(12.dp),
                         singleLine = true
                     )
 
@@ -437,7 +485,7 @@ fun ScheduleScreen(
                                     showSelectPatientDialog = false
                                     onNavigateToRegisterPatient()
                                 },
-                                shape = RoundedCornerShape(8.dp),
+                                shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(1.dp, ThornburyPrimary)
                             ) {
                                 Icon(
@@ -462,7 +510,7 @@ fun ScheduleScreen(
                                             bookingTargetPatient = patient
                                             showSelectPatientDialog = false
                                         },
-                                    shape = RoundedCornerShape(10.dp),
+                                    shape = RoundedCornerShape(12.dp),
                                     color = ThornburySurfaceSoft,
                                     border = BorderStroke(1.dp, ThornburyHairlineSoft)
                                 ) {
@@ -480,7 +528,7 @@ fun ScheduleScreen(
                                                 color = ThornburyInk
                                             )
                                             Text(
-                                                text = "${patient.opNo} • DOB: ${patient.dob}",
+                                                text = "OP: ${patient.opNo} • DOB: ${patient.dob}",
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = ThornburyMuted
                                             )
@@ -537,6 +585,14 @@ fun ScheduleScreen(
     if (appointmentToCancel != null) {
         AlertDialog(
             onDismissRequest = { appointmentToCancel = null },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.WarningAmber,
+                    contentDescription = null,
+                    tint = ThornburyError,
+                    modifier = Modifier.size(28.dp)
+                )
+            },
             title = {
                 Text(
                     text = "Cancel Appointment",
@@ -546,7 +602,7 @@ fun ScheduleScreen(
             },
             text = {
                 Text(
-                    text = "Are you sure you want to cancel the appointment for ${appointmentToCancel?.patientName} (${appointmentToCancel?.procedure}) scheduled at ${formatTimeWithAmPm(appointmentToCancel?.time ?: "")}?",
+                    text = "Are you sure you want to cancel the surgery appointment for ${appointmentToCancel?.patientName} (${appointmentToCancel?.procedure}) at ${formatTimeWithAmPm(appointmentToCancel?.time ?: "")}?",
                     style = MaterialTheme.typography.bodyMedium,
                     color = ThornburyBody
                 )
@@ -559,17 +615,22 @@ fun ScheduleScreen(
                         }
                         appointmentToCancel = null
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = ThornburyError)
+                    colors = ButtonDefaults.buttonColors(containerColor = ThornburyError),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("Confirm Cancel", color = Color.White)
+                    Text("Confirm Cancel", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { appointmentToCancel = null }) {
+                OutlinedButton(
+                    onClick = { appointmentToCancel = null },
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
                     Text("Keep Appointment", color = ThornburyInk)
                 }
             },
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(18.dp),
             containerColor = ThornburyCanvas,
             modifier = Modifier.adaptiveDialogWidth(480.dp)
         )
@@ -599,16 +660,22 @@ private fun ScheduleSearchField(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",
-                tint = ThornburyMuted
+                tint = ThornburyMuted,
+                modifier = Modifier.size(20.dp)
             )
         },
         trailingIcon = {
-            if (searchQuery.isNotEmpty()) {
+            AnimatedVisibility(
+                visible = searchQuery.isNotEmpty(),
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut()
+            ) {
                 IconButton(onClick = { onSearchQueryChange("") }) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Clear",
-                        tint = ThornburyMuted
+                        tint = ThornburyMuted,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -619,7 +686,8 @@ private fun ScheduleSearchField(
             focusedContainerColor = ThornburyCanvas,
             unfocusedContainerColor = ThornburyCanvas,
             focusedBorderColor = ThornburyPrimary,
-            unfocusedBorderColor = ThornburyHairline
+            unfocusedBorderColor = ThornburyHairline,
+            cursorColor = ThornburyPrimary
         ),
         singleLine = true
     )
@@ -630,39 +698,61 @@ private fun ScheduleStatusFilterRow(
     statusFilter: String,
     onStatusFilterChange: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = "Appointment Status",
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-            color = ThornburyMuted
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        val statusOptions = listOf(
+            "all" to "All Statuses",
+            "confirmed" to "Upcoming",
+            "completed" to "Seen",
+            "cancelled" to "Cancelled"
         )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val statusOptions = listOf(
-                "all" to "All",
-                "confirmed" to "Upcoming",
-                "completed" to "Seen",
-                "cancelled" to "Cancelled"
+        statusOptions.forEach { (key, label) ->
+            val isSelected = statusFilter == key
+            val targetBg by animateColorAsState(
+                targetValue = if (isSelected) ThornburyPrimary else ThornburySurfaceSoft,
+                animationSpec = tween(220),
+                label = "ScheduleFilterChipBg"
             )
-            statusOptions.forEach { (key, label) ->
-                val isSelected = statusFilter == key
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onStatusFilterChange(key) },
-                    label = { Text(label) },
-                    shape = RoundedCornerShape(12.dp),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = ThornburyPrimary,
-                        selectedLabelColor = Color.White,
-                        containerColor = ThornburySurfaceSoft,
-                        labelColor = ThornburyInk
+
+            FilterChip(
+                selected = isSelected,
+                onClick = { onStatusFilterChange(key) },
+                label = {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
                     )
+                },
+                leadingIcon = if (isSelected) {
+                    {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = ThornburyOnPrimary
+                        )
+                    }
+                } else null,
+                shape = RoundedCornerShape(20.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = ThornburyPrimary,
+                    selectedLabelColor = ThornburyOnPrimary,
+                    containerColor = targetBg,
+                    labelColor = ThornburyBody
+                ),
+                border = FilterChipDefaults.filterChipBorder(
+                    enabled = true,
+                    selected = isSelected,
+                    borderColor = ThornburyHairline,
+                    selectedBorderColor = ThornburyPrimary
                 )
-            }
+            )
         }
     }
 }
@@ -673,17 +763,22 @@ private fun ScheduleAppointmentCard(
     onOpenPatientChart: (String) -> Unit,
     onCancelClick: (Appointment) -> Unit
 ) {
-    OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceCard),
-        border = BorderStroke(1.dp, ThornburyHairline)
+    val isConfirmed = appt.status == "confirmed"
+
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy)),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = ThornburySurfaceCard),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp, pressedElevation = 5.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(18.dp)
         ) {
+            // Top Row: Time Badge, Reminder Pill, and Animated Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -735,7 +830,7 @@ private fun ScheduleAppointmentCard(
                                     modifier = Modifier.size(12.dp)
                                 )
                                 Text(
-                                    text = "${appt.reminderLeadTimeMin}m reminder",
+                                    text = "${appt.reminderLeadTimeMin}m",
                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                     color = ThornburyInk
                                 )
@@ -743,22 +838,30 @@ private fun ScheduleAppointmentCard(
                         }
                     }
 
-                    val (statusText, statusBg, statusFg) = when (appt.status) {
-                        "completed" -> Triple("Seen", ThornburySuccessWash, ThornburySuccess)
-                        "cancelled" -> Triple("Cancelled", ThornburyErrorWash, ThornburyError)
-                        else -> Triple("Confirmed", ThornburyPrimaryWash, ThornburyPrimaryText)
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(9999.dp),
-                        color = statusBg,
-                        border = BorderStroke(1.dp, statusFg.copy(alpha = 0.3f))
-                    ) {
-                        Text(
-                            text = statusText,
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = statusFg
-                        )
+                    AnimatedContent(
+                        targetState = appt.status,
+                        transitionSpec = {
+                            fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
+                        },
+                        label = "ScheduleApptStatusAnim"
+                    ) { status ->
+                        val (statusText, statusBg, statusFg) = when (status) {
+                            "completed" -> Triple("Seen", ThornburySuccessWash, ThornburySuccess)
+                            "cancelled" -> Triple("Cancelled", ThornburyErrorWash, ThornburyError)
+                            else -> Triple("Upcoming", ThornburyPrimaryWash, ThornburyPrimaryText)
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(9999.dp),
+                            color = statusBg,
+                            border = BorderStroke(1.dp, statusFg.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = statusText,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = statusFg
+                            )
+                        }
                     }
                 }
             }
@@ -800,7 +903,7 @@ private fun ScheduleAppointmentCard(
                     Icon(
                         imageVector = Icons.Default.MedicalServices,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(15.dp),
                         tint = ThornburyPrimary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -819,7 +922,7 @@ private fun ScheduleAppointmentCard(
                     Icon(
                         imageVector = Icons.Default.Person,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(15.dp),
                         tint = ThornburyMuted
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -831,9 +934,9 @@ private fun ScheduleAppointmentCard(
                 }
 
                 if (!appt.allergyList.isNullOrBlank()) {
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
+                        shape = RoundedCornerShape(8.dp),
                         color = ThornburyErrorWash
                     ) {
                         Row(
@@ -846,7 +949,7 @@ private fun ScheduleAppointmentCard(
                                 modifier = Modifier.size(14.dp),
                                 tint = ThornburyError
                             )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Allergies: ${appt.allergyList}",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
@@ -859,46 +962,49 @@ private fun ScheduleAppointmentCard(
 
             Spacer(modifier = Modifier.height(14.dp))
             HorizontalDivider(color = ThornburyHairlineSoft, thickness = 1.dp)
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedButton(
                     onClick = { onOpenPatientChart(appt.patientId) },
-                    shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, ThornburyHairline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = ThornburyInk),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                     modifier = Modifier
                         .weight(1f)
-                        .height(36.dp)
+                        .height(38.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.FolderOpen,
                         contentDescription = null,
                         modifier = Modifier.size(15.dp)
                     )
-                    Spacer(modifier = Modifier.width(3.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "Chart",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 }
 
-                if (appt.status == "confirmed") {
-                    OutlinedButton(
+                if (isConfirmed) {
+                    FilledTonalButton(
                         onClick = { DentalRepository.updateAppointmentStatus(appt.id, "completed") },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = ThornburySuccessWash,
                             contentColor = ThornburySuccess
                         ),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(36.dp)
+                            .height(38.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Check,
@@ -906,25 +1012,26 @@ private fun ScheduleAppointmentCard(
                             tint = ThornburySuccess,
                             modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(3.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Mark Seen",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                         )
                     }
 
                     OutlinedButton(
                         onClick = { onCancelClick(appt) },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, ThornburyError.copy(alpha = 0.4f)),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = ThornburyError
                         ),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(36.dp)
+                            .height(38.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
@@ -932,12 +1039,12 @@ private fun ScheduleAppointmentCard(
                             tint = ThornburyError,
                             modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(3.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "Cancel",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold)
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                         )
                     }
                 }
@@ -952,10 +1059,21 @@ private fun ScheduleEmptyCard(
     selectedDate: String,
     modifier: Modifier = Modifier
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ScheduleEmptyFloating")
+    val floatOffset by infiniteTransition.animateFloat(
+        initialValue = -4f,
+        targetValue = 4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "FloatingAnimation"
+    )
+
     OutlinedCard(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.outlinedCardColors(containerColor = ThornburyCanvas),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft.copy(alpha = 0.5f)),
         border = BorderStroke(1.dp, ThornburyHairline)
     ) {
         Column(
@@ -965,26 +1083,37 @@ private fun ScheduleEmptyCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.EventBusy,
-                contentDescription = null,
-                modifier = Modifier.size(48.dp),
-                tint = ThornburyMutedSoft
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            Surface(
+                modifier = Modifier
+                    .size(64.dp)
+                    .offset(y = floatOffset.dp),
+                shape = CircleShape,
+                color = ThornburySurfaceCard,
+                border = BorderStroke(1.dp, ThornburyHairline)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.EventBusy,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = ThornburyPrimaryText
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = if (isDayEmpty) "No Appointments This Day" else "No Matching Appointments",
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                 color = ThornburyInk
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = if (isDayEmpty) {
                     "Nothing booked for ${isoDateDisplayLabel(selectedDate)} yet."
                 } else {
                     "No appointments on ${isoDateDisplayLabel(selectedDate)} match your active status filter or search query."
                 },
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = ThornburyMuted,
                 modifier = Modifier.padding(horizontal = 16.dp),
                 textAlign = TextAlign.Center,
@@ -995,12 +1124,7 @@ private fun ScheduleEmptyCard(
 }
 
 /**
- * Horizontal 7-day (Monday-Sunday) week strip: month/year label with
- * previous/next-week navigation and a "Today" jump button, then one column
- * per day showing the weekday letters, day-of-month in a circle (filled when
- * selected, tinted when it's today), and a small dot when that day has at
- * least one appointment on record (independent of the status/search
- * filters below, so the dot is a reliable "is anything booked here" signal).
+ * Modern Material 3 Horizontal 7-day (Monday-Sunday) week strip with smooth animated date selector
  */
 @Composable
 private fun WeekStripSelector(
@@ -1017,12 +1141,13 @@ private fun WeekStripSelector(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         color = ThornburyCanvas,
-        border = BorderStroke(1.dp, ThornburyHairline)
+        border = BorderStroke(1.dp, ThornburyHairline),
+        tonalElevation = 1.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .padding(horizontal = 20.dp, vertical = 14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1035,8 +1160,15 @@ private fun WeekStripSelector(
                     color = ThornburyInk
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (!isIsoDateToday(selectedDate)) {
-                        TextButton(onClick = onJumpToToday, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    AnimatedVisibility(
+                        visible = !isIsoDateToday(selectedDate),
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally()
+                    ) {
+                        TextButton(
+                            onClick = onJumpToToday,
+                            contentPadding = PaddingValues(horizontal = 8.dp)
+                        ) {
                             Text(
                                 text = "Today",
                                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
@@ -1061,7 +1193,7 @@ private fun WeekStripSelector(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(modifier = Modifier.fillMaxWidth()) {
                 weekDates.forEach { date ->
@@ -1069,11 +1201,31 @@ private fun WeekStripSelector(
                     val isToday = isIsoDateToday(date)
                     val hasAppointments = datesWithAppointments.contains(date)
 
+                    val targetContainerColor by animateColorAsState(
+                        targetValue = when {
+                            isSelected -> ThornburyPrimary
+                            isToday -> ThornburySurfaceSoft
+                            else -> Color.Transparent
+                        },
+                        animationSpec = tween(220),
+                        label = "DayPillBg"
+                    )
+
+                    val targetTextColor by animateColorAsState(
+                        targetValue = when {
+                            isSelected -> Color.White
+                            isToday -> ThornburyPrimaryText
+                            else -> ThornburyInk
+                        },
+                        animationSpec = tween(220),
+                        label = "DayPillText"
+                    )
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
+                            .clip(RoundedCornerShape(14.dp))
                             .clickable { onSelectDate(date) }
                             .padding(vertical = 6.dp)
                     ) {
@@ -1085,28 +1237,18 @@ private fun WeekStripSelector(
                             ),
                             color = if (isSelected) ThornburyPrimary else ThornburyMuted
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(5.dp))
                         Box(
                             modifier = Modifier
-                                .size(34.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    when {
-                                        isSelected -> ThornburyPrimary
-                                        isToday -> ThornburySurfaceSoft
-                                        else -> Color.Transparent
-                                    }
-                                ),
+                                .background(targetContainerColor),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = isoDateDayOfMonth(date).toString(),
                                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = when {
-                                    isSelected -> Color.White
-                                    isToday -> ThornburyPrimaryText
-                                    else -> ThornburyInk
-                                }
+                                color = targetTextColor
                             )
                         }
                         Spacer(modifier = Modifier.height(4.dp))

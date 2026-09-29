@@ -2,9 +2,10 @@ package com.example.thornburydental.ui.clinic
 
 import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -14,16 +15,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -36,9 +40,7 @@ import com.example.thornburydental.reminder.ReminderManager
 import com.example.thornburydental.theme.*
 
 /**
- * Redesigned Clinician Profile & Practice Settings Screen.
- * Displays clinician credentials, schedule reminders, clinical ergonomics,
- * local database telemetry, data privacy/FLAG_SECURE status, and account actions.
+ * Redesigned Clinician Profile & Practice Settings Screen with Material 3 & Fluid Animations.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,21 +94,23 @@ fun ProfileScreen(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = ThornburyCanvas,
-            border = BorderStroke(1.dp, ThornburyHairline)
+            border = BorderStroke(1.dp, ThornburyHairline),
+            tonalElevation = 1.dp
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
             ) {
                 Text(
                     text = "Clinician Profile & Practice",
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = (-0.3).sp
                     ),
                     color = ThornburyInk
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = "Operatory management, clinical ergonomics, and system preferences",
                     style = MaterialTheme.typography.bodyMedium,
@@ -222,25 +226,22 @@ fun ProfileScreen(
                         context = context
                     )
 
-                SecurityShieldTelemetryCard(
-                    patientsCount = patients.size,
-                    plansCount = treatmentPlans.size,
-                    reportsCount = reports.size,
-                    visitsCount = appointments.size,
-                    isBiometricAuthEnabled = isBiometricAuthEnabled,
-                    biometricLockTimeoutMinutes = biometricLockTimeoutMinutes,
-                    onBiometricAuthChange = { DentalRepository.setBiometricAuthEnabled(it) },
-                    onBiometricTimeoutChange = { DentalRepository.setBiometricLockTimeoutMinutes(it) }
-                )
+                    SecurityShieldTelemetryCard(
+                        patientsCount = patients.size,
+                        plansCount = treatmentPlans.size,
+                        reportsCount = reports.size,
+                        visitsCount = appointments.size,
+                        isBiometricAuthEnabled = isBiometricAuthEnabled,
+                        biometricLockTimeoutMinutes = biometricLockTimeoutMinutes,
+                        onBiometricAuthChange = { DentalRepository.setBiometricAuthEnabled(it) },
+                        onBiometricTimeoutChange = { DentalRepository.setBiometricLockTimeoutMinutes(it) }
+                    )
                 }
             }
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Dialogs: Edit Profile, Change Password
-    // -------------------------------------------------------------------------
-
+    // Dialogs: Edit Profile
     if (showEditProfileDialog) {
         var clinicianNameInput by remember { mutableStateOf(displayName) }
         var clinicianPhone by remember { mutableStateOf(currentUser?.phone ?: "+1 (503) 224-7700") }
@@ -256,20 +257,24 @@ fun ProfileScreen(
                     .adaptiveDialogWidth(500.dp)
                     .wrapContentHeight()
                     .padding(vertical = 16.dp),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = ThornburyCanvas),
                 border = BorderStroke(1.dp, ThornburyHairline)
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "Edit Clinician Profile", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                        Text(
+                            text = "Edit Clinician Profile",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = ThornburyInk
+                        )
                         IconButton(onClick = { showEditProfileDialog = false }, modifier = Modifier.size(28.dp)) {
                             Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = ThornburyMuted)
                         }
@@ -280,6 +285,7 @@ fun ProfileScreen(
                         onValueChange = { clinicianNameInput = it },
                         label = { Text("Clinician Full Name") },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
                         colors = thornburyTextFieldColors()
                     )
 
@@ -288,6 +294,7 @@ fun ProfileScreen(
                         onValueChange = { clinicianPhone = it },
                         label = { Text("Surgery Contact Telephone") },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
                         colors = thornburyTextFieldColors()
                     )
 
@@ -296,10 +303,11 @@ fun ProfileScreen(
                         onValueChange = { clinicianEmail = it },
                         label = { Text("Surgery Email Address") },
                         modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
                         colors = thornburyTextFieldColors()
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -318,9 +326,9 @@ fun ProfileScreen(
                                 Toast.makeText(context, "Clinician profile details updated", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary, contentColor = Color.White),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(10.dp)
                         ) {
-                            Text("Save Changes")
+                            Text("Save Changes", fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -336,13 +344,22 @@ private fun ClinicianIdentityCard(
     roleLabel: String,
     onEditClick: () -> Unit
 ) {
+    val infiniteTransition = rememberInfiniteTransition(label = "ActivePulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.25f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "PulseScale"
+    )
+
     ElevatedCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(BorderStroke(1.dp, ThornburyHairline), RoundedCornerShape(16.dp)),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = ThornburyCanvas),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.elevatedCardColors(containerColor = ThornburySurfaceCard),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp, pressedElevation = 5.dp)
     ) {
         Column(
             modifier = Modifier.padding(20.dp),
@@ -350,7 +367,7 @@ private fun ClinicianIdentityCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(76.dp)
+                    .size(78.dp)
                     .clip(CircleShape)
                     .background(ThornburyPrimary),
                 contentAlignment = Alignment.Center
@@ -369,9 +386,12 @@ private fun ClinicianIdentityCard(
             Text(
                 text = displayName,
                 style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = (-0.3).sp
                 ),
-                color = ThornburyInk
+                color = ThornburyInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             Spacer(modifier = Modifier.height(2.dp))
@@ -379,10 +399,12 @@ private fun ClinicianIdentityCard(
             Text(
                 text = "BDS, MSc Oral Surgery & Implantology",
                 style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-                color = ThornburyPrimaryText
+                color = ThornburyPrimaryText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -412,7 +434,8 @@ private fun ClinicianIdentityCard(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
+                                .size(7.dp)
+                                .scale(pulseScale)
                                 .clip(CircleShape)
                                 .background(ThornburySuccess)
                         )
@@ -437,7 +460,7 @@ private fun ClinicianIdentityCard(
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f, fill = false)
+                    modifier = Modifier.weight(1f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.MedicalServices,
@@ -456,27 +479,32 @@ private fun ClinicianIdentityCard(
                         text = roleLabel,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                         color = ThornburyInk,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
                 Spacer(modifier = Modifier.width(8.dp))
 
-                TextButton(
+                FilledTonalButton(
                     onClick = onEditClick,
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = ThornburyPrimaryWash,
+                        contentColor = ThornburyPrimaryText
+                    ),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = null,
                         modifier = Modifier.size(14.dp),
-                        tint = ThornburyPrimary
+                        tint = ThornburyPrimaryText
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Edit Name & Info",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyPrimary
+                        text = "Edit Profile",
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                     )
                 }
             }
@@ -494,8 +522,10 @@ private fun ScheduleRemindersCard(
     context: android.content.Context
 ) {
     OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
         border = BorderStroke(1.dp, ThornburyHairline)
     ) {
@@ -503,7 +533,7 @@ private fun ScheduleRemindersCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(imageVector = Icons.Default.NotificationsActive, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "Schedule Reminders & Daily Briefing", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                Text(text = "Schedule Reminders & Briefings", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = "Automated morning patient briefing and chairside arrival alerts", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
@@ -528,83 +558,98 @@ private fun ScheduleRemindersCard(
                 )
             }
 
-            if (morningReminderEnabled) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = ThornburyCanvas,
-                    border = BorderStroke(1.dp, ThornburyHairlineSoft),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Default.Alarm, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(text = "Briefing Time", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    val parts = morningReminderTime.split(":")
-                                    val initialHour = parts.getOrNull(0)?.filter { it.isDigit() }?.toIntOrNull() ?: 8
-                                    val initialMinute = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-                                    TimePickerDialog(
-                                        context,
-                                        { _, hourOfDay, minute ->
-                                            val formatted = String.format(java.util.Locale.US, "%02d:%02d", hourOfDay, minute)
-                                            onMorningReminderChange(true, formatted)
-                                        },
-                                        initialHour,
-                                        initialMinute,
-                                        false
-                                    ).show()
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                                border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.4f))
+            AnimatedVisibility(
+                visible = morningReminderEnabled,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = ThornburyCanvas,
+                        border = BorderStroke(1.dp, ThornburyHairlineSoft),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = ReminderManager.formatTime12Hour(morningReminderTime),
-                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = ThornburyPrimary
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = ThornburyPrimary)
-                            }
-                        }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Alarm, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(text = "Briefing Time", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                                }
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Quick presets
-                        LazyRow(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(listOf("07:00", "07:30", "08:00", "08:30", "09:00")) { presetTime ->
-                                val isSelected = morningReminderTime == presetTime
-                                FilterChip(
-                                    selected = isSelected,
-                                    onClick = { onMorningReminderChange(true, presetTime) },
-                                    label = {
-                                        Text(
-                                            text = ReminderManager.formatTime12Hour(presetTime),
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                            ),
-                                            maxLines = 1,
-                                            softWrap = false
-                                        )
+                                OutlinedButton(
+                                    onClick = {
+                                        val parts = morningReminderTime.split(":")
+                                        val initialHour = parts.getOrNull(0)?.filter { it.isDigit() }?.toIntOrNull() ?: 8
+                                        val initialMinute = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hourOfDay, minute ->
+                                                val formatted = String.format(java.util.Locale.US, "%02d:%02d", hourOfDay, minute)
+                                                onMorningReminderChange(true, formatted)
+                                            },
+                                            initialHour,
+                                            initialMinute,
+                                            false
+                                        ).show()
                                     },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = ThornburyPrimaryWash,
-                                        selectedLabelColor = ThornburyPrimaryText
+                                    shape = RoundedCornerShape(8.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                                    border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.4f))
+                                ) {
+                                    Text(
+                                        text = ReminderManager.formatTime12Hour(morningReminderTime),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = ThornburyPrimary
                                     )
-                                )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(12.dp), tint = ThornburyPrimary)
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Quick presets
+                            LazyRow(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(listOf("07:00", "07:30", "08:00", "08:30", "09:00")) { presetTime ->
+                                    val isSelected = morningReminderTime == presetTime
+                                    val chipBg by animateColorAsState(
+                                        targetValue = if (isSelected) ThornburyPrimary else ThornburySurfaceSoft,
+                                        animationSpec = tween(220),
+                                        label = "PresetTimeChipBg"
+                                    )
+
+                                    FilterChip(
+                                        selected = isSelected,
+                                        onClick = { onMorningReminderChange(true, presetTime) },
+                                        label = {
+                                            Text(
+                                                text = ReminderManager.formatTime12Hour(presetTime),
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                ),
+                                                maxLines = 1,
+                                                softWrap = false
+                                            )
+                                        },
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = ThornburyPrimary,
+                                            selectedLabelColor = ThornburyOnPrimary,
+                                            containerColor = chipBg,
+                                            labelColor = ThornburyBody
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -634,6 +679,12 @@ private fun ScheduleRemindersCard(
                         )
                     ) { (leadMin, label) ->
                         val isSelected = chairsideReminderDefaultMin == leadMin
+                        val leadBg by animateColorAsState(
+                            targetValue = if (isSelected) ThornburyPrimary else ThornburyCanvas,
+                            animationSpec = tween(220),
+                            label = "LeadTimeChipBg"
+                        )
+
                         FilterChip(
                             selected = isSelected,
                             onClick = { onChairsideReminderChange(leadMin) },
@@ -641,15 +692,18 @@ private fun ScheduleRemindersCard(
                                 Text(
                                     text = label,
                                     style = MaterialTheme.typography.labelSmall.copy(
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                     ),
                                     maxLines = 1,
                                     softWrap = false
                                 )
                             },
+                            shape = RoundedCornerShape(12.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = ThornburyPrimaryWash,
-                                selectedLabelColor = ThornburyPrimaryText
+                                selectedContainerColor = ThornburyPrimary,
+                                selectedLabelColor = ThornburyOnPrimary,
+                                containerColor = leadBg,
+                                labelColor = ThornburyBody
                             )
                         )
                     }
@@ -674,7 +728,7 @@ private fun ClinicalErgonomicsCard(
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
         border = BorderStroke(1.dp, ThornburyHairline)
     ) {
@@ -705,7 +759,7 @@ private fun ClinicalErgonomicsCard(
 
             HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
 
-            // Hands-Free Voice Charting (off by default; opt in per device)
+            // Hands-Free Voice Charting
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -717,7 +771,7 @@ private fun ClinicalErgonomicsCard(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(text = "Hands-Free Voice Charting", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
                     }
-                    Text(text = "On-device dictation for periodontal depths and clinical notes. Needs a one-time 57 MB language download; audio never leaves this device.", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                    Text(text = "On-device dictation for periodontal depths and clinical notes. Audio never leaves this device.", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Switch(
@@ -728,36 +782,73 @@ private fun ClinicalErgonomicsCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Tooth numbering. Dictation refuses to guess between the schemes: 14 is the
-            // upper-left first molar in Universal and the upper-right first premolar in FDI.
+            // Tooth numbering
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Dictated tooth numbering",
+                    text = "Dictated tooth numbering scheme",
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
                     color = ThornburyInk
                 )
                 Text(
-                    text = "Voice charting reads spoken tooth numbers in this scheme only.",
+                    text = "Voice charting interprets spoken numbers in this scheme.",
                     style = MaterialTheme.typography.bodySmall,
                     color = ThornburyMuted
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     ToothNumberingSystem.entries.forEach { system ->
-                        FilterChip(
-                            selected = system == toothNumberingSystem,
+                        val isSelected = system == toothNumberingSystem
+                        Surface(
                             onClick = { onToothNumberingChange(system) },
-                            label = { Text(system.displayName + " (" + system.example + ")") }
-                        )
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) ThornburyPrimaryWash else ThornburyCanvas,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) ThornburyPrimary else ThornburyHairlineSoft
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = null,
+                                    colors = RadioButtonDefaults.colors(
+                                        selectedColor = ThornburyPrimary,
+                                        unselectedColor = ThornburyMuted
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = system.displayName,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        color = if (isSelected) ThornburyPrimaryText else ThornburyInk
+                                    )
+                                    Text(
+                                        text = system.example,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ThornburyMuted
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Unattended apply. Off by default: a dictated value nobody confirmed is the
-            // core hazard of voice charting, so skipping confirmation is a deliberate
-            // clinic decision, not a default.
+            // Unattended apply
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -770,8 +861,7 @@ private fun ClinicalErgonomicsCard(
                         color = ThornburyInk
                     )
                     Text(
-                        text = "Writes confident readings straight to the chart. Readings are still " +
-                            "read back aloud and can be undone.",
+                        text = "Writes confident readings straight to the chart. Readings can still be undone.",
                         style = MaterialTheme.typography.bodySmall,
                         color = ThornburyMuted
                     )
@@ -800,32 +890,6 @@ private fun ClinicalErgonomicsCard(
                     onCheckedChange = onNotificationsChange
                 )
             }
-
-            HorizontalDivider(color = ThornburyHairlineSoft, modifier = Modifier.padding(vertical = 10.dp))
-
-            // Notation System Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = "Dental Charting Notation", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                    Text(text = "Universal System (#1 to #32) active with FDI cross-reference", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
-                }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = ThornburyPrimaryWash,
-                    border = BorderStroke(1.dp, ThornburyPrimary.copy(alpha = 0.25f))
-                ) {
-                    Text(
-                        text = "Universal 1-32",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = ThornburyPrimaryText,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
-            }
         }
     }
 }
@@ -842,8 +906,10 @@ private fun SecurityShieldTelemetryCard(
     onBiometricTimeoutChange: (Int) -> Unit
 ) {
     OutlinedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
         border = BorderStroke(1.dp, ThornburyHairline)
     ) {
@@ -854,7 +920,7 @@ private fun SecurityShieldTelemetryCard(
                 Text(text = "Data Security & Patient Privacy", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             // Biometric Auth Session Lock Switch
             Row(
@@ -865,7 +931,7 @@ private fun SecurityShieldTelemetryCard(
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(38.dp)
                             .background(ThornburyPrimary.copy(alpha = 0.12f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
@@ -873,8 +939,8 @@ private fun SecurityShieldTelemetryCard(
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text(text = "Biometric & Fingerprint Security", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-                        Text(text = "Require fingerprint, facial recognition, or PIN on resume", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
+                        Text(text = "Biometric Session Lock", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
+                        Text(text = "Require fingerprint, face recognition, or PIN on resume", style = MaterialTheme.typography.bodySmall, color = ThornburyMuted)
                     }
                 }
                 Switch(
@@ -883,9 +949,13 @@ private fun SecurityShieldTelemetryCard(
                 )
             }
 
-            if (isBiometricAuthEnabled) {
-                Spacer(modifier = Modifier.height(10.dp))
+            AnimatedVisibility(
+                visible = isBiometricAuthEnabled,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "Require lock after backgrounding:",
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
@@ -906,6 +976,12 @@ private fun SecurityShieldTelemetryCard(
                             )
                         ) { (timeoutMin, label) ->
                             val isSelected = biometricLockTimeoutMinutes == timeoutMin
+                            val chipBg by animateColorAsState(
+                                targetValue = if (isSelected) ThornburyPrimary else ThornburyCanvas,
+                                animationSpec = tween(220),
+                                label = "BiometricTimeoutChipBg"
+                            )
+
                             FilterChip(
                                 selected = isSelected,
                                 onClick = { onBiometricTimeoutChange(timeoutMin) },
@@ -913,15 +989,18 @@ private fun SecurityShieldTelemetryCard(
                                     Text(
                                         text = label,
                                         style = MaterialTheme.typography.labelSmall.copy(
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                                         ),
                                         maxLines = 1,
                                         softWrap = false
                                     )
                                 },
+                                shape = RoundedCornerShape(12.dp),
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = ThornburyPrimaryWash,
-                                    selectedLabelColor = ThornburyPrimaryText
+                                    selectedContainerColor = ThornburyPrimary,
+                                    selectedLabelColor = ThornburyOnPrimary,
+                                    containerColor = chipBg,
+                                    labelColor = ThornburyBody
                                 )
                             )
                         }
@@ -938,7 +1017,7 @@ private fun SecurityShieldTelemetryCard(
             ) {
                 Surface(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = ThornburySuccessWash,
                     border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
                 ) {
@@ -948,16 +1027,28 @@ private fun SecurityShieldTelemetryCard(
                     ) {
                         Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(text = "SQLCipher AES-256", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
-                            Text(text = "Database encrypted at rest", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyBodyStrong)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "SQLCipher AES-256",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                color = ThornburySuccess,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Encrypted at rest",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = ThornburyBodyStrong,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
 
                 Surface(
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(12.dp),
                     color = ThornburySuccessWash,
                     border = BorderStroke(1.dp, ThornburySuccess.copy(alpha = 0.3f))
                 ) {
@@ -967,9 +1058,21 @@ private fun SecurityShieldTelemetryCard(
                     ) {
                         Icon(imageVector = Icons.Default.Shield, contentDescription = null, tint = ThornburySuccess, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(text = "FLAG_SECURE Active", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburySuccess)
-                            Text(text = "Screenshot protection enabled", style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp), color = ThornburyBodyStrong)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "FLAG_SECURE Active",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                color = ThornburySuccess,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Screenshot blocked",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = ThornburyBodyStrong,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
                     }
                 }
@@ -982,12 +1085,32 @@ private fun SecurityShieldTelemetryCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                TelemetryStatBadge(label = "PATIENTS", value = "$patientsCount", icon = Icons.Default.Groups)
-                TelemetryStatBadge(label = "PLANS", value = "$plansCount", icon = Icons.Default.Assignment)
-                TelemetryStatBadge(label = "REPORTS", value = "$reportsCount", icon = Icons.Default.Image)
-                TelemetryStatBadge(label = "VISITS", value = "$visitsCount", icon = Icons.Default.Event)
+                TelemetryStatBadge(
+                    modifier = Modifier.weight(1f),
+                    label = "PATIENTS",
+                    value = patientsCount,
+                    icon = Icons.Default.Groups
+                )
+                TelemetryStatBadge(
+                    modifier = Modifier.weight(1f),
+                    label = "PLANS",
+                    value = plansCount,
+                    icon = Icons.AutoMirrored.Filled.Assignment
+                )
+                TelemetryStatBadge(
+                    modifier = Modifier.weight(1f),
+                    label = "REPORTS",
+                    value = reportsCount,
+                    icon = Icons.Default.Image
+                )
+                TelemetryStatBadge(
+                    modifier = Modifier.weight(1f),
+                    label = "VISITS",
+                    value = visitsCount,
+                    icon = Icons.Default.Event
+                )
             }
         }
     }
@@ -999,7 +1122,7 @@ private fun AccountSecurityCard(
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.outlinedCardColors(containerColor = ThornburySurfaceSoft),
         border = BorderStroke(1.dp, ThornburyHairline)
     ) {
@@ -1011,12 +1134,15 @@ private fun AccountSecurityCard(
 
             OutlinedButton(
                 onClick = onEditProfileClick,
-                modifier = Modifier.fillMaxWidth().height(46.dp),
-                shape = RoundedCornerShape(10.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, ThornburyHairline)
             ) {
-                Icon(imageVector = Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Edit Clinician Profile Details", style = MaterialTheme.typography.labelMedium)
+                Icon(imageVector = Icons.Default.AccountBox, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Edit Clinician Profile Details", style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
             }
         }
     }
@@ -1025,23 +1151,42 @@ private fun AccountSecurityCard(
 @Composable
 private fun TelemetryStatBadge(
     label: String,
-    value: String,
-    icon: ImageVector
+    value: Int,
+    icon: ImageVector,
+    modifier: Modifier = Modifier
 ) {
     Surface(
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = ThornburyCanvas,
         border = BorderStroke(1.dp, ThornburyHairlineSoft),
-        modifier = Modifier.width(74.dp)
+        modifier = modifier
     ) {
         Column(
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
+            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             Icon(imageVector = icon, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
-            Text(text = value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = ThornburyInk)
-            Text(text = label, style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold), color = ThornburyMuted)
+            AnimatedContent(
+                targetState = value,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "TelemetryValAnim"
+            ) { v ->
+                Text(
+                    text = "$v",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                    color = ThornburyInk,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                color = ThornburyMuted,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
     }
 }

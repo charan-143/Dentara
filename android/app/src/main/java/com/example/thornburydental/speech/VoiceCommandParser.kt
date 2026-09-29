@@ -28,7 +28,12 @@ data class PocketDepthResult(
     val depthMm: Int,
     val isBleeding: Boolean = false,
     val site: PerioSite = PerioSite.UNSPECIFIED,
-    val rawText: String = ""
+    val rawText: String = "",
+    val recessionMm: Int = 0,
+    val attachmentLossMm: Int = depthMm + recessionMm,
+    val furcationGrade: Int = 0, // 0 = None, 1..4 = Class I..IV
+    val mobilityGrade: Int = 0,  // 0 = None, 1..3 = Grade I..III
+    val isSuppurating: Boolean = false
 )
 
 data class ClinicalNoteResult(

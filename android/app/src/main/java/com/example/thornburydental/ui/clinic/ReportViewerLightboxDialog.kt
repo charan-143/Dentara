@@ -251,7 +251,7 @@ fun ReportViewerLightboxDialog(
                         .weight(1f)
                         .clip(RoundedCornerShape(14.dp))
                         .border(1.dp, ThornburySurfaceDarkElevated, RoundedCornerShape(14.dp)),
-                    color = if (isInverted) Color(0xFFE9EEF0) else Color(0xFF0A0F12)
+                    color = if (isInverted) ThornburyCanvas else ThornburySurfaceDarkLowest
                 ) {
                     Box(modifier = Modifier.fillMaxSize()) {
                         val zoomPanModifier = Modifier
@@ -282,14 +282,14 @@ fun ReportViewerLightboxDialog(
                             ) {
                                 Surface(
                                     shape = CircleShape,
-                                    color = Color(0xFFC0392B).copy(alpha = 0.15f),
+                                    color = ThornburyErrorWash,
                                     modifier = Modifier.size(72.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = Icons.Default.PictureAsPdf,
                                             contentDescription = null,
-                                            tint = Color(0xFFE74C3C),
+                                            tint = ThornburyError,
                                             modifier = Modifier.size(36.dp)
                                         )
                                     }
@@ -307,7 +307,7 @@ fun ReportViewerLightboxDialog(
                                 Text(
                                     text = "${selectedAttachment.sizeStr} • Diagnostic Laboratory Report / Clinical PDF",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF8FA4A0)
+                                    color = ThornburyMuted
                                 )
                                 Spacer(modifier = Modifier.height(22.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -323,7 +323,7 @@ fun ReportViewerLightboxDialog(
                                     OutlinedButton(
                                         onClick = { AttachmentViewerUtils.shareAttachment(context, selectedAttachment) },
                                         shape = RoundedCornerShape(8.dp),
-                                        border = BorderStroke(1.dp, Color(0xFF4A635E))
+                                        border = BorderStroke(1.dp, ThornburyHairlineDark)
                                     ) {
                                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                                         Spacer(modifier = Modifier.width(8.dp))
@@ -347,8 +347,8 @@ fun ReportViewerLightboxDialog(
                                     .align(Alignment.BottomEnd)
                                     .padding(12.dp),
                                 shape = RoundedCornerShape(10.dp),
-                                color = (if (isInverted) Color(0xFFE0E6E4) else Color(0xFF131B1F)).copy(alpha = 0.94f),
-                                border = BorderStroke(1.dp, if (isInverted) Color(0xFFB0C4BF) else Color(0xFF2C3E44))
+                                color = (if (isInverted) ThornburySurfaceCard else ThornburySurfaceDarkElevated).copy(alpha = 0.94f),
+                                border = BorderStroke(1.dp, if (isInverted) ThornburyHairline else ThornburyHairlineDark)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
@@ -369,7 +369,7 @@ fun ReportViewerLightboxDialog(
 
                                     VerticalDivider(
                                         modifier = Modifier.height(18.dp),
-                                        color = if (isInverted) Color(0xFFB0C4BF) else Color(0xFF2C3E44)
+                                        color = if (isInverted) ThornburyHairline else ThornburyHairlineDark
                                     )
 
                                     IconButton(
@@ -379,7 +379,7 @@ fun ReportViewerLightboxDialog(
                                         Icon(
                                             imageVector = Icons.Default.Remove,
                                             contentDescription = "Zoom Out",
-                                            tint = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1),
+                                            tint = if (isInverted) ThornburyInk else ThornburyOnDark,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -399,7 +399,7 @@ fun ReportViewerLightboxDialog(
                                                 fontFamily = FontFamily.Monospace,
                                                 fontWeight = FontWeight.Bold
                                             ),
-                                            color = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1)
+                                            color = if (isInverted) ThornburyInk else ThornburyOnDark
                                         )
                                     }
 
@@ -410,7 +410,7 @@ fun ReportViewerLightboxDialog(
                                         Icon(
                                             imageVector = Icons.Default.Add,
                                             contentDescription = "Zoom In",
-                                            tint = if (isInverted) Color(0xFF12201E) else Color(0xFFEAF3F1),
+                                            tint = if (isInverted) ThornburyInk else ThornburyOnDark,
                                             modifier = Modifier.size(18.dp)
                                         )
                                     }
@@ -461,7 +461,7 @@ fun ReportViewerLightboxDialog(
                                 Text(
                                     text = "This diagnostic record contains clinical findings without an uploaded image or document.",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF8FA4A0),
+                                    color = ThornburyMuted,
                                     textAlign = TextAlign.Center
                                 )
                             }
