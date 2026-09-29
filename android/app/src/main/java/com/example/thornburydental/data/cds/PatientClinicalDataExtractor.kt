@@ -34,6 +34,8 @@ object PatientClinicalDataExtractor {
                 ToothCondition.ROOT_CANAL -> rct.add(tooth.number)
                 ToothCondition.CROWN -> crown.add(tooth.number)
                 ToothCondition.IMPLANT -> filled.add(tooth.number)
+                ToothCondition.EXFOLIATED -> missing.add(tooth.number)
+                ToothCondition.UNERUPTED -> {}
                 ToothCondition.SOUND -> {}
             }
         }

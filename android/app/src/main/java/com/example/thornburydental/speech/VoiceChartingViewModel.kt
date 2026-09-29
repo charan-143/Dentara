@@ -59,11 +59,18 @@ class VoiceChartingViewModel internal constructor(
         patientId: String? = null
     ) = controller.startDictation(viewModelScope, mode, continuousHandsFree, patientId)
 
-    fun stopDictationAndProcess() = controller.stopDictationAndProcess(viewModelScope)
+    fun stopDictationAndProcess(patientId: String? = null) =
+        controller.stopDictationAndProcess(viewModelScope, patientId)
 
     fun provisionModel() {
         viewModelScope.launch { controller.provisionModel() }
     }
+
+    /** Applies structured clinical findings extracted by AI. */
+    fun applyClinicalFindings(
+        patientId: String,
+        findings: ClinicalFindings
+    ): Boolean = controller.applyClinicalFindings(patientId, findings)
 
     /** @param transcript what was dictated, stored as provenance beside the written value. */
     fun applyParsedCommand(

@@ -33,45 +33,40 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.thornburydental.data.ToothAnatomyType
 import com.example.thornburydental.data.ToothCondition
 import com.example.thornburydental.data.ToothRecord
+import com.example.thornburydental.data.getToothAnatomyType
 import com.example.thornburydental.theme.*
 
-// =============================================================================
-// Tooth Anatomy Classification Helper
-// =============================================================================
-
-enum class ToothAnatomyType {
-    MOLAR,
-    PREMOLAR,
-    CANINE,
-    INCISOR
+/**
+ * Returns whether tooth belongs to Maxillary (Upper 1-16 Universal, 11-28 FDI, 51-65 Primary FDI) or Mandibular arch.
+ */
+fun isMaxillaryTooth(toothNum: Int): Boolean {
+    // FDI Quadrants 1, 2, 5, 6 -> Maxillary
+    if (toothNum in 11..18 || toothNum in 21..28 || toothNum in 51..55 || toothNum in 61..65) return true
+    // FDI Quadrants 3, 4, 7, 8 -> Mandibular
+    if (toothNum in 31..38 || toothNum in 41..48 || toothNum in 71..75 || toothNum in 81..85) return false
+    // Universal 1-32 system (1-16 Upper, 17-32 Lower)
+    return toothNum in 1..16
 }
 
-/**
- * Classifies tooth anatomy based on Universal Dental Numbering System (1 - 32).
- */
-fun getToothAnatomyType(toothNum: Int): ToothAnatomyType {
-    // Molars: 1, 2, 3, 14, 15, 16 (Upper) and 17, 18, 19, 30, 31, 32 (Lower)
-    if ((toothNum in 1..3) || (toothNum in 14..19) || (toothNum in 30..32)) {
-        return ToothAnatomyType.MOLAR
+fun isMaxillaryTooth(tooth: ToothRecord): Boolean {
+    // 1. Explicit arch descriptor takes primary priority
+    if (tooth.arch.contains("Mandibular", ignoreCase = true) || tooth.arch.contains("Lower", ignoreCase = true)) {
+        return false
     }
-    // Premolars: 4, 5, 12, 13 (Upper) and 20, 21, 28, 29 (Lower)
-    if (toothNum in listOf(4, 5, 12, 13, 20, 21, 28, 29)) {
-        return ToothAnatomyType.PREMOLAR
+    if (tooth.arch.contains("Maxillary", ignoreCase = true) || tooth.arch.contains("Upper", ignoreCase = true)) {
+        return true
     }
-    // Canines: 6, 11 (Upper) and 22, 27 (Lower)
-    if (toothNum in listOf(6, 11, 22, 27)) {
-        return ToothAnatomyType.CANINE
-    }
-    // Incisors: 7, 8, 9, 10 (Upper) and 23, 24, 25, 26 (Lower)
-    return ToothAnatomyType.INCISOR
-}
 
-/**
- * Returns whether tooth belongs to Maxillary (Upper 1-16) or Mandibular (Lower 17-32) arch.
- */
-fun isMaxillaryTooth(toothNum: Int): Boolean = toothNum in 1..16
+    // 2. Check FDI Quadrants if available
+    if (tooth.fdiNumber in 11..18 || tooth.fdiNumber in 21..28 || tooth.fdiNumber in 51..55 || tooth.fdiNumber in 61..65) return true
+    if (tooth.fdiNumber in 31..38 || tooth.fdiNumber in 41..48 || tooth.fdiNumber in 71..75 || tooth.fdiNumber in 81..85) return false
+
+    // 3. Fallback to tooth number
+    return isMaxillaryTooth(tooth.number)
+}
 
 // =============================================================================
 // Color & Condition Resolvers
@@ -86,6 +81,8 @@ fun getToothConditionColor(condition: ToothCondition): Color {
         ToothCondition.ROOT_CANAL -> ToothRootCanal
         ToothCondition.IMPLANT -> ToothImplant
         ToothCondition.MISSING -> ToothMissing
+        ToothCondition.EXFOLIATED -> ToothMissing
+        ToothCondition.UNERUPTED -> ToothSound.copy(alpha = 0.5f)
     }
 }
 
@@ -339,6 +336,36 @@ fun ToothConditionBadge(
                 )
             }
         }
+        ToothCondition.EXFOLIATED -> {
+            Surface(
+                modifier = modifier,
+                shape = RoundedCornerShape(3.dp),
+                color = ThornburyNeutralWash
+            ) {
+                Text(
+                    text = "Exf",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ThornburySlateText,
+                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                )
+            }
+        }
+        ToothCondition.UNERUPTED -> {
+            Surface(
+                modifier = modifier,
+                shape = RoundedCornerShape(3.dp),
+                color = ThornburyInfoWash
+            ) {
+                Text(
+                    text = "Une",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ThornburyTertiaryText,
+                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 0.5.dp)
+                )
+            }
+        }
     }
 }
 
@@ -391,8 +418,11 @@ fun AnatomicalToothCanvas(
     tooth: ToothRecord,
     modifier: Modifier = Modifier
 ) {
-    val anatomy = remember(tooth.number) { getToothAnatomyType(tooth.number) }
-    val isUpper = remember(tooth.number) { isMaxillaryTooth(tooth.number) }
+    val anatomy = remember(tooth) {
+        val num = if (tooth.fdiNumber > 0 && tooth.fdiNumber != tooth.number) tooth.fdiNumber else tooth.number
+        getToothAnatomyType(num)
+    }
+    val isUpper = remember(tooth) { isMaxillaryTooth(tooth) }
 
     // Pre-create reusable anatomical paths in the 64x90 coordinate space
     val paths = remember(anatomy, isUpper) {

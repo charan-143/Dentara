@@ -2,6 +2,7 @@ package com.example.thornburydental.data
 
 import android.util.Log
 import com.example.thornburydental.data.db.LocalDatabaseManager
+import com.example.thornburydental.speech.ClinicalFindings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -419,7 +420,9 @@ object DentalRepository {
                     fdiNumber = fdi,
                     name = name,
                     arch = "Maxillary (Upper Primary Arch)",
-                    condition = ToothCondition.SOUND
+                    condition = ToothCondition.SOUND,
+                    isPrimary = true,
+                    permanentSuccessorFdi = ToothNumberingSystem.getPermanentSuccessorFdi(fdi)
                 )
             }
             (primaryLowerLeft + primaryLowerRight).forEach { (fdi, name) ->
@@ -428,7 +431,9 @@ object DentalRepository {
                     fdiNumber = fdi,
                     name = name,
                     arch = "Mandibular (Lower Primary Arch)",
-                    condition = ToothCondition.SOUND
+                    condition = ToothCondition.SOUND,
+                    isPrimary = true,
+                    permanentSuccessorFdi = ToothNumberingSystem.getPermanentSuccessorFdi(fdi)
                 )
             }
         } else {
@@ -942,6 +947,182 @@ object DentalRepository {
     private fun appendNoteLine(existing: String, addition: String): String {
         val current = existing.trim()
         return if (current.isEmpty()) addition else current + "\n• " + addition
+    }
+
+    /**
+     * Applies a complete batch of structured clinical findings extracted by AI / voice charting.
+     * Logs each discrete clinical entity into its separate dedicated field:
+     * - Tooth Conditions -> Odontogram
+     * - Pocket Depths & Bleeding -> Periodontal Chart
+     * - Recommended Procedures -> Treatment Plan
+     * - Complaints, Pain, Sensitivity, Soft Tissue, Calculus, Caries Risk, Diagnosis -> Respective Examination Fields
+     * - Extra unclassified remarks -> Clinical Notes
+     */
+    fun applyClinicalFindings(
+        patientId: String,
+        findings: ClinicalFindings,
+        clinicianName: String? = null
+    ): Boolean {
+        if (findings.isEmpty) return false
+
+        val undoDesc = buildString {
+            append("Voice Dictation (")
+            val parts = mutableListOf<String>()
+            if (findings.toothConditions.isNotEmpty()) parts.add("${findings.toothConditions.size} teeth")
+            if (findings.perioMeasurements.isNotEmpty()) parts.add("${findings.perioMeasurements.size} perio sites")
+            if (findings.treatmentPlanItems.isNotEmpty()) parts.add("${findings.treatmentPlanItems.size} plans")
+            if (findings.examFindings.chiefComplaints.isNotEmpty()) parts.add("${findings.examFindings.chiefComplaints.size} complaints")
+            if (findings.examFindings.extraNotes.isNotEmpty()) parts.add("${findings.examFindings.extraNotes.size} notes")
+            append(parts.joinToString(", "))
+            append(")")
+        }
+        captureVoiceUndoPoint(patientId, undoDesc)
+
+        val activeClinician = clinicianName ?: clinicianDisplayName.value
+        val provenance = VoiceChartEntry(
+            clinicianName = activeClinician,
+            transcript = findings.rawTranscript,
+            confidence = findings.confidence,
+            reviewRequired = findings.requiresReview
+        )
+
+        // 1. Apply tooth conditions to Odontogram
+        for (cond in findings.toothConditions) {
+            val surfaceNote = if (cond.surface.isNotBlank()) "Surface: ${cond.surface}" else ""
+            val fullNote = listOf(surfaceNote, cond.notes).filter { it.isNotBlank() }.joinToString(" | ")
+            updateToothCondition(patientId, cond.toothNumber, cond.condition, fullNote)
+        }
+
+        // 2. Apply periodontal pocket depths and BOP
+        for (perio in findings.perioMeasurements) {
+            applyVoicePeriodontalPocket(
+                patientId = patientId,
+                toothNumber = perio.toothNumber,
+                depthMm = perio.depthMm,
+                isBleeding = perio.isBleeding,
+                siteLabel = perio.site,
+                provenance = provenance
+            )
+        }
+
+        // 3. Apply Treatment Plan Items to Treatment Plans
+        if (findings.treatmentPlanItems.isNotEmpty()) {
+            val steps = findings.treatmentPlanItems.mapIndexed { idx, item ->
+                PlanStep(
+                    id = "step-${System.currentTimeMillis()}-$idx",
+                    toothNumber = item.toothNumber,
+                    toothNumbers = if (item.toothNumber != null) listOf(item.toothNumber) else emptyList(),
+                    procedure = item.procedure,
+                    code = if (item.code.isNotBlank()) item.code else "D0100",
+                    fee = if (item.estimatedCost > 0) item.estimatedCost else 150.0,
+                    completed = false
+                )
+            }
+            createTreatmentPlan(
+                patientId = patientId,
+                title = "Voice Dictated Treatment Plan",
+                clinicianName = activeClinician,
+                diagnosis = findings.examFindings.diagnosis.ifBlank { "Clinical Dictation Plan" },
+                steps = steps
+            )
+        }
+
+        // 4. Update discrete Clinical Examination Fields and separate Patient Diagnosis
+        val exam = findings.examFindings
+        _patients.updateAndGet { list ->
+            list.map { patient ->
+                if (patient.id != patientId) return@map patient
+
+                val currentExam = patient.examAnswers ?: ExaminationAnswers()
+
+                val updatedComplaints = (currentExam.chiefComplaints + exam.chiefComplaints).distinct()
+                val updatedComplaintOther = if (exam.chiefComplaintOther.isNotBlank()) exam.chiefComplaintOther else currentExam.chiefComplaintOther
+                val updatedPain = if (exam.painSeverity.isNotBlank()) exam.painSeverity else currentExam.painSeverity
+                val updatedSensitivity = (currentExam.sensitivityTriggers + exam.sensitivityTriggers).distinct()
+                val updatedRecession = (currentExam.gingivalRecession + exam.gingivalRecession).distinct()
+                val updatedSoftTissue = (currentExam.softTissue + exam.softTissue).distinct()
+                val updatedCalculus = (currentExam.calculus + exam.calculus).distinct()
+                val updatedStains = (currentExam.stains + exam.stains).distinct()
+                val updatedTmj = (currentExam.tmjAssessment + exam.tmjAssessment).distinct()
+                val updatedHabits = (currentExam.functionalHabits + exam.functionalHabits).distinct()
+                val updatedCariesRisk = if (exam.cariesRisk.isNotBlank()) exam.cariesRisk else currentExam.cariesRisk
+                val updatedBrushing = when {
+                    exam.brushingFrequency.isNotBlank() -> exam.brushingFrequency
+                    exam.oralHygiene.isNotBlank() -> exam.oralHygiene
+                    else -> currentExam.brushingFrequency
+                }
+                val updatedFlossing = if (exam.flossingFrequency.isNotBlank()) exam.flossingFrequency else currentExam.flossingFrequency
+                val updatedDiagnosesConditions = if (exam.diagnosis.isNotBlank()) {
+                    (currentExam.otherDiagnosesConditions + exam.diagnosis).distinct()
+                } else {
+                    currentExam.otherDiagnosesConditions
+                }
+
+                // ONLY extra / general notes go into clinicianNotes!
+                val updatedClinicianNotes = if (exam.extraNotes.isNotEmpty()) {
+                    appendNoteLine(currentExam.clinicianNotes, exam.extraNotes.joinToString("\n• "))
+                } else {
+                    currentExam.clinicianNotes
+                }
+
+                val newExamAnswers = currentExam.copy(
+                    chiefComplaints = updatedComplaints,
+                    chiefComplaintOther = updatedComplaintOther,
+                    painSeverity = updatedPain,
+                    sensitivityTriggers = updatedSensitivity,
+                    gingivalRecession = updatedRecession,
+                    softTissue = updatedSoftTissue,
+                    calculus = updatedCalculus,
+                    stains = updatedStains,
+                    tmjAssessment = updatedTmj,
+                    functionalHabits = updatedHabits,
+                    cariesRisk = updatedCariesRisk,
+                    brushingFrequency = updatedBrushing,
+                    flossingFrequency = updatedFlossing,
+                    otherDiagnosesConditions = updatedDiagnosesConditions,
+                    clinicianNotes = updatedClinicianNotes,
+                    voiceEntries = currentExam.voiceEntries + provenance.copy(
+                        applied = "Voice dictation logged across discrete clinical fields"
+                    )
+                )
+
+                // Dedicated Patient Diagnosis record
+                val newDiagnosis = if (exam.diagnosis.isNotBlank()) {
+                    PatientDiagnosis(
+                        primaryDiagnosis = exam.diagnosis,
+                        clinicalFindings = "Recorded via clinical voice dictation",
+                        prognosis = exam.prognosis.ifBlank { "Good" },
+                        dateRecorded = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
+                        lastUpdated = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
+                        clinicianName = activeClinician
+                    )
+                } else {
+                    patient.diagnosis
+                }
+
+                patient.copy(
+                    examAnswers = newExamAnswers,
+                    diagnosis = newDiagnosis
+                )
+            }
+        }
+
+        // Persist exam answers & diagnosis to SQLite
+        val updatedPatient = _patients.value.firstOrNull { it.id == patientId }
+        if (updatedPatient != null) {
+            repositoryScope.launch {
+                if (LocalDatabaseManager.isInitialized) {
+                    updatedPatient.examAnswers?.let {
+                        LocalDatabaseManager.patientDao.updateExaminationAnswers(patientId, it)
+                    }
+                    updatedPatient.diagnosis?.let {
+                        LocalDatabaseManager.patientDao.updateDiagnosis(patientId, it)
+                    }
+                }
+            }
+        }
+
+        return true
     }
 
     fun issuePrescription(

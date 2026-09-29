@@ -62,7 +62,11 @@ data class RedFlagResult(
     val hasRedFlag: Boolean,
     val redFlagReason: String? = null,
     val emergencyGuidance: String? = null,
-    val recommendedActions: List<String> = emptyList()
+    val recommendedActions: List<String> = emptyList(),
+    val isAdvisory: Boolean = true,
+    val guidelineCitations: List<String> = emptyList(),
+    val requiresClinicianOverride: Boolean = false,
+    val overrideProtocol: String? = null
 )
 
 /**

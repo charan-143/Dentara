@@ -134,12 +134,36 @@ object RedFlagSafetyChecker {
             }
         }
 
+        val citations = mutableListOf<String>()
+        var requiresOverride = false
+
+        if (reasons.any { it.contains("PENICILLIN") }) {
+            citations.add("ADA Clinical Practice Guideline on Antibiotic Use for the Urgent Management of Pulpal- and Periapical-Related Dental Pain and Intraoral Swelling (2019)")
+            requiresOverride = true
+        }
+        if (reasons.any { it.contains("MRONJ") }) {
+            citations.add("American Association of Oral and Maxillofacial Surgeons (AAOMS) 2022 Position Paper on Medication-Related Osteonecrosis of the Jaws")
+            requiresOverride = true
+        }
+        if (reasons.any { it.contains("Hemorrhage") || it.contains("Shock") }) {
+            citations.add("Advanced Trauma Life Support (ATLS) / ADA Guidelines on Anticoagulated Patient Management")
+            requiresOverride = true
+        }
+        if (reasons.any { it.contains("Ludwig") || it.contains("Airway") }) {
+            citations.add("Consensus Guidelines on Deep Neck Space Infection & Airway Management in Maxillofacial Emergencies")
+            requiresOverride = true
+        }
+
         if (reasons.isNotEmpty()) {
             return RedFlagResult(
                 hasRedFlag = true,
                 redFlagReason = reasons.joinToString(" | "),
-                emergencyGuidance = "CRITICAL CLINICAL RED FLAG DETECTED — REQUIRE IMMEDIATE EMERGENCY EVALUATION",
-                recommendedActions = actions.distinct()
+                emergencyGuidance = "CRITICAL CLINICAL ADVISORY DETECTED — REQUIRE IMMEDIATE CLINICAL EVALUATION & SIGNED OVERRIDE IF PROCEEDING",
+                recommendedActions = actions.distinct(),
+                isAdvisory = true,
+                guidelineCitations = citations.distinct(),
+                requiresClinicianOverride = requiresOverride,
+                overrideProtocol = if (requiresOverride) "MANDATORY_CLINICIAN_SIGNED_OVERRIDE_REQUIRED" else null
             )
         }
 
@@ -147,7 +171,11 @@ object RedFlagSafetyChecker {
             hasRedFlag = false,
             redFlagReason = null,
             emergencyGuidance = null,
-            recommendedActions = emptyList()
+            recommendedActions = emptyList(),
+            isAdvisory = false,
+            guidelineCitations = emptyList(),
+            requiresClinicianOverride = false,
+            overrideProtocol = null
         )
     }
 

@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.speech.DictationTargetMode
 import com.example.thornburydental.speech.VoiceDictationState
 import com.example.thornburydental.speech.model.SpeechModelState
+import com.example.thornburydental.theme.*
 
 /**
  * Docked Floating Overlay for Hands-Free Voice Charting.
@@ -129,9 +130,9 @@ fun HandsFreeVoiceDictationBar(
             Surface(
                 onClick = { isExpanded = true },
                 shape = RoundedCornerShape(28.dp),
-                color = if (isListening) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                color = if (isListening) ThornburyErrorWash else ThornburyPrimaryWash,
                 shadowElevation = 8.dp,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                border = BorderStroke(1.dp, if (isListening) ThornburyError.copy(alpha = 0.5f) else ThornburyHairline)
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
@@ -143,9 +144,9 @@ fun HandsFreeVoiceDictationBar(
                             .clip(CircleShape)
                             .background(
                                 when {
-                                    isListening -> Color(0xFFD32F2F)
-                                    isUnavailable -> Color(0xFF9E9E9E)
-                                    else -> Color(0xFF388E3C)
+                                    isListening -> ThornburyError
+                                    isUnavailable -> ThornburyMuted
+                                    else -> ThornburySuccess
                                 }
                             )
                     )
@@ -153,7 +154,7 @@ fun HandsFreeVoiceDictationBar(
                     Icon(
                         imageVector = Icons.Default.Mic,
                         contentDescription = "Hands-Free Voice Dictation",
-                        tint = if (isListening) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = if (isListening) ThornburyError else ThornburyPrimary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -165,7 +166,7 @@ fun HandsFreeVoiceDictationBar(
                         },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (isListening) MaterialTheme.colorScheme.onErrorContainer else MaterialTheme.colorScheme.onPrimaryContainer
+                        color = if (isListening) ThornburyError else ThornburyInk
                     )
                 }
             }
@@ -175,9 +176,10 @@ fun HandsFreeVoiceDictationBar(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = if (isListening) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = if (isListening) ThornburyPrimaryWash else ThornburySurfaceCard
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
+                border = BorderStroke(1.dp, ThornburyHairline)
             ) {
                 Column(
                     modifier = Modifier
@@ -197,9 +199,9 @@ fun HandsFreeVoiceDictationBar(
                                     .clip(CircleShape)
                                     .background(
                                         when {
-                                            isListening -> Color(0xFFD32F2F)
-                                            isTranscribing -> Color(0xFFF57C00)
-                                            else -> Color(0xFF388E3C)
+                                            isListening -> ThornburyError
+                                            isTranscribing -> ThornburyWarning
+                                            else -> ThornburySuccess
                                         }
                                     )
                             )
@@ -208,7 +210,7 @@ fun HandsFreeVoiceDictationBar(
                                 text = "Voice Dictation",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = ThornburyInk
                             )
                         }
 
@@ -330,9 +332,9 @@ fun HandsFreeVoiceDictationBar(
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = when {
-                                    state is VoiceDictationState.Error -> Color(0xFFD32F2F)
-                                    isUnavailable -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    state is VoiceDictationState.Error -> ThornburyError
+                                    isUnavailable -> ThornburyMuted
+                                    else -> ThornburyBody
                                 }
                             )
 
@@ -346,7 +348,7 @@ fun HandsFreeVoiceDictationBar(
                                     Icon(
                                         imageVector = Icons.Default.GraphicEq,
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
+                                        tint = ThornburyPrimary,
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -355,7 +357,7 @@ fun HandsFreeVoiceDictationBar(
                                             .height(6.dp)
                                             .fillMaxWidth(currentAmplitude.coerceIn(0.1f, 1f))
                                             .clip(RoundedCornerShape(3.dp))
-                                            .background(MaterialTheme.colorScheme.primary)
+                                            .background(ThornburyPrimary)
                                     )
                                 }
                             }
@@ -375,9 +377,9 @@ fun HandsFreeVoiceDictationBar(
                                 enabled = !isUnavailable,
                                 shape = CircleShape,
                                 color = when {
-                                    isUnavailable -> MaterialTheme.colorScheme.surfaceVariant
-                                    isListening -> Color(0xFFD32F2F)
-                                    else -> MaterialTheme.colorScheme.primary
+                                    isUnavailable -> ThornburySurfaceSoft
+                                    isListening -> ThornburyError
+                                    else -> ThornburyPrimary
                                 },
                                 shadowElevation = if (isUnavailable) 0.dp else 8.dp,
                                 modifier = Modifier.size(52.dp)
@@ -395,7 +397,7 @@ fun HandsFreeVoiceDictationBar(
                                             else -> "Start Hands-Free Dictation"
                                         },
                                         tint = if (isUnavailable) {
-                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                            ThornburyMuted
                                         } else {
                                             Color.White
                                         },

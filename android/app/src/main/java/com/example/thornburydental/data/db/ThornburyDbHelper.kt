@@ -98,7 +98,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
-        const val DATABASE_VERSION = 7
+        const val DATABASE_VERSION = 8
 
         // Table Names
         const val TABLE_PATIENTS = "patients"
@@ -111,6 +111,27 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
         const val TABLE_USER_PREFERENCES = "user_preferences"
         const val TABLE_MEDICATION_PRESETS = "medication_presets"
         const val TABLE_VOICE_UNDO_POINTS = "voice_undo_points"
+        const val TABLE_AUDIT_LOGS = "audit_logs"
+        const val TABLE_CLOUD_REQUEST_QUEUE = "cloud_request_queue"
+
+        // Audit Logs columns
+        const val COL_AUDIT_ID = "id"
+        const val COL_AUDIT_TIMESTAMP = "timestamp"
+        const val COL_AUDIT_ACTOR_ID = "actor_id"
+        const val COL_AUDIT_ACTION_TYPE = "action_type"
+        const val COL_AUDIT_RESOURCE_ID = "resource_id"
+        const val COL_AUDIT_PAYLOAD_HASH = "payload_hash"
+        const val COL_AUDIT_PREV_HASH = "prev_hash"
+        const val COL_AUDIT_ENTRY_HASH = "entry_hash"
+
+        // Cloud Request Queue columns
+        const val COL_QUEUE_ID = "id"
+        const val COL_QUEUE_REPORT_ID = "report_id"
+        const val COL_QUEUE_REQUEST_TYPE = "request_type"
+        const val COL_QUEUE_PAYLOAD_JSON = "payload_json"
+        const val COL_QUEUE_STATUS = "status"
+        const val COL_QUEUE_RETRY_COUNT = "retry_count"
+        const val COL_QUEUE_CREATED_AT = "created_at"
 
         // Voice Undo Points columns
         const val COL_UNDO_ID = "id"
@@ -451,9 +472,115 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_undo_patient ON $TABLE_VOICE_UNDO_POINTS ($COL_UNDO_PATIENT_ID);")
+
+        // 11. Tamper-Evident Append-Only Audit Logs Table
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS $TABLE_AUDIT_LOGS (
+                $COL_AUDIT_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                $COL_AUDIT_TIMESTAMP INTEGER NOT NULL,
+                $COL_AUDIT_ACTOR_ID TEXT NOT NULL,
+                $COL_AUDIT_ACTION_TYPE TEXT NOT NULL,
+                $COL_AUDIT_RESOURCE_ID TEXT NOT NULL,
+                $COL_AUDIT_PAYLOAD_HASH TEXT NOT NULL,
+                $COL_AUDIT_PREV_HASH TEXT NOT NULL,
+                $COL_AUDIT_ENTRY_HASH TEXT NOT NULL
+            );
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON $TABLE_AUDIT_LOGS ($COL_AUDIT_TIMESTAMP);")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_audit_resource ON $TABLE_AUDIT_LOGS ($COL_AUDIT_RESOURCE_ID);")
+
+        // Triggers to enforce immutable, append-only guarantees
+        db.execSQL(
+            """
+            CREATE TRIGGER IF NOT EXISTS trig_prevent_audit_update
+            BEFORE UPDATE ON $TABLE_AUDIT_LOGS
+            BEGIN
+                SELECT RAISE(ABORT, 'Audit log entries are cryptographically immutable and cannot be updated');
+            END;
+            """.trimIndent()
+        )
+        db.execSQL(
+            """
+            CREATE TRIGGER IF NOT EXISTS trig_prevent_audit_delete
+            BEFORE DELETE ON $TABLE_AUDIT_LOGS
+            BEGIN
+                SELECT RAISE(ABORT, 'Audit log entries are cryptographically immutable and cannot be deleted');
+            END;
+            """.trimIndent()
+        )
+
+        // 12. Offline Cloud Request Queue Table
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS $TABLE_CLOUD_REQUEST_QUEUE (
+                $COL_QUEUE_ID TEXT PRIMARY KEY,
+                $COL_QUEUE_REPORT_ID TEXT NOT NULL,
+                $COL_QUEUE_REQUEST_TYPE TEXT NOT NULL,
+                $COL_QUEUE_PAYLOAD_JSON TEXT NOT NULL,
+                $COL_QUEUE_STATUS TEXT NOT NULL DEFAULT 'PENDING',
+                $COL_QUEUE_RETRY_COUNT INTEGER NOT NULL DEFAULT 0,
+                $COL_QUEUE_CREATED_AT INTEGER NOT NULL
+            );
+            """.trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_queue_status ON $TABLE_CLOUD_REQUEST_QUEUE ($COL_QUEUE_STATUS);")
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 8) {
+            try {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS $TABLE_AUDIT_LOGS (
+                        $COL_AUDIT_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                        $COL_AUDIT_TIMESTAMP INTEGER NOT NULL,
+                        $COL_AUDIT_ACTOR_ID TEXT NOT NULL,
+                        $COL_AUDIT_ACTION_TYPE TEXT NOT NULL,
+                        $COL_AUDIT_RESOURCE_ID TEXT NOT NULL,
+                        $COL_AUDIT_PAYLOAD_HASH TEXT NOT NULL,
+                        $COL_AUDIT_PREV_HASH TEXT NOT NULL,
+                        $COL_AUDIT_ENTRY_HASH TEXT NOT NULL
+                    );
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON $TABLE_AUDIT_LOGS ($COL_AUDIT_TIMESTAMP);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_audit_resource ON $TABLE_AUDIT_LOGS ($COL_AUDIT_RESOURCE_ID);")
+                db.execSQL(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS trig_prevent_audit_update
+                    BEFORE UPDATE ON $TABLE_AUDIT_LOGS
+                    BEGIN
+                        SELECT RAISE(ABORT, 'Audit log entries are cryptographically immutable and cannot be updated');
+                    END;
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TRIGGER IF NOT EXISTS trig_prevent_audit_delete
+                    BEFORE DELETE ON $TABLE_AUDIT_LOGS
+                    BEGIN
+                        SELECT RAISE(ABORT, 'Audit log entries are cryptographically immutable and cannot be deleted');
+                    END;
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS $TABLE_CLOUD_REQUEST_QUEUE (
+                        $COL_QUEUE_ID TEXT PRIMARY KEY,
+                        $COL_QUEUE_REPORT_ID TEXT NOT NULL,
+                        $COL_QUEUE_REQUEST_TYPE TEXT NOT NULL,
+                        $COL_QUEUE_PAYLOAD_JSON TEXT NOT NULL,
+                        $COL_QUEUE_STATUS TEXT NOT NULL DEFAULT 'PENDING',
+                        $COL_QUEUE_RETRY_COUNT INTEGER NOT NULL DEFAULT 0,
+                        $COL_QUEUE_CREATED_AT INTEGER NOT NULL
+                    );
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_queue_status ON $TABLE_CLOUD_REQUEST_QUEUE ($COL_QUEUE_STATUS);")
+            } catch (_: Exception) {}
+        }
         if (oldVersion < 7) {
             try {
                 db.execSQL(

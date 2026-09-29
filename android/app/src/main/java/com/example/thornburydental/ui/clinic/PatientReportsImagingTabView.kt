@@ -631,7 +631,7 @@ fun PatientReportsImagingTabView(
                     icon = Icons.Default.PictureAsPdf,
                     title = "Upload PDF Document / Lab Slip",
                     subtitle = "Attach clinical laboratory results, consent forms, or reports",
-                    tint = Color(0xFFC0392B),
+                    tint = ThornburyError,
                     onClick = {
                         showQuickUploadMenu = false
                         pickDocumentLauncher.launch("application/pdf")
@@ -682,7 +682,7 @@ private fun DiagnosticReportRecordCard(
                         color = when (report.kind) {
                             "Radiograph" -> ThornburyPrimary.copy(alpha = 0.12f)
                             "CBCT Scan" -> ThornburyAccentTeal.copy(alpha = 0.12f)
-                            "Lab Report" -> Color(0xFFC0392B).copy(alpha = 0.12f)
+                            "Lab Report" -> ThornburyErrorWash
                             else -> ThornburySurfaceSoft
                         },
                         modifier = Modifier.size(36.dp)
@@ -700,7 +700,7 @@ private fun DiagnosticReportRecordCard(
                                 tint = when (report.kind) {
                                     "Radiograph" -> ThornburyPrimary
                                     "CBCT Scan" -> ThornburyAccentTeal
-                                    "Lab Report" -> Color(0xFFC0392B)
+                                    "Lab Report" -> ThornburyError
                                     else -> ThornburyInk
                                 },
                                 modifier = Modifier.size(20.dp)
@@ -926,7 +926,7 @@ private fun InlineImageAttachmentCard(
                 modifier = Modifier
                     .size(64.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFF101618)),
+                    .background(ThornburySurfaceDarkLowest),
                 contentAlignment = Alignment.Center
             ) {
                 if (bitmapState != null) {
@@ -1000,14 +1000,14 @@ private fun InlineDocumentAttachmentCard(
         ) {
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = Color(0xFFC0392B).copy(alpha = 0.12f),
+                color = ThornburyErrorWash,
                 modifier = Modifier.size(42.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = Icons.Default.PictureAsPdf,
                         contentDescription = null,
-                        tint = Color(0xFFC0392B),
+                        tint = ThornburyError,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -1089,7 +1089,7 @@ private fun ImagingGalleryCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(130.dp)
-                    .background(Color(0xFF0F1518)),
+                    .background(ThornburySurfaceDarkLowest),
                 contentAlignment = Alignment.Center
             ) {
                 if (bitmapState != null) {
@@ -1104,7 +1104,7 @@ private fun ImagingGalleryCard(
                         Icon(
                             imageVector = Icons.Default.PictureAsPdf,
                             contentDescription = null,
-                            tint = Color(0xFFC0392B),
+                            tint = ThornburyError,
                             modifier = Modifier.size(36.dp)
                         )
                         Spacer(modifier = Modifier.height(4.dp))

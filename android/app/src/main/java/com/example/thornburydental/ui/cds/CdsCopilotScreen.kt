@@ -628,7 +628,7 @@ fun AgentProgressSection(steps: List<AgentExecutionStep>) {
                                 Icon(
                                     Icons.Default.CheckCircle, 
                                     contentDescription = "Done", 
-                                    tint = Color(0xFF4CAF50), 
+                                    tint = ThornburySuccess, 
                                     modifier = Modifier.size(20.dp)
                                 )
                             }

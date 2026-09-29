@@ -22,6 +22,8 @@ node_modules/
 # .impeccable/config.json stays tracked: it holds the documented rule exemptions.
 tsconfig.tsbuildinfo
 .impeccable/hook.cache.json
-.data/
 .idea/
-
+agent/
+*.patch
+brag-output*
+broken_cds/
