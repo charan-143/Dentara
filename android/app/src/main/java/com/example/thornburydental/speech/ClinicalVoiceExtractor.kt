@@ -195,6 +195,24 @@ object ClinicalVoiceExtractor {
         6. Return ONLY valid JSON with no markdown formatting or code fences.
     """.trimIndent()
 
+    val gemma4Engine by lazy { Gemma4AudioEngine().apply { initialize() } }
+
+    /**
+     * Extracts structured clinical findings directly from raw 16kHz PCM audio
+     * using Google Gemma 4 E2B Multimodal Native Audio Architecture.
+     */
+    suspend fun extractFromAudio(
+        pcmAudio: ShortArray,
+        transcriptHint: String? = null,
+        context: Context? = null
+    ): ClinicalFindings {
+        return gemma4Engine.processAudioUtterance(
+            pcmData = pcmAudio,
+            context = context,
+            transcriptHint = transcriptHint
+        )
+    }
+
     /**
      * Extracts structured clinical findings from speech transcript.
      */

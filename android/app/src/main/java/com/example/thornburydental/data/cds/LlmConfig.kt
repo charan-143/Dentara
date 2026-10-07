@@ -49,6 +49,16 @@ object LlmModels {
         contextLength = 2048
     )
 
+    val GEMMA_4_E2B_AUDIO = LlmModelSpec(
+        id = "gemma-4-e2b-audio-it",
+        displayName = "Gemma 4 E2B Audio (Multimodal Native Audio, ~1.2 GB)",
+        fileName = "gemma-4-e2b-audio-it.bin",
+        parameterCount = "2B",
+        quantization = "E2B-Q4_K",
+        minRamMb = 2400L,
+        contextLength = 4096
+    )
+
     /**
      * Inspects system available RAM via ActivityManager.MemoryInfo to choose
      * the optimal model tier (1B vs 3B) without risking OOM termination.
