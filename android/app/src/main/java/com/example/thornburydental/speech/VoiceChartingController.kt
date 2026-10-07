@@ -93,8 +93,7 @@ class VoiceChartingController(
     private var listeningScopeJob: Job? = null
     private var lastParsedCommand: ParsedVoiceCommand? = null
     private var lastFindings: ClinicalFindings? = null
-    private var lastRawTranscript: String = ""
-
+    private val gemma4AudioEngine: Gemma4AudioEngine = Gemma4AudioEngine().apply { initialize() }
     private var speechRecognizerManager: AndroidSpeechRecognizerManager? = null
 
     init {
@@ -263,8 +262,10 @@ class VoiceChartingController(
         }
     }
 
+    private var lastRawTranscript: String = ""
+
     /**
-     * Processes PCM audio detected from offline microphone capture.
+     * Processes PCM audio detected from offline microphone capture using Gemma 4 E2B Multimodal Native Audio.
      */
     private fun processPcmSpeechUtterance(
         scope: CoroutineScope,
@@ -281,16 +282,24 @@ class VoiceChartingController(
                 )
 
                 val transcript = whisperEngine.transcribeAudio(speechPcm, activeMode)
-                if (transcript.isBlank()) {
+                // Gemma 4 E2B Native Audio Model Extraction
+                val gemmaFindings = gemma4AudioEngine.processAudioUtterance(
+                    pcmData = speechPcm,
+                    context = context,
+                    transcriptHint = transcript
+                )
+
+                val effectiveTranscript = transcript.ifBlank { gemmaFindings.rawTranscript }
+                if (effectiveTranscript.isBlank() && gemmaFindings.isEmpty) {
                     if (audioRecordManager.isRecording()) {
                         _uiState.value = VoiceDictationState.Listening(0f, activeMode)
                     }
                     return@launch
                 }
 
-                processFullUtterance(scope, transcript, patientId)
+                processFullUtterance(scope, effectiveTranscript, patientId, gemmaFindings)
             } catch (e: Exception) {
-                safeLogE("Error transcribing PCM utterance", e)
+                safeLogE("Error transcribing PCM utterance with Gemma 4 E2B", e)
                 if (audioRecordManager.isRecording()) {
                     _uiState.value = VoiceDictationState.Listening(0f, activeMode)
                 }
@@ -300,7 +309,7 @@ class VoiceChartingController(
 
     /**
      * Complete full-utterance processor:
-     * 1. Uses AI / deterministic clinical extractor to parse multi-entity findings.
+     * 1. Uses Gemma 4 E2B AI / deterministic clinical extractor to parse multi-entity findings.
      * 2. Checks for undo / confirmation commands.
      * 3. Sets state to FindingsExtracted / CommandParsed.
      * 4. Auto-applies if enabled.
@@ -308,7 +317,8 @@ class VoiceChartingController(
     fun processFullUtterance(
         scope: CoroutineScope,
         transcript: String,
-        patientId: String?
+        patientId: String?,
+        precomputedFindings: ClinicalFindings? = null
     ) {
         scope.launch(Dispatchers.Default) {
             try {
@@ -352,8 +362,12 @@ class VoiceChartingController(
                     else -> {}
                 }
 
-                // 2. AI & Rule-based multi-entity clinical extraction
-                val findings = ClinicalVoiceExtractor.extract(transcript, context)
+                // 2. AI (Gemma 4 E2B / Gemini) & Rule-based multi-entity clinical extraction
+                val findings = if (precomputedFindings != null && !precomputedFindings.isEmpty) {
+                    precomputedFindings
+                } else {
+                    ClinicalVoiceExtractor.extract(transcript, context)
+                }
                 lastFindings = findings
                 lastParsedCommand = parsedCommand
                 lastRawTranscript = transcript
@@ -409,13 +423,19 @@ class VoiceChartingController(
                 listeningScopeJob?.cancel()
 
                 val transcript = whisperEngine.transcribeAudio(pcmData, activeMode)
+                val gemmaFindings = gemma4AudioEngine.processAudioUtterance(
+                    pcmData = pcmData,
+                    context = context,
+                    transcriptHint = transcript
+                )
 
-                if (transcript.isBlank()) {
+                val effectiveTranscript = transcript.ifBlank { gemmaFindings.rawTranscript }
+                if (effectiveTranscript.isBlank() && gemmaFindings.isEmpty) {
                     _uiState.value = VoiceDictationState.Error("No spoken clinical dictation detected")
                     return@launch
                 }
 
-                processFullUtterance(scope, transcript, patientId)
+                processFullUtterance(scope, effectiveTranscript, patientId, gemmaFindings)
             } catch (e: SpeechEngineUnavailableException) {
                 safeLogE("Transcription unavailable", e)
                 _uiState.value = VoiceDictationState.Unavailable(e.message ?: ENGINE_LOAD_FAILED)
