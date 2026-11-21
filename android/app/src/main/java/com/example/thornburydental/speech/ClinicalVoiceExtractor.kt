@@ -19,6 +19,43 @@ import kotlinx.serialization.json.jsonPrimitive
 import java.util.Locale
 
 @Serializable
+data class AllergyFinding(
+    val allergen: String,
+    val severity: String = "Moderate", // "Severe / Anaphylaxis", "Moderate", "Mild"
+    val reaction: String = ""
+)
+
+@Serializable
+data class DemographicsFinding(
+    val name: String = "",
+    val dob: String = "",
+    val ageYears: Int? = null,
+    val phone: String = "",
+    val email: String = "",
+    val address: String = "",
+    val isChild: Boolean? = null,
+    val medicalHistory: String = "",
+    val familyHistory: String = "",
+    val pastDentalHistory: String = "",
+    val allergies: List<AllergyFinding> = emptyList(),
+    val medicalAlerts: List<String> = emptyList()
+) {
+    val hasAnyField: Boolean
+        get() = name.isNotBlank() ||
+                dob.isNotBlank() ||
+                ageYears != null ||
+                phone.isNotBlank() ||
+                email.isNotBlank() ||
+                address.isNotBlank() ||
+                isChild != null ||
+                medicalHistory.isNotBlank() ||
+                familyHistory.isNotBlank() ||
+                pastDentalHistory.isNotBlank() ||
+                allergies.isNotEmpty() ||
+                medicalAlerts.isNotEmpty()
+}
+
+@Serializable
 data class ToothConditionFinding(
     val toothNumber: Int,
     val condition: ToothCondition,
@@ -78,6 +115,7 @@ data class ClinicalFindings(
     val clinicalNotes: List<ClinicalNoteFinding> = emptyList(),
     val treatmentPlanItems: List<TreatmentPlanFinding> = emptyList(),
     val examFindings: ClinicalExamFindings = ClinicalExamFindings(),
+    val demographics: DemographicsFinding? = null,
     val confidence: Float = 1.0f,
     val isAiExtracted: Boolean = false,
     val warnings: List<String> = emptyList()
@@ -101,10 +139,20 @@ data class ClinicalFindings(
                 (if (examFindings.cariesRisk.isNotBlank()) 1 else 0) +
                 (if (examFindings.brushingFrequency.isNotBlank()) 1 else 0) +
                 (if (examFindings.flossingFrequency.isNotBlank()) 1 else 0) +
-                (if (examFindings.oralHygiene.isNotBlank()) 1 else 0)
+                (if (examFindings.oralHygiene.isNotBlank()) 1 else 0) +
+                (if (demographics?.name?.isNotBlank() == true) 1 else 0) +
+                (if (demographics?.dob?.isNotBlank() == true || demographics?.ageYears != null) 1 else 0) +
+                (if (demographics?.phone?.isNotBlank() == true) 1 else 0) +
+                (if (demographics?.email?.isNotBlank() == true) 1 else 0) +
+                (if (demographics?.address?.isNotBlank() == true) 1 else 0) +
+                (if (demographics?.medicalHistory?.isNotBlank() == true) 1 else 0) +
+                (if (demographics?.familyHistory?.isNotBlank() == true) 1 else 0) +
+                (if (demographics?.pastDentalHistory?.isNotBlank() == true) 1 else 0) +
+                (demographics?.allergies?.size ?: 0) +
+                (demographics?.medicalAlerts?.size ?: 0)
 
     val isEmpty: Boolean
-        get() = totalCount == 0 && clinicalNotes.isEmpty()
+        get() = totalCount == 0 && clinicalNotes.isEmpty() && (demographics == null || !demographics.hasAnyField)
 
     val requiresReview: Boolean
         get() = warnings.isNotEmpty() || confidence < 0.75f || perioMeasurements.any { it.depthMm > 12 }
@@ -134,6 +182,26 @@ object ClinicalVoiceExtractor {
         
         Output JSON strictly matching this schema:
         {
+          "demographics": {
+            "name": "Sarah Connor",
+            "dob": "15/04/1985",
+            "ageYears": 39,
+            "phone": "+1 555-0199",
+            "email": "sarah.connor@example.com",
+            "address": "45 Elm Street, Springfield",
+            "isChild": false,
+            "medicalHistory": "Hypertension, asthma",
+            "familyHistory": "Maternal diabetes",
+            "pastDentalHistory": "Orthodontic braces in teens",
+            "allergies": [
+              {
+                "allergen": "Penicillin",
+                "severity": "Severe / Anaphylaxis",
+                "reaction": "Airway swelling"
+              }
+            ],
+            "medicalAlerts": ["Pre-medication required", "Blood thinners"]
+          },
           "toothConditions": [
             {
               "toothNumber": 14,
@@ -187,12 +255,13 @@ object ClinicalVoiceExtractor {
         "MB" (Mesiobuccal), "B" (Buccal/Facial), "DB" (Distobuccal), "ML" (Mesiolingual), "L" (Lingual/Palatal), "DL" (Distolingual), "Mesial", "Distal", "Buccal", "Lingual", "Palatal"
         
         Categorization Rules:
-        1. Tooth conditions (caries, missing, crown, rct, implant, filled) belong in "toothConditions".
-        2. Probing depths and bleeding belong in "perioMeasurements".
-        3. Recommended treatments and procedures belong in "treatmentPlanItems".
-        4. Complaints, pain scale, triggers, soft tissue, calculus, stains, tmj, habits, brushing, flossing, risk, and diagnosis belong in their specific "examFindings" fields.
-        5. Any general narrative or extra remarks that do not fit the above fields belong in "examFindings.extraNotes".
-        6. Return ONLY valid JSON with no markdown formatting or code fences.
+        1. Patient demographics, age, DOB, contact details, allergies, alerts, and medical history belong in "demographics".
+        2. Tooth conditions (caries, missing, crown, rct, implant, filled) belong in "toothConditions".
+        3. Probing depths and bleeding belong in "perioMeasurements".
+        4. Recommended treatments and procedures belong in "treatmentPlanItems".
+        5. Complaints, pain scale, triggers, soft tissue, calculus, stains, tmj, habits, brushing, flossing, risk, and diagnosis belong in their specific "examFindings" fields.
+        6. Any general narrative or extra remarks that do not fit the above fields belong in "examFindings.extraNotes".
+        7. Return ONLY valid JSON with no markdown formatting or code fences.
     """.trimIndent()
 
     val gemma4Engine by lazy { Gemma4AudioEngine().apply { initialize() } }
@@ -264,6 +333,44 @@ object ClinicalVoiceExtractor {
                 .trim()
 
             val root = json.parseToJsonElement(cleanJson).jsonObject
+
+            val demoObj = root["demographics"]?.jsonObject
+            val demographics = if (demoObj != null) {
+                val name = demoObj["name"]?.jsonPrimitive?.content ?: ""
+                val dob = demoObj["dob"]?.jsonPrimitive?.content ?: ""
+                val ageYears = demoObj["ageYears"]?.jsonPrimitive?.intOrNull
+                val phone = demoObj["phone"]?.jsonPrimitive?.content ?: ""
+                val email = demoObj["email"]?.jsonPrimitive?.content ?: ""
+                val address = demoObj["address"]?.jsonPrimitive?.content ?: ""
+                val isChild = demoObj["isChild"]?.jsonPrimitive?.booleanOrNull
+                val medicalHistory = demoObj["medicalHistory"]?.jsonPrimitive?.content ?: ""
+                val familyHistory = demoObj["familyHistory"]?.jsonPrimitive?.content ?: ""
+                val pastDentalHistory = demoObj["pastDentalHistory"]?.jsonPrimitive?.content ?: ""
+                val allergies = mutableListOf<AllergyFinding>()
+                demoObj["allergies"]?.jsonArray?.forEach { allergyEl ->
+                    if (allergyEl is JsonObject) {
+                        val allergen = allergyEl["allergen"]?.jsonPrimitive?.content ?: return@forEach
+                        val severity = allergyEl["severity"]?.jsonPrimitive?.content ?: "Moderate"
+                        val reaction = allergyEl["reaction"]?.jsonPrimitive?.content ?: ""
+                        allergies.add(AllergyFinding(allergen, severity, reaction))
+                    }
+                }
+                val medicalAlerts = demoObj["medicalAlerts"]?.jsonArray?.mapNotNull { it.jsonPrimitive.content } ?: emptyList()
+                DemographicsFinding(
+                    name = name,
+                    dob = dob,
+                    ageYears = ageYears,
+                    phone = phone,
+                    email = email,
+                    address = address,
+                    isChild = isChild,
+                    medicalHistory = medicalHistory,
+                    familyHistory = familyHistory,
+                    pastDentalHistory = pastDentalHistory,
+                    allergies = allergies,
+                    medicalAlerts = medicalAlerts
+                )
+            } else null
 
             val toothConditions = mutableListOf<ToothConditionFinding>()
             root["toothConditions"]?.jsonArray?.forEach { el ->
@@ -362,6 +469,7 @@ object ClinicalVoiceExtractor {
                 perioMeasurements = perioMeasurements,
                 treatmentPlanItems = treatmentPlans,
                 examFindings = examFindings,
+                demographics = demographics,
                 confidence = 0.95f,
                 isAiExtracted = true,
                 warnings = warnings
@@ -398,6 +506,20 @@ object ClinicalVoiceExtractor {
         var prognosis = "Good"
         val warnings = mutableListOf<String>()
 
+        // Demographics extraction state
+        var patientName = ""
+        var patientDob = ""
+        var patientAgeYears: Int? = null
+        var patientPhone = ""
+        var patientEmail = ""
+        var patientAddress = ""
+        var patientIsChild: Boolean? = null
+        val patientAllergies = mutableListOf<AllergyFinding>()
+        val patientMedicalAlerts = mutableListOf<String>()
+        val medicalHistoryNotes = mutableListOf<String>()
+        val familyHistoryNotes = mutableListOf<String>()
+        val pastDentalHistoryNotes = mutableListOf<String>()
+
         var normalized = transcript
             .replace(Regex("(?i)\\btooth\\s+number\\b"), "tooth")
             .replace(Regex("(?i)\\bteeth\\b"), "tooth")
@@ -425,7 +547,7 @@ object ClinicalVoiceExtractor {
             normalized = normalized.replace(Regex("(?i)\\btooth\\s+$word\\b"), "tooth $num")
         }
 
-        val clauses = normalized.split(Regex("(?<=[.!?])\\s+|(?<=[,;])\\s+(?=(?:tooth|teeth|#|recommend|plan|schedule|suggest|patient|complaint|pain|sensitive|gingivit|calculus|caries|plaque|hygiene|brush|floss|habit|bruxism|clench|stain|tmj|mucosa|ulcer|diagnosis|prognosis))|\\s+and\\s+(?=(?:tooth|teeth|#|recommend|plan|floss|brush))")).map { it.trim() }.filter { it.isNotBlank() }
+        val clauses = normalized.split(Regex("(?<=[.!?])\\s+|(?<=[,;])\\s+(?=(?:tooth|teeth|#|recommend|plan|schedule|suggest|patient|complaint|pain|sensitive|gingivit|calculus|caries|plaque|hygiene|brush|floss|habit|bruxism|clench|stain|tmj|mucosa|ulcer|diagnosis|prognosis|name|dob|born|age|phone|mobile|email|address|allerg|alert|medical|history))|\\s+and\\s+(?=(?:tooth|teeth|#|recommend|plan|floss|brush|patient|name|dob|born|age|phone|mobile|email|address|allerg|alert|medical|history))")).map { it.trim() }.filter { it.isNotBlank() }
 
         for (clause in clauses) {
             var handled = false
@@ -647,7 +769,146 @@ object ClinicalVoiceExtractor {
                     }
                     // Diagnosis
                     clause.contains("diagnosis", ignoreCase = true) || clause.contains("diagnosed", ignoreCase = true) -> {
-                        diagnosis = clause.replace(Regex("(?i)diagnosis:?|diagnosed with:?"), "").trim().capitalize(Locale.US)
+                        diagnosis = clause.replace(Regex("(?i)diagnosis:?|diagnosed with:?"), "").trim().trimEnd('.', ',', ';', ':').capitalize(Locale.US)
+                        handled = true
+                    }
+                    // Demographics: Patient Name
+                    (clause.contains(Regex("(?i)\\b(?:patient(?:'s)?\\s+name\\s+(?:is)?|name\\s+is)\\b")) ||
+                     clause.matches(Regex("(?i)^patient\\s+([A-Z][a-z]+(?:\\s+[A-Z][a-z]+)+)$"))) -> {
+                        val namePart = clause
+                            .replace(Regex("(?i)^.*?\\b(?:patient(?:'s)?\\s+name\\s+(?:is)?|name\\s+is|patient)\\s*:?\\s*"), "")
+                            .trim()
+                            .trimEnd('.', ',', ';', ':')
+                        if (namePart.isNotBlank()) {
+                            patientName = namePart.split(" ")
+                                .joinToString(" ") { it.replaceFirstChar { ch -> ch.uppercase(Locale.US) } }
+                        }
+                        handled = true
+                    }
+                    // Demographics: Date of Birth / Born on
+                    clause.contains(Regex("(?i)\\b(?:date\\s+of\\s+birth|dob|born\\s+on)\\b")) -> {
+                        val dobPart = clause
+                            .replace(Regex("(?i)^.*?\\b(?:date\\s+of\\s+birth|dob|born\\s+on)\\s*:?\\s*(?:is\\s+)?"), "")
+                            .trim()
+                            .trimEnd('.', ',', ';', ':')
+                        if (dobPart.isNotBlank()) {
+                            patientDob = dobPart
+                        }
+                        handled = true
+                    }
+                    // Demographics: Age / Pediatric / Adult
+                    clause.contains(Regex("(?i)\\b(?:pediatric|child|primary\\s+dentition|primary\\s+teeth)\\b")) -> {
+                        patientIsChild = true
+                        handled = true
+                    }
+                    clause.contains(Regex("(?i)\\b(?:adult\\s+patient|permanent\\s+dentition)\\b")) -> {
+                        patientIsChild = false
+                        handled = true
+                    }
+                    clause.contains(Regex("(?i)\\b(?:age\\s+(?:is\\s+)?\\d{1,3}|\\d{1,3}\\s+years\\s+old)\\b")) -> {
+                        val ageMatch = Regex("(?i)\\b(?:age\\s+(?:is\\s+)?)?(\\d{1,3})(?:\\s+years\\s+old)?\\b").find(clause)
+                        val ageVal = ageMatch?.groupValues?.get(1)?.toIntOrNull()
+                        if (ageVal != null) {
+                            patientAgeYears = ageVal
+                            if (ageVal < 14) patientIsChild = true
+                        }
+                        handled = true
+                    }
+                    // Demographics: Phone / Mobile
+                    clause.contains(Regex("(?i)\\b(?:phone|telephone|mobile|cell)\\b")) -> {
+                        val phonePart = clause
+                            .replace(Regex("(?i)^.*?\\b(?:phone(?:\\s+number)?|telephone|mobile|cell)\\s*:?\\s*(?:is\\s+)?"), "")
+                            .trim()
+                            .trimEnd('.', ',', ';', ':')
+                        if (phonePart.isNotBlank()) {
+                            patientPhone = phonePart
+                        }
+                        handled = true
+                    }
+                    // Demographics: Email
+                    clause.contains(Regex("(?i)\\b(?:email|e-mail)\\b")) -> {
+                        val emailPart = clause
+                            .replace(Regex("(?i)^.*?\\b(?:email(?:\\s+address)?|e-mail)\\s*:?\\s*(?:is\\s+)?"), "")
+                            .replace(" dot ", ".")
+                            .replace(" at ", "@")
+                            .replace(" ", "")
+                            .trim()
+                            .trimEnd('.', ',', ';', ':')
+                        if (emailPart.isNotBlank()) {
+                            patientEmail = emailPart
+                        }
+                        handled = true
+                    }
+                    // Demographics: Address
+                    clause.contains(Regex("(?i)\\b(?:address|residing\\s+at|lives\\s+at)\\b")) -> {
+                        val addrPart = clause
+                            .replace(Regex("(?i)^.*?\\b(?:address|residing\\s+at|lives\\s+at)\\s*:?\\s*(?:is\\s+)?"), "")
+                            .trim()
+                            .trimEnd('.', ',', ';', ':')
+                        if (addrPart.isNotBlank()) {
+                            patientAddress = addrPart.capitalize(Locale.US)
+                        }
+                        handled = true
+                    }
+                    // Demographics: Allergies
+                    clause.contains(Regex("(?i)\\b(?:allergic\\s+to|allergy\\s+to|allergies)\\b")) -> {
+                        val rawAllergens = clause
+                            .replace(Regex("(?i)^.*?\\b(?:allergic\\s+to|allergy\\s+to|allergies(?:\\s*:|\\s+include)?)\\s*"), "")
+                            .split(Regex("(?i)\\s+(?:and|,)\\s+"))
+                        for (raw in rawAllergens) {
+                            val clean = raw.trim()
+                            if (clean.isNotBlank()) {
+                                val isSevere = clean.contains("severe", ignoreCase = true) || clean.contains("anaphylaxis", ignoreCase = true)
+                                val isMild = clean.contains("mild", ignoreCase = true)
+                                val severity = when {
+                                    isSevere -> "Severe / Anaphylaxis"
+                                    isMild -> "Mild"
+                                    else -> "Moderate"
+                                }
+                                val allergenName = clean
+                                    .replace(Regex("(?i)\\b(?:severe|mild|moderate|allergy|allergic)\\b"), "")
+                                    .trim()
+                                    .trimEnd('.', ',', ';', ':')
+                                    .capitalize(Locale.US)
+                                if (allergenName.isNotBlank()) {
+                                    patientAllergies.add(AllergyFinding(allergen = allergenName, severity = severity))
+                                }
+                            }
+                        }
+                        handled = true
+                    }
+                    // Demographics: Medical Alerts
+                    clause.contains(Regex("(?i)\\b(?:medical\\s+alert|pre-medication|blood\\s+thinner|bleeding\\s+disorder|pacemaker|diabetic\\s+alert|anticoagulant|bisphosphonate|mronj)\\b")) -> {
+                        val alertText = when {
+                            clause.contains("pre-med", ignoreCase = true) -> "Pre-medication required"
+                            clause.contains("blood thinner", ignoreCase = true) || clause.contains("anticoagulant", ignoreCase = true) -> "Blood thinners / Anticoagulant therapy"
+                            clause.contains("bleeding", ignoreCase = true) -> "Bleeding disorder"
+                            clause.contains("pacemaker", ignoreCase = true) -> "Cardiac Pacemaker"
+                            clause.contains("bisphosphonate", ignoreCase = true) || clause.contains("mronj", ignoreCase = true) -> "Bisphosphonates / MRONJ risk"
+                            clause.contains("diabetic", ignoreCase = true) -> "Diabetic Alert"
+                            else -> clause.replace(Regex("(?i)^.*?medical\\s+alert:?\\s*"), "").trim().capitalize(Locale.US)
+                        }
+                        if (alertText.isNotBlank()) {
+                            patientMedicalAlerts.add(alertText)
+                        }
+                        handled = true
+                    }
+                    // Demographics: Family History
+                    clause.contains(Regex("(?i)\\bfamily\\s+history\\b")) -> {
+                        val fam = clause.replace(Regex("(?i)^.*?family\\s+history:?\\s*(?:of\\s+)?"), "").trim().capitalize(Locale.US)
+                        if (fam.isNotBlank()) familyHistoryNotes.add(fam)
+                        handled = true
+                    }
+                    // Demographics: Past Dental History
+                    clause.contains(Regex("(?i)\\b(?:past\\s+dental\\s+history|dental\\s+history)\\b")) -> {
+                        val dent = clause.replace(Regex("(?i)^.*?(?:past\\s+dental\\s+history|dental\\s+history):?\\s*"), "").trim().capitalize(Locale.US)
+                        if (dent.isNotBlank()) pastDentalHistoryNotes.add(dent)
+                        handled = true
+                    }
+                    // Demographics: Medical History
+                    clause.contains(Regex("(?i)\\b(?:medical\\s+history|history\\s+of\\s+(?:hypertension|diabetes|asthma|cardiac|hepatitis|cancer|epilepsy|stroke))\\b")) -> {
+                        val med = clause.replace(Regex("(?i)^.*?medical\\s+history:?\\s*"), "").trim().capitalize(Locale.US)
+                        if (med.isNotBlank()) medicalHistoryNotes.add(med)
                         handled = true
                     }
                     // Extra / General Notes (Only true extra remarks go here!)
@@ -684,6 +945,21 @@ object ClinicalVoiceExtractor {
             extraNotes = extraNotes.distinct()
         )
 
+        val demographicsFinding = DemographicsFinding(
+            name = patientName,
+            dob = patientDob,
+            ageYears = patientAgeYears,
+            phone = patientPhone,
+            email = patientEmail,
+            address = patientAddress,
+            isChild = patientIsChild,
+            medicalHistory = medicalHistoryNotes.joinToString(", "),
+            familyHistory = familyHistoryNotes.joinToString(", "),
+            pastDentalHistory = pastDentalHistoryNotes.joinToString(", "),
+            allergies = patientAllergies.distinctBy { it.allergen.lowercase() },
+            medicalAlerts = patientMedicalAlerts.distinct()
+        )
+
         return ClinicalFindings(
             rawTranscript = transcript,
             toothConditions = toothConditions.distinctBy { it.toothNumber },
@@ -691,7 +967,8 @@ object ClinicalVoiceExtractor {
             clinicalNotes = extraNotes.map { ClinicalNoteFinding(category = "General Note", text = it) },
             treatmentPlanItems = treatmentPlans,
             examFindings = examFindings,
-            confidence = if (toothConditions.isNotEmpty() || perioMeasurements.isNotEmpty()) 0.95f else 0.85f,
+            demographics = if (demographicsFinding.hasAnyField) demographicsFinding else null,
+            confidence = if (toothConditions.isNotEmpty() || perioMeasurements.isNotEmpty() || demographicsFinding.hasAnyField) 0.95f else 0.85f,
             isAiExtracted = false,
             warnings = warnings
         )

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db, newId, sha256, nowIso } from "@/lib/db";
 import { record, readAudit } from "@/lib/audit";
+import { authenticateApiRequest } from "@/lib/auth";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -35,6 +36,13 @@ async function ensureAuditLogTable(sql: any) {
 
 export async function GET(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
     const { searchParams } = new URL(request.url);
     const limit = parseInt(searchParams.get("limit") || "100", 10);
     const patientId = searchParams.get("patient_id") || searchParams.get("patientId") || undefined;
@@ -118,9 +126,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const action = body.action ? String(body.action) : "clinical_access";
-    const actorId = body.actor_id || body.actorId || "c_ingrid";
+    const actorId = body.actor_id || body.actorId || user.clinicianId;
     const patientId = body.patient_id || body.patientId || null;
     const details = body.details || body.data || {};
 

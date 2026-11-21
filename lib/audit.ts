@@ -48,13 +48,14 @@ function digest(f: {
   ].join(" "));
 }
 
-// Actions permitted into the audit trail. Everything else is ignored to keep
-// the audit trail tailored strictly to user appointments and patient registry.
-const AUDITED_ENTITIES = new Set(["appointment", "patient"]);
+// Actions permitted into the audit trail. Prescription events contain opaque
+// record references only; their clinical justification stays on the prescription.
+const AUDITED_ENTITIES = new Set(["appointment", "patient", "prescription"]);
 
 function shouldAudit(entry: AuditEntry): boolean {
-  if (!entry.actorId) return false;
+  if (!entry.actorId || !AUDITED_ENTITIES.has(entry.entity)) return false;
   if (entry.entity === "appointment") return true;
+  if (entry.entity === "prescription") return true;
   if (entry.entity === "patient" && (entry.action.includes("register") || entry.action.includes("created"))) {
     return true;
   }

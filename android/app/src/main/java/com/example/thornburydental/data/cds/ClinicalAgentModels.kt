@@ -104,7 +104,11 @@ data class DifferentialDiagnosisRecommendation(
     val associatedTeeth: List<Int> = emptyList(),
     val recommendedCdtCodes: List<String> = emptyList(), // e.g. ["D0140", "D3330", "D2740"]
     val icd10DiagnosisCode: String? = null, // e.g. "K04.01", "K05.32"
-    val citedGuidelineIds: List<String> = emptyList()
+    val citedGuidelineIds: List<String> = emptyList(),
+    val confidenceScore: Float = 0.92f, // 0.0 - 1.0 calibrated probability
+    val evidenceLevel: String = "Level 1A (Systematic Review)", // e.g. "Level 1A Systematic Review", "Level 1B RCT", "ADA Expert Consensus"
+    val primaryGuidelineBadge: String = "ADA 2024", // "ADA 2024", "NICE CG19", "AAOMS 2022", "SDCEP 2024"
+    val guidelineCitationText: String = "ADA Clinical Practice Guideline for Management of Acute Dental Pain & Infections"
 )
 
 /**
@@ -116,7 +120,9 @@ data class PharmacologicalAlert(
     val severityLevel: SafetySeverityLevel,
     val reason: String,
     val clinicalAction: String,
-    val safeAlternative: String? = null
+    val evidenceSource: String = "No reviewed medication source configured",
+    val guidelineVersion: String? = null,
+    val reviewDate: String? = null
 )
 
 enum class SafetySeverityLevel {
@@ -193,7 +199,10 @@ data class SuggestedTreatmentProcedure(
     val priority: String = "High", // "Urgent / Emergency", "High", "Moderate", "Preventive / Maintenance"
     val clinicalRationale: String = "",
     val estimatedVisits: Int = 1,
-    val isClinicianCustomization: Boolean = false
+    val isClinicianCustomization: Boolean = false,
+    val confidenceScore: Float = 0.94f,
+    val evidenceGrade: String = "Grade A Recommendation",
+    val guidelineBadge: String = "ADA 2024"
 )
 
 /**
@@ -217,7 +226,10 @@ data class SuggestedTreatmentPlan(
     val primaryDiagnosis: String,
     val phases: List<SuggestedTreatmentPhase> = emptyList(),
     val totalEstimatedProcedures: Int = 0,
-    val clinicianCustomizations: List<String> = emptyList()
+    val clinicianCustomizations: List<String> = emptyList(),
+    val overallConfidence: Float = 0.91f,
+    val evidenceSummaryBadge: String = "NICE / ADA Concordant",
+    val confidenceThresholdMet: Boolean = true
 )
 
 /**

@@ -299,7 +299,8 @@ async function ensureNeonColumns(client: NeonQueryFunction<false, false>) {
       refills         INTEGER NOT NULL DEFAULT 0 CHECK (refills >= 0),
       indication      TEXT NOT NULL,
       issued_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-      override_reason TEXT
+      override_reason TEXT,
+      safety_review_summary TEXT
     );`,
     `CREATE TABLE IF NOT EXISTS reminders (
       id              TEXT PRIMARY KEY,
@@ -407,6 +408,7 @@ async function ensureNeonColumns(client: NeonQueryFunction<false, false>) {
 
   try { await client`ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS refills INTEGER NOT NULL DEFAULT 0;`; } catch (e) {}
   try { await client`ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS override_reason TEXT;`; } catch (e) {}
+  try { await client`ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS safety_review_summary TEXT;`; } catch (e) {}
 
   try { await client`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS duration_min INTEGER NOT NULL DEFAULT 30;`; } catch (e) {}
   try { await client`ALTER TABLE appointments ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';`; } catch (e) {}

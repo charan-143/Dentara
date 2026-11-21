@@ -195,4 +195,57 @@ class ClinicalVoiceExtractorTest {
         assertTrue(summary.contains("Tooth 14 active caries / decay surface MOD"))
         assertTrue(summary.contains("Tooth 4 missing"))
     }
+
+    @Test
+    fun extractDemographicsFromSpokenSpeech() {
+        val transcript = "Patient name is Sarah Connor, born on 15/04/1985, phone 555-0199, email sarah dot connor at gmail dot com, address 45 Elm Street, allergic to penicillin and latex, medical alert blood thinners."
+        val findings = ClinicalVoiceExtractor.extractDeterministic(transcript)
+
+        assertNotNull(findings.demographics)
+        val demo = findings.demographics!!
+        assertEquals("Sarah Connor", demo.name)
+        assertEquals("15/04/1985", demo.dob)
+        assertEquals("555-0199", demo.phone)
+        assertEquals("sarah.connor@gmail.com", demo.email)
+        assertTrue(demo.address.contains("45 Elm Street"))
+        assertTrue(demo.allergies.any { it.allergen.contains("Penicillin", ignoreCase = true) })
+        assertTrue(demo.allergies.any { it.allergen.contains("Latex", ignoreCase = true) })
+        assertTrue(demo.medicalAlerts.any { it.contains("Blood thinner", ignoreCase = true) })
+    }
+
+    @Test
+    fun applyClinicalFindingsUpdatesDemographicsAndExamination() {
+        val transcript = "Patient name Arthur Pendelton. Phone 555-9988. Allergic to amoxicillin. Tooth 14 occlusal decay MOD. Tooth 30 missing. Chief complaint severe throbbing pain. Cold sensitivity. High caries risk. Diagnosis generalized periodontitis."
+        val findings = ClinicalVoiceExtractor.extractDeterministic(transcript)
+
+        assertNotNull(findings.demographics)
+        assertEquals("Arthur Pendelton", findings.demographics!!.name)
+        assertEquals("555-9988", findings.demographics!!.phone)
+        assertEquals(2, findings.toothConditions.size)
+        assertTrue(findings.examFindings.chiefComplaints.isNotEmpty())
+        assertEquals("High", findings.examFindings.cariesRisk)
+
+        val applied = DentalRepository.applyClinicalFindings(patient.id, findings, "Dr. Thornbury")
+        assertTrue(applied)
+
+        val updated = current()
+        // 1. Demographics populated
+        assertEquals("Arthur Pendelton", updated.name)
+        assertEquals("555-9988", updated.phone)
+        assertTrue(updated.allergies.any { it.allergen.contains("Amoxicillin", ignoreCase = true) })
+
+        // 2. Odontogram populated
+        val t14 = updated.teeth.values.first { it.number == 14 || it.fdiNumber == 14 }
+        assertEquals(ToothCondition.DECAY, t14.condition)
+        assertTrue(t14.notes.contains("MOD"))
+
+        val t30 = updated.teeth.values.first { it.number == 30 || it.fdiNumber == 30 || it.fdiNumber == 46 || it.number == 46 }
+        assertEquals(ToothCondition.MISSING, t30.condition)
+
+        // 3. Clinical Examination populated
+        assertNotNull(updated.examAnswers)
+        assertTrue(updated.examAnswers!!.chiefComplaints.any { it.contains("pain", ignoreCase = true) })
+        assertEquals("High", updated.examAnswers!!.cariesRisk)
+        assertTrue(updated.examAnswers!!.sensitivityTriggers.contains("Cold"))
+    }
 }

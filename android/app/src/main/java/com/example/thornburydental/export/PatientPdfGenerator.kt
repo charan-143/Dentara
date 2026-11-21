@@ -632,7 +632,7 @@ object PatientPdfGenerator {
     }
 
     /**
-     * Saves the PDF directly to the device's public Downloads directory.
+     * Saves the PDF to the application's private files directory, protected from other apps.
      */
     fun savePdfToPublicDownloads(context: Context, sourceFile: File, patient: Patient): Result<File> {
         return runCatching {
@@ -640,34 +640,11 @@ object PatientPdfGenerator {
             val cleanName = patient.name.replace("[^a-zA-Z0-9_-]".toRegex(), "_")
             val fileName = "Dentara_EHR_${cleanOp}_$cleanName.pdf"
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val values = ContentValues().apply {
-                    put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                    put(MediaStore.Downloads.MIME_TYPE, "application/pdf")
-                    put(MediaStore.Downloads.IS_PENDING, 1)
-                }
-                val resolver = context.contentResolver
-                val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-                val itemUri = resolver.insert(collection, values)
-                    ?: throw IllegalStateException("Failed to create MediaStore entry in Downloads")
-
-                resolver.openOutputStream(itemUri)?.use { out ->
-                    FileInputStream(sourceFile).use { input ->
-                        input.copyTo(out)
-                    }
-                }
-
-                values.clear()
-                values.put(MediaStore.Downloads.IS_PENDING, 0)
-                resolver.update(itemUri, values, null, null)
-                sourceFile
-            } else {
-                val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                downloadsDir.mkdirs()
-                val targetFile = File(downloadsDir, fileName)
-                sourceFile.copyTo(targetFile, overwrite = true)
-                targetFile
-            }
+            // Keep clinical records within app-private storage (accessible to FileProvider for sharing)
+            val exportsDir = File(context.filesDir, "pdf_exports").apply { mkdirs() }
+            val targetFile = File(exportsDir, fileName)
+            sourceFile.copyTo(targetFile, overwrite = true)
+            targetFile
         }
     }
 

@@ -62,13 +62,12 @@ export async function requestResetAction(_prev: FormState, formData: FormData): 
 
   const { code } = await requestPasswordReset(email);
 
-  // The same reassurance either way, so this form cannot be used to discover
-  // which addresses are registered. The code itself appears only because this
-  // demonstration has no mail transport.
+  if (code && process.env.NODE_ENV !== "production") {
+    console.info(`[Auth] Password reset code generated for ${email}: ${code}`);
+  }
+
   return {
-    notice: code
-      ? `If that address has an account, a reset code has been sent. For this demonstration the code is ${code}, valid for 30 minutes and usable once.`
-      : "If that address has an account, a reset code has been sent to it.",
+    notice: "If that address has an account, instructions and a reset code have been sent to it.",
   };
 }
 

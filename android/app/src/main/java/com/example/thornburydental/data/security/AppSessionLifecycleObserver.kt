@@ -19,11 +19,11 @@ object AppSessionLifecycleObserver : DefaultLifecycleObserver {
     // Timeout threshold in milliseconds for background inactivity (0 = lock immediately on background resume)
     var lockTimeoutMs: Long = 0L
 
-    var isGatingEnabled: Boolean = true
+    var isGatingEnabled: Boolean = false
 
     fun initPreferences(context: Context) {
         val prefs = context.getSharedPreferences("dentara_app_prefs", Context.MODE_PRIVATE)
-        isGatingEnabled = prefs.getBoolean("biometric_auth_enabled", true)
+        isGatingEnabled = prefs.getBoolean("biometric_auth_enabled", false)
         val timeoutMin = prefs.getInt("biometric_lock_timeout_min", 0)
         lockTimeoutMs = timeoutMin * 60 * 1000L
         lastBackgroundTimeMs = prefs.getLong("last_background_time_ms", 0L)

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import com.example.thornburydental.speech.ClinicalFindings
 import com.example.thornburydental.speech.ClinicalNoteFinding
 import com.example.thornburydental.speech.ClinicalNoteResult
+import com.example.thornburydental.speech.DemographicsFinding
 import com.example.thornburydental.speech.ParsedVoiceCommand
 import com.example.thornburydental.speech.PerioMeasurementFinding
 import com.example.thornburydental.speech.PocketDepthResult
@@ -152,6 +153,19 @@ fun ClinicalFindingsPreviewSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // 0. Patient Demographics
+                findings.demographics?.let { demo ->
+                    if (demo.hasAnyField) {
+                        Text(
+                            text = "👤 Patient Demographics",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = ThornburyPrimary
+                        )
+                        DemographicsFindingCard(demo)
+                    }
+                }
+
                 // 1. Odontogram Tooth Conditions
                 if (findings.toothConditions.isNotEmpty()) {
                     Text(
@@ -840,6 +854,82 @@ private fun ClinicalNoteItemCard(entry: ClinicalNoteResult) {
                 text = entry.noteText,
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+    }
+}
+
+@Composable
+fun DemographicsFindingCard(demo: DemographicsFinding) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = ThornburySurfaceCard),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ThornburyHairline)
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (demo.name.isNotBlank()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Person, contentDescription = null, tint = ThornburyPrimary, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "Name: ${demo.name}", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = ThornburyInk)
+                    if (demo.isChild == true) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(shape = RoundedCornerShape(6.dp), color = ThornburyPrimaryWash) {
+                            Text(text = "Pediatric", style = MaterialTheme.typography.labelSmall, color = ThornburyPrimary, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+                }
+            }
+            if (demo.dob.isNotBlank() || demo.ageYears != null) {
+                val ageStr = listOfNotNull(
+                    if (demo.dob.isNotBlank()) "DOB: ${demo.dob}" else null,
+                    if (demo.ageYears != null) "Age: ${demo.ageYears} yrs" else null
+                ).joinToString(" • ")
+                Text(text = ageStr, style = MaterialTheme.typography.bodySmall, color = ThornburyBody)
+            }
+            if (demo.phone.isNotBlank() || demo.email.isNotBlank()) {
+                val contactStr = listOfNotNull(
+                    if (demo.phone.isNotBlank()) "📞 ${demo.phone}" else null,
+                    if (demo.email.isNotBlank()) "✉️ ${demo.email}" else null
+                ).joinToString(" | ")
+                Text(text = contactStr, style = MaterialTheme.typography.bodySmall, color = ThornburyBody)
+            }
+            if (demo.address.isNotBlank()) {
+                Text(text = "📍 Address: ${demo.address}", style = MaterialTheme.typography.bodySmall, color = ThornburyBody)
+            }
+            if (demo.allergies.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Warning, contentDescription = null, tint = ThornburyError, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Allergies: ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = ThornburyError)
+                    Text(
+                        text = demo.allergies.joinToString(", ") { "${it.allergen} (${it.severity})" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ThornburyError
+                    )
+                }
+            }
+            if (demo.medicalAlerts.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.NotificationImportant, contentDescription = null, tint = ThornburyWarning, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "Medical Alerts: ", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = ThornburyWarning)
+                    Text(
+                        text = demo.medicalAlerts.joinToString(", "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ThornburyInk
+                    )
+                }
+            }
+            if (demo.medicalHistory.isNotBlank()) {
+                Text(text = "Medical History: ${demo.medicalHistory}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+            }
+            if (demo.familyHistory.isNotBlank()) {
+                Text(text = "Family History: ${demo.familyHistory}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+            }
+            if (demo.pastDentalHistory.isNotBlank()) {
+                Text(text = "Past Dental History: ${demo.pastDentalHistory}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+            }
         }
     }
 }

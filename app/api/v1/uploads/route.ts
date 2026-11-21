@@ -10,10 +10,28 @@
 
 import { NextResponse } from "next/server";
 import { newId } from "@/lib/db";
+import { authenticateApiRequest } from "@/lib/auth";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25MB
+
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+  "application/dicom",
+]);
+
+const ALLOWED_EXTENSIONS = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".pdf",
+  ".dcm",
+]);
 
 /** Strips path separators and anything outside [A-Za-z0-9._-], then collapses repeats. */
 function sanitizeFilename(name: string): string {
@@ -25,6 +43,14 @@ function sanitizeFilename(name: string): string {
 
 export async function POST(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -38,6 +64,19 @@ export async function POST(request: Request) {
     if (file.size > MAX_UPLOAD_BYTES) {
       return NextResponse.json(
         { status: "error", message: "File exceeds the 25MB upload limit." },
+        { status: 400 }
+      );
+    }
+
+    const mimeType = (file.type || "").toLowerCase();
+    const ext = path.extname(file.name || "").toLowerCase();
+
+    if (!ALLOWED_MIME_TYPES.has(mimeType) || !ALLOWED_EXTENSIONS.has(ext)) {
+      return NextResponse.json(
+        {
+          status: "error",
+          message: "Disallowed file type. Only JPEG, PNG, WEBP, PDF, and DICOM attachments are permitted.",
+        },
         { status: 400 }
       );
     }

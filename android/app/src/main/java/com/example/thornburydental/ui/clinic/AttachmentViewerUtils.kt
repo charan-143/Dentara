@@ -82,6 +82,52 @@ object AttachmentViewerUtils {
     }
 
     /**
+     * Loads low-res WebP thumbnail from encrypted cache for 120 Hz smooth scrolling.
+     * Falls back to safely downsampling the full image and creating an encrypted thumbnail on the fly.
+     */
+    suspend fun loadThumbnailSafely(
+        context: Context,
+        attachment: ReportAttachment
+    ): Bitmap? = withContext(Dispatchers.IO) {
+        val thumbPath = attachment.thumbnailUri
+        if (!thumbPath.isNullOrBlank()) {
+            val thumbFile = File(thumbPath)
+            if (thumbFile.exists()) {
+                val cached = com.example.thornburydental.data.security.EncryptedThumbnailManager.loadDecryptedThumbnail(context, thumbFile, attachment.id)
+                if (cached != null) return@withContext cached
+            }
+        }
+
+        // Try to generate thumbnail on the fly if physical file is available
+        val fullFile = resolveAttachmentFile(context, attachment)
+        if (fullFile != null && fullFile.exists()) {
+            val generatedThumb = com.example.thornburydental.data.security.EncryptedThumbnailManager.generateAndEncryptThumbnail(context, fullFile, attachment.id)
+            if (generatedThumb != null) {
+                return@withContext com.example.thornburydental.data.security.EncryptedThumbnailManager.loadDecryptedThumbnail(context, generatedThumb, attachment.id)
+            }
+        }
+
+        // Fallback to decodeBitmapSafely
+        decodeBitmapSafely(context, attachment.uri, 300, 300)
+    }
+
+    /**
+     * Loads thumbnail for gallery items from encrypted cache.
+     */
+    suspend fun loadReportThumbnail(
+        context: Context,
+        report: com.example.thornburydental.data.DiagnosticReport,
+        attachment: ReportAttachment?
+    ): Bitmap? = withContext(Dispatchers.IO) {
+        if (attachment != null) {
+            val thumb = loadThumbnailSafely(context, attachment)
+            if (thumb != null) return@withContext thumb
+        }
+        val uriStr = attachment?.uri ?: report.image
+        decodeBitmapSafely(context, uriStr, 300, 300)
+    }
+
+    /**
      * Safely decodes a bitmap from a URI or file path with inSampleSize calculation to prevent OOM.
      */
     suspend fun decodeBitmapSafely(

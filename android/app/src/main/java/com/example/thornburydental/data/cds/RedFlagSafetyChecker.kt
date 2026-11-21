@@ -43,8 +43,8 @@ object RedFlagSafetyChecker {
 
         if (hasAirwayKeywords || hasLudwigsCombo) {
             reasons.add("Potential Airway Compromise / Deep Space Infection (Ludwig's Angina Risk)")
-            actions.add("Immediate Emergency Department referral for surgical airway assessment & IV antibiotic therapy")
-            actions.add("Maintain patient upright; DO NOT place in supine position if breathing or swallowing is impaired")
+            actions.add("Emergency escalation: activate local emergency medical services and arrange immediate emergency department assessment for suspected airway compromise")
+            actions.add("Keep the patient under direct observation and follow local emergency airway protocols; do not delay transfer for this advisory")
         }
 
         // -------------------------------------------------------------
@@ -64,8 +64,8 @@ object RedFlagSafetyChecker {
         if (hasBleeding || (isHemodynamicallyUnstable && (combinedAssertedText.contains("bleeding") || combinedAssertedText.contains("trauma")))) {
             val shockNote = if (isHemodynamicallyUnstable) " (Shock Index: ${"%.2f".format(shockIndex)} - Elevated Hemodynamic Risk)" else ""
             reasons.add("Active Severe Hemorrhage with Risk of Hemodynamic Shock$shockNote")
-            actions.add("Apply direct firm pressure with gauze soaked in 5% Tranexamic Acid (TXA)")
-            actions.add("Check INR / anticoagulant status and initiate emergency EMS transfer if hemostasis fails")
+            actions.add("Emergency escalation: apply appropriate direct pressure per local protocol and activate emergency services for uncontrolled bleeding or instability")
+            actions.add("Urgently assess anticoagulant use, bleeding history, and hemodynamic status; medication or reversal decisions require a clinician")
         }
 
         // -------------------------------------------------------------
@@ -81,8 +81,8 @@ object RedFlagSafetyChecker {
 
         if (hasHighFever || hasSepticKeywords) {
             reasons.add("Severe Systemic Toxicity / Septicemia or Cavernous Sinus Thrombosis Risk")
-            actions.add("Urgent hospital admission for blood cultures and high-dose parenteral broad-spectrum antimicrobials")
-            actions.add("Continuous monitoring of temperature, MAP, and neurological status")
+            actions.add("Emergency escalation: arrange immediate hospital assessment for possible severe infection or neurological emergency")
+            actions.add("Antimicrobial and monitoring decisions require the receiving clinical team and applicable local protocol")
         }
 
         // -------------------------------------------------------------
@@ -95,9 +95,8 @@ object RedFlagSafetyChecker {
         val hasAnaphylaxis = anaphylaxisKeywords.any { combinedAssertedText.contains(it) }
         if (hasAnaphylaxis) {
             reasons.add("Suspected Acute Anaphylactic Reaction")
-            actions.add("Administer IM Epinephrine (1:1,000, 0.3-0.5 mg in anterolateral thigh) immediately")
-            actions.add("Activate Emergency Medical Services (EMS / 911)")
-            actions.add("Administer high-flow supplemental oxygen (10-15 L/min)")
+            actions.add("Emergency escalation: activate local emergency medical services immediately and follow the site's anaphylaxis protocol")
+            actions.add("A trained clinician should assess and treat suspected anaphylaxis without delay; follow local protocol for medication and supportive care")
         }
 
         // -------------------------------------------------------------
@@ -110,8 +109,8 @@ object RedFlagSafetyChecker {
         val hasCardioStroke = cardioStrokeKeywords.any { combinedAssertedText.contains(it) }
         if (hasCardioStroke) {
             reasons.add("Acute Cardiovascular or Neurological Emergency (MI / CVA Risk)")
-            actions.add("Immediate 911 / EMS activation and continuous vital sign / ECG monitoring")
-            actions.add("Administer chewable aspirin (300 mg) unless contraindicated by active hemorrhage")
+            actions.add("Emergency escalation: activate local emergency medical services immediately for possible cardiac or stroke emergency")
+            actions.add("Do not initiate medication from this advisory; treatment requires clinician assessment and local emergency protocol")
         }
 
         // -------------------------------------------------------------
@@ -120,17 +119,24 @@ object RedFlagSafetyChecker {
         val patientAllergies = query.vitalsContext.patientAllergies.map { it.lowercase(Locale.ROOT) }
         if (patientAllergies.any { it.contains("penicillin") || it.contains("amoxicillin") }) {
             if (combinedAssertedText.contains("infection") || combinedAssertedText.contains("abscess") || combinedAssertedText.contains("swelling")) {
-                reasons.add("PATIENT PENICILLIN ALLERGY: Beta-lactams / Amoxicillin strictly contraindicated")
-                actions.add("Prescribe Clindamycin (300 mg TID) or Azithromycin (500 mg day 1, then 250 mg daily) for odontogenic infections")
+                reasons.add("Medication safety alert: reported penicillin-family allergy requires verification before considering a beta-lactam")
+                actions.add("Verify the allergy agent, reaction, severity, and timing with the patient and record; do not infer an alternative antibiotic from allergy history alone")
+                actions.add("Any prescription requires clinician confirmation against a current, locally approved medication knowledge base, including renal function, pregnancy status, interactions, and medical history")
             }
         }
 
         val patientConditions = query.vitalsContext.medicalConditions.map { it.lowercase(Locale.ROOT) }
+        val medicationContextIncomplete = query.vitalsContext.renalFunctionSummary.isNullOrBlank() ||
+                query.vitalsContext.pregnancyStatus.isNullOrBlank()
+        if ((patientAllergies.isNotEmpty() || query.vitalsContext.currentMedications.isNotEmpty()) && medicationContextIncomplete) {
+            reasons.add("Medication review context incomplete: renal function and/or pregnancy status not documented")
+            actions.add("Resolve missing medication safety context and check current medications, interactions, and medical history before prescribing")
+        }
         if (patientConditions.any { it.contains("bisphosphonate") || it.contains("mronj") || it.contains("denosumab") }) {
             if (combinedAssertedText.contains("extraction") || combinedAssertedText.contains("exposed bone") || combinedAssertedText.contains("pain")) {
                 reasons.add("MRONJ Risk: Patient on antiresorptive / bisphosphonate therapy")
-                actions.add("Avoid elective surgical dentoalveolar extractions without OMFS specialist consultation")
-                actions.add("Prioritize conservative endodontic therapy and 0.12% Chlorhexidine irrigation")
+                actions.add("Assess medication-related jaw osteonecrosis risk and consult an appropriate specialist before elective dentoalveolar surgery")
+                actions.add("Select management with the treating clinician using current specialist guidance and patient-specific factors")
             }
         }
 
@@ -155,15 +161,31 @@ object RedFlagSafetyChecker {
         }
 
         if (reasons.isNotEmpty()) {
+            val allergyAlert = reasons.any { it.startsWith("Medication safety alert:") }
+            val alerts = buildList {
+                if (allergyAlert) add(ClinicalAlert(
+                    category = "MEDICATION_ALLERGY",
+                    severity = "WARNING_REQUIRES_VERIFICATION",
+                    message = "Reported allergy is a safety signal; allergy history alone does not establish an appropriate alternative regimen.",
+                    evidenceSource = "Local, versioned medication knowledge base required",
+                    guidelineVersion = "Not configured",
+                    reviewDate = null
+                ))
+            }
             return RedFlagResult(
                 hasRedFlag = true,
                 redFlagReason = reasons.joinToString(" | "),
-                emergencyGuidance = "CRITICAL CLINICAL ADVISORY DETECTED — REQUIRE IMMEDIATE CLINICAL EVALUATION & SIGNED OVERRIDE IF PROCEEDING",
+                emergencyGuidance = if (actions.any { it.startsWith("Emergency escalation:") })
+                    "EMERGENCY ESCALATION: follow local emergency pathways and obtain immediate clinician assessment"
+                else "CLINICAL ADVISORY: clinician review required before medication decisions",
                 recommendedActions = actions.distinct(),
                 isAdvisory = true,
                 guidelineCitations = citations.distinct(),
                 requiresClinicianOverride = requiresOverride,
-                overrideProtocol = if (requiresOverride) "MANDATORY_CLINICIAN_SIGNED_OVERRIDE_REQUIRED" else null
+                overrideProtocol = if (requiresOverride) "MANDATORY_CLINICIAN_SIGNED_OVERRIDE_WITH_IDENTITY_AND_JUSTIFICATION" else null,
+                alerts = alerts,
+                requiresClinicianConfirmation = allergyAlert || reasons.any { it.startsWith("Medication review context incomplete:") },
+                evidenceReviewedDate = null
             )
         }
 
@@ -175,7 +197,8 @@ object RedFlagSafetyChecker {
             isAdvisory = false,
             guidelineCitations = emptyList(),
             requiresClinicianOverride = false,
-            overrideProtocol = null
+            overrideProtocol = null,
+            requiresClinicianConfirmation = false
         )
     }
 

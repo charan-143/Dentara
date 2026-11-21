@@ -164,7 +164,8 @@ data class ReportAttachment(
     val name: String,
     val sizeStr: String,
     val mimeType: String,
-    val uri: String? = null
+    val uri: String? = null,
+    val thumbnailUri: String? = null
 )
 
 @Serializable
@@ -244,7 +245,9 @@ data class Prescription(
     val duration: String,
     val instructions: String,
     val issueDate: String,
-    val isDispensed: Boolean = false
+    val isDispensed: Boolean = false,
+    val overrideReason: String? = null,
+    val safetyReviewSummary: String? = null
 )
 
 @Serializable

@@ -77,6 +77,7 @@ async function initPGlite(): Promise<any> {
 
     ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS refills INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS override_reason TEXT;
+    ALTER TABLE prescriptions ADD COLUMN IF NOT EXISTS safety_review_summary TEXT;
 
     ALTER TABLE appointments ADD COLUMN IF NOT EXISTS duration_min INTEGER NOT NULL DEFAULT 30;
     ALTER TABLE appointments ADD COLUMN IF NOT EXISTS room TEXT NOT NULL DEFAULT '';

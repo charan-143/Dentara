@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { db, newId } from "@/lib/db";
+import { authenticateApiRequest } from "@/lib/auth";
 
 async function ensureReportAttachmentsTable(sql: any) {
   try {
@@ -18,8 +19,15 @@ async function ensureReportAttachmentsTable(sql: any) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
     const sql = db();
     await ensureReportAttachmentsTable(sql);
 
@@ -74,6 +82,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
       patient_id: patientSnake,

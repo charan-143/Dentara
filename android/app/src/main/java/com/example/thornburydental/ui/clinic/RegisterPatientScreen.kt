@@ -20,9 +20,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.Patient
+import com.example.thornburydental.speech.AndroidSpeechRecognizerManager
+import com.example.thornburydental.speech.ClinicalVoiceExtractor
+import com.example.thornburydental.speech.DemographicsFinding
+import com.example.thornburydental.speech.rememberMicrophonePermissionState
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.ui.components.ThornburyDatePickerField
 import com.example.thornburydental.util.ValidationUtils
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * Dedicated Full-Page Patient Registration View.
@@ -47,6 +56,7 @@ fun RegisterPatientScreen(
     var emergencyPhone by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var showVoiceIntakeDialog by remember { mutableStateOf(false) }
 
     val genders = listOf("Female", "Male", "Other")
 
@@ -76,6 +86,25 @@ fun RegisterPatientScreen(
                             contentDescription = "Back",
                             tint = ThornburyInk
                         )
+                    }
+                },
+                actions = {
+                    FilledTonalButton(
+                        onClick = { showVoiceIntakeDialog = true },
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = ThornburyPrimaryWash,
+                            contentColor = ThornburyPrimary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Voice Auto-Fill",
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Voice Auto-Fill", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = ThornburyCanvas)
@@ -580,5 +609,197 @@ fun RegisterPatientScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+    }
+
+    if (showVoiceIntakeDialog) {
+        VoiceDemographicIntakeDialog(
+            onDismiss = { showVoiceIntakeDialog = false },
+            onApplyDemographics = { demo ->
+                if (demo.name.isNotBlank()) name = demo.name
+                if (demo.dob.isNotBlank()) {
+                    dob = demo.dob
+                } else if (demo.ageYears != null) {
+                    val cal = Calendar.getInstance()
+                    cal.add(Calendar.YEAR, -demo.ageYears)
+                    dob = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(cal.time)
+                }
+                if (demo.phone.isNotBlank()) phone = ValidationUtils.filterPhoneInput(demo.phone)
+                if (demo.email.isNotBlank()) email = demo.email
+                if (demo.address.isNotBlank()) address = demo.address
+                if (demo.isChild != null) isChild = demo.isChild
+            }
+        )
+    }
 }
+
+@Composable
+fun VoiceDemographicIntakeDialog(
+    onDismiss: () -> Unit,
+    onApplyDemographics: (DemographicsFinding) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isListening by remember { mutableStateOf(false) }
+    var recognizedText by remember { mutableStateOf("") }
+    var extractedFinding by remember { mutableStateOf<DemographicsFinding?>(null) }
+    var isProcessing by remember { mutableStateOf(false) }
+
+    val recognizer = remember {
+        if (AndroidSpeechRecognizerManager.isAvailable(context)) {
+            AndroidSpeechRecognizerManager(context)
+        } else null
+    }
+
+    val micPermission = rememberMicrophonePermissionState(
+        onGranted = {
+            isListening = true
+            recognizer?.startListening(
+                continuous = false,
+                onPartialResult = { partial -> recognizedText = partial },
+                onFinalResult = { full ->
+                    recognizedText = full
+                    isListening = false
+                    isProcessing = true
+                    coroutineScope.launch {
+                        val findings = ClinicalVoiceExtractor.extract(full, context)
+                        extractedFinding = findings.demographics
+                        isProcessing = false
+                    }
+                },
+                onError = { isListening = false }
+            )
+        }
+    )
+
+    AlertDialog(
+        onDismissRequest = {
+            if (isListening) recognizer?.stopListening()
+            onDismiss()
+        },
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = ThornburyPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "AI Voice Intake Scribe",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = ThornburyInk
+                )
+            }
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = "Speak patient details hands-free (name, DOB or age, phone, email, address, adult or pediatric):",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = ThornburyMuted
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = ThornburyCanvas,
+                    border = BorderStroke(1.dp, ThornburyHairline)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (recognizedText.isNotBlank()) "\"$recognizedText\"" else if (isListening) "Listening for clinician voice..." else "Tap 'Start Recording' and dictate patient demographics.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (recognizedText.isNotBlank()) ThornburyInk else ThornburyMuted
+                        )
+                    }
+                }
+
+                if (isProcessing) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+
+                extractedFinding?.let { demo ->
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        color = ThornburyPrimaryWash
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(text = "Extracted Demographic Fields:", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = ThornburyPrimary)
+                            if (demo.name.isNotBlank()) Text("• Name: ${demo.name}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+                            if (demo.dob.isNotBlank() || demo.ageYears != null) Text("• DOB/Age: ${demo.dob.ifBlank { "${demo.ageYears} yrs" }}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+                            if (demo.phone.isNotBlank()) Text("• Phone: ${demo.phone}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+                            if (demo.email.isNotBlank()) Text("• Email: ${demo.email}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+                            if (demo.address.isNotBlank()) Text("• Address: ${demo.address}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+                            if (demo.isChild != null) Text("• Type: ${if (demo.isChild == true) "Child / Pediatric" else "Adult"}", style = MaterialTheme.typography.bodySmall, color = ThornburyInk)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!isListening && extractedFinding == null) {
+                    Button(
+                        onClick = {
+                            if (micPermission.isGranted) {
+                                isListening = true
+                                recognizer?.startListening(
+                                    continuous = false,
+                                    onPartialResult = { partial -> recognizedText = partial },
+                                    onFinalResult = { full ->
+                                        recognizedText = full
+                                        isListening = false
+                                        isProcessing = true
+                                        coroutineScope.launch {
+                                            val findings = ClinicalVoiceExtractor.extract(full, context)
+                                            extractedFinding = findings.demographics
+                                            isProcessing = false
+                                        }
+                                    },
+                                    onError = { isListening = false }
+                                )
+                            } else {
+                                micPermission.request()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary)
+                    ) {
+                        Icon(imageVector = Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Start Recording")
+                    }
+                } else if (isListening) {
+                    Button(
+                        onClick = {
+                            isListening = false
+                            recognizer?.stopListening()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyError)
+                    ) {
+                        Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Stop")
+                    }
+                } else if (extractedFinding != null) {
+                    Button(
+                        onClick = {
+                            extractedFinding?.let { onApplyDemographics(it) }
+                            onDismiss()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = ThornburyPrimary)
+                    ) {
+                        Text("Apply to Form")
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }

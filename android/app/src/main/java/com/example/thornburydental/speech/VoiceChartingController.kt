@@ -24,7 +24,8 @@ sealed interface VoiceDictationState {
     data class Listening(
         val amplitude: Float = 0f,
         val targetMode: DictationTargetMode = DictationTargetMode.PERIODONTAL_CHARTING,
-        val streamingPartialTranscript: String = ""
+        val streamingPartialTranscript: String = "",
+        val decibels: Float = 0f
     ) : VoiceDictationState
 
     data class Transcribing(val partialTranscript: String = "") : VoiceDictationState
@@ -216,7 +217,8 @@ class VoiceChartingController(
                 recognizer.amplitudeFlow.collect { amp ->
                     val current = _uiState.value
                     if (current is VoiceDictationState.Listening) {
-                        _uiState.value = current.copy(amplitude = amp)
+                        val db = (32f + amp * 56f).coerceIn(30f, 90f)
+                        _uiState.value = current.copy(amplitude = amp, decibels = db)
                     }
                 }
             }
@@ -256,7 +258,8 @@ class VoiceChartingController(
             audioRecordManager.amplitudeFlow.collect { amplitude ->
                 val current = _uiState.value
                 if (current is VoiceDictationState.Listening) {
-                    _uiState.value = current.copy(amplitude = amplitude, targetMode = activeMode)
+                    val db = (32f + amplitude * 56f).coerceIn(30f, 90f)
+                    _uiState.value = current.copy(amplitude = amplitude, decibels = db, targetMode = activeMode)
                 }
             }
         }
@@ -383,16 +386,11 @@ class VoiceChartingController(
 
                 // Check auto-apply
                 val autoApply = DentalRepository.isVoiceAutoApplyEnabled.value
-                if (autoApply && !findings.requiresReview && patientId != null && !findings.isEmpty) {
-                    DentalRepository.applyClinicalFindings(patientId, findings)
-                    _uiState.value = VoiceDictationState.Success("Applied ${findings.totalCount} findings to patient chart")
-                } else {
-                    _uiState.value = VoiceDictationState.FindingsExtracted(
-                        rawTranscript = transcript,
-                        findings = findings,
-                        targetMode = activeMode
-                    )
-                }
+                _uiState.value = VoiceDictationState.FindingsExtracted(
+                    rawTranscript = transcript,
+                    findings = findings,
+                    targetMode = activeMode
+                )
             } catch (e: Exception) {
                 safeLogE("Error processing full speech utterance", e)
                 _uiState.value = VoiceDictationState.Error(e.message ?: "Failed to process dictation")

@@ -8,10 +8,13 @@
       ThornburyCanvas / ThornburyPrimary / ThornburyInk — keep in sync.
     -->
     <style name="Theme.ThornburyDental" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">#F6FAFA</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:colorPrimary">#0D7377</item>
         <item name="android:colorPrimaryDark">#0A5A5D</item>
         <item name="android:textColorPrimary">#12181B</item>
         <item name="android:colorAccent">#0D7377</item>
+        <item name="android:windowSplashScreenBackground">#0D7377</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#0D7377</item>
     </style>
 </resources>
