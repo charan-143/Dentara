@@ -5,6 +5,8 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import android.util.Log
+import com.example.thornburydental.data.db.ThornburyDbHelper
+import java.security.GeneralSecurityException
 import java.security.KeyStore
 import java.security.SecureRandom
 import javax.crypto.Cipher
@@ -42,6 +44,14 @@ object KeyStoreManager {
         val encryptedBase64 = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
         val ivBase64 = prefs.getString(KEY_PASSPHRASE_IV, null)
 
+        if (encryptedBase64.isNullOrEmpty() xor ivBase64.isNullOrEmpty()) {
+            throw GeneralSecurityException("Stored database encryption key is incomplete; recovery is required")
+        }
+
+        if (encryptedBase64.isNullOrEmpty() && context.applicationContext.getDatabasePath(ThornburyDbHelper.DATABASE_NAME).exists()) {
+            throw GeneralSecurityException("Encrypted database exists but its key record is missing; recovery is required")
+        }
+
         if (!encryptedBase64.isNullOrEmpty() && !ivBase64.isNullOrEmpty()) {
             try {
                 val encryptedBytes = Base64.decode(encryptedBase64, Base64.DEFAULT)
@@ -57,7 +67,8 @@ object KeyStoreManager {
                 cachedPassphrase = passphrase
                 return passphrase
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to decrypt existing database passphrase from KeyStore, regenerating...", e)
+                Log.e(TAG, "Could not decrypt existing database passphrase; refusing to replace it", e)
+                throw GeneralSecurityException("Unable to unlock the existing encrypted database. Restore the original device/key or use a recovery export.", e)
             }
         }
 
@@ -71,15 +82,16 @@ object KeyStoreManager {
             val iv = cipher.iv
             val encryptedBytes = cipher.doFinal(passphrase.toByteArray(Charsets.UTF_8))
 
-            prefs.edit()
+            val saved = prefs.edit()
                 .putString(KEY_ENCRYPTED_PASSPHRASE, Base64.encodeToString(encryptedBytes, Base64.DEFAULT))
                 .putString(KEY_PASSPHRASE_IV, Base64.encodeToString(iv, Base64.DEFAULT))
-                .apply()
+                .commit()
+            if (!saved) throw GeneralSecurityException("Unable to persist database encryption key")
 
             cachedPassphrase = passphrase
         } catch (e: Exception) {
             Log.e(TAG, "Failed to store encrypted passphrase in KeyStore", e)
-            cachedPassphrase = passphrase
+            throw GeneralSecurityException("Unable to securely initialize database encryption", e)
         }
 
         return passphrase
