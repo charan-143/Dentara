@@ -1,6 +1,11 @@
 package com.example.thornburydental.data.cds
 
 import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import java.security.GeneralSecurityException
+import java.security.KeyStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -8,6 +13,10 @@ import kotlinx.serialization.json.*
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Response structure holding generated text and live web citations from Google Search grounding.
@@ -27,7 +36,12 @@ object GeminiMultimodalClient {
 
     private const val GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
     private const val PREFS_NAME = "dentara_ai_config"
-    private const val KEY_GEMINI_API_KEY = "gemini_api_key"
+    private const val LEGACY_API_KEY = "gemini_api_key"
+    private const val ENCRYPTED_API_KEY = "gemini_api_key_encrypted"
+    private const val API_KEY_IV = "gemini_api_key_iv"
+    private const val API_KEY_ALIAS = "dentara_gemini_api_key"
+    private const val ANDROID_KEYSTORE = "AndroidKeyStore"
+    private const val AES_GCM = "AES/GCM/NoPadding"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -40,16 +54,70 @@ object GeminiMultimodalClient {
      * Retrieves stored API key from user preferences if configured.
      */
     fun getApiKey(context: Context): String? {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_GEMINI_API_KEY, null)?.takeIf { it.isNotBlank() }
+        return try {
+            val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val encrypted = prefs.getString(ENCRYPTED_API_KEY, null)
+            val iv = prefs.getString(API_KEY_IV, null)
+            if (!encrypted.isNullOrBlank() || !iv.isNullOrBlank()) {
+                if (encrypted.isNullOrBlank() || iv.isNullOrBlank()) {
+                    throw GeneralSecurityException("Stored API key is incomplete")
+                }
+                val cipher = Cipher.getInstance(AES_GCM)
+                cipher.init(Cipher.DECRYPT_MODE, getOrCreateApiKeyMasterKey(), GCMParameterSpec(128, Base64.decode(iv, Base64.NO_WRAP)))
+                val decrypted = String(cipher.doFinal(Base64.decode(encrypted, Base64.NO_WRAP)), Charsets.UTF_8)
+                if (prefs.contains(LEGACY_API_KEY) && !prefs.edit().remove(LEGACY_API_KEY).commit()) {
+                    throw GeneralSecurityException("Could not remove legacy plaintext Gemini API key")
+                }
+                return decrypted.takeIf { it.isNotBlank() }
+            }
+
+            // One-time migration from the former plaintext preference. Do not keep
+            // the old value if encryption or durable persistence fails.
+            val legacy = prefs.getString(LEGACY_API_KEY, null)?.takeIf { it.isNotBlank() } ?: return null
+            storeEncryptedApiKey(prefs, legacy)
+            legacy
+        } catch (_: Exception) {
+            null
+        }
     }
 
     /**
      * Stores API key into user preferences.
      */
     fun setApiKey(context: Context, apiKey: String) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_GEMINI_API_KEY, apiKey.trim()).apply()
+        val value = apiKey.trim()
+        if (value.isBlank()) throw IllegalArgumentException("API key must not be empty")
+        val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        storeEncryptedApiKey(prefs, value)
+    }
+
+    private fun storeEncryptedApiKey(prefs: android.content.SharedPreferences, apiKey: String) {
+        val cipher = Cipher.getInstance(AES_GCM)
+        cipher.init(Cipher.ENCRYPT_MODE, getOrCreateApiKeyMasterKey())
+        val encrypted = Base64.encodeToString(cipher.doFinal(apiKey.toByteArray(Charsets.UTF_8)), Base64.NO_WRAP)
+        val iv = Base64.encodeToString(cipher.iv, Base64.NO_WRAP)
+        if (!prefs.edit().putString(ENCRYPTED_API_KEY, encrypted).putString(API_KEY_IV, iv).commit()) {
+            throw GeneralSecurityException("Unable to persist encrypted Gemini API key")
+        }
+        // Remove legacy plaintext only after the encrypted value is durable.
+        if (!prefs.edit().remove(LEGACY_API_KEY).commit()) {
+            throw GeneralSecurityException("Could not remove legacy plaintext Gemini API key")
+        }
+    }
+
+    private fun getOrCreateApiKeyMasterKey(): SecretKey {
+        val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE).apply { load(null) }
+        (keyStore.getEntry(API_KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEYSTORE)
+        generator.init(
+            KeyGenParameterSpec.Builder(API_KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+                .setRandomizedEncryptionRequired(true)
+                .build()
+        )
+        return generator.generateKey()
     }
 
     /**
@@ -69,12 +137,13 @@ object GeminiMultimodalClient {
         }
 
         try {
-            val url = URL("$GEMINI_API_ENDPOINT?key=$apiKey")
+            val url = URL(GEMINI_API_ENDPOINT)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "POST"
             connection.connectTimeout = 15000
             connection.readTimeout = 35000
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            connection.setRequestProperty("x-goog-api-key", apiKey)
             connection.doOutput = true
 
             val parts = mutableListOf<JsonObject>()
@@ -91,7 +160,7 @@ object GeminiMultimodalClient {
                 parts.add(
                     buildJsonObject {
                         putJsonObject("inlineData") {
-                            put("mimeType", if (item.mimeType.startsWith("image/")) item.mimeType else "image/jpeg")
+                            put("mimeType", item.mimeType)
                             put("data", item.base64Data)
                         }
                     }
