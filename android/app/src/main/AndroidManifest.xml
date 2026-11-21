@@ -25,16 +25,16 @@
 
     <application
         android:name=".ThornburyApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:windowSoftInputMode="adjustResize"
         android:theme="@style/Theme.ThornburyDental">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -56,12 +56,21 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Internal reminders & alarm handling (not accessible to external applications) -->
         <receiver
             android:name=".reminder.DentaraAlarmReceiver"
-            android:exported="true">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.practix.dental.ACTION_DAILY_MORNING_BRIEFING" />
                 <action android:name="com.practix.dental.ACTION_PATIENT_ARRIVAL" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Boot receiver to restore alarms on reboot -->
+        <receiver
+            android:name=".reminder.DentaraBootReceiver"
+            android:exported="true">
+            <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>

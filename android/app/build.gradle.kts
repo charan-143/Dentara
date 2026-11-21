@@ -51,19 +51,30 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            storeFile = file("practix-release-key.jks")
-            storePassword = "practix2026"
-            keyAlias = "practix"
-            keyPassword = "practix2026"
+    val releaseStoreFile = providers.environmentVariable("PRACTIX_KEYSTORE_FILE").orNull
+    val releaseStorePassword = providers.environmentVariable("PRACTIX_KEYSTORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.environmentVariable("PRACTIX_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.environmentVariable("PRACTIX_KEY_PASSWORD").orNull
+    val releaseSigningConfig = if (
+        listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+            .all { !it.isNullOrBlank() }
+    ) {
+        signingConfigs.create("release") {
+            storeFile = file(releaseStoreFile!!)
+            storePassword = releaseStorePassword
+            keyAlias = releaseKeyAlias
+            keyPassword = releaseKeyPassword
         }
+    } else {
+        null
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            // Never fall back to the publicly known debug signing key. With no
+            // release credentials configured, produce no debug-signed release.
+            signingConfig = releaseSigningConfig
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -81,6 +92,10 @@ android {
     lint {
         checkReleaseBuilds = false
         abortOnError = false
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     packaging {

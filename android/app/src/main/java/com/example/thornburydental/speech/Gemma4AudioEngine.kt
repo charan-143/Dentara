@@ -1,7 +1,6 @@
 package com.example.thornburydental.speech
 
 import android.content.Context
-import android.util.Base64
 import android.util.Log
 import com.example.thornburydental.data.cds.GeminiMultimodalClient
 import com.example.thornburydental.data.cds.LlmModels
@@ -14,12 +13,8 @@ import kotlin.math.abs
 import kotlin.math.sqrt
 
 /**
- * Native Audio Processing Engine powered by Google Gemma 4 E2B Multimodal Architecture.
- *
- * Gemma 4 E2B features a dedicated 305M-parameter USM (Universal Speech Model) Conformer audio encoder
- * that processes raw 16kHz audio in 40ms chunks (640 samples/frame) directly alongside language tokens.
- * This enables end-to-end speech understanding, high-accuracy clinical entity extraction, and acoustic
- * noise resilience (dental turbine/suction noise suppression) directly on mobile and edge hardware.
+ * Audio preprocessing and optional remote multimodal extraction. This class does not
+ * load or run a local Gemma model; initialize reports readiness only for preprocessing.
  */
 class Gemma4AudioEngine(
     private val sampleRate: Int = SAMPLE_RATE_HZ,
@@ -39,11 +34,11 @@ class Gemma4AudioEngine(
     private var isInitialized = false
 
     /**
-     * Initializes the Gemma 4 E2B Audio Runtime and prepares conformer audio encoder buffers.
+     * Marks audio preprocessing as available. No Gemma inference runtime is initialized.
      */
     fun initialize(): Boolean {
         isInitialized = true
-        Log.i(TAG, "Gemma 4 E2B Native Audio Engine initialized with 305M USM Conformer pipeline ($SAMPLE_RATE_HZ Hz, ${SAMPLES_PER_FRAME} samples/frame)")
+        Log.i(TAG, "Audio preprocessing initialized ($SAMPLE_RATE_HZ Hz, ${SAMPLES_PER_FRAME} samples/frame); no local inference backend is configured")
         return true
     }
 
@@ -79,7 +74,7 @@ class Gemma4AudioEngine(
             if (!apiKey.isNullOrBlank()) {
                 try {
                     val wavBytes = pcmToWavBytes(preprocessedPcm, SAMPLE_RATE_HZ)
-                    val base64Audio = Base64.encodeToString(wavBytes, Base64.NO_WRAP)
+                    val base64Audio = android.util.Base64.encodeToString(wavBytes, android.util.Base64.NO_WRAP)
 
                     val systemPrompt = """
                         You are the Gemma 4 E2B Dental Audio Copilot. You analyze raw 16kHz dental clinical audio and extract structured dental chart findings into JSON format.
@@ -125,15 +120,23 @@ class Gemma4AudioEngine(
                         context = context,
                         systemInstruction = systemPrompt,
                         promptText = prompt,
-                        mediaItems = emptyList() // Audio passed with prompt context
+                        mediaItems = listOf(
+                            com.example.thornburydental.data.cds.MultimodalMediaItem(
+                                id = "clinical-audio",
+                                reportId = "voice-session",
+                                name = "clinical-audio.wav",
+                                mimeType = "audio/wav",
+                                base64Data = base64Audio,
+                                isSelected = true
+                            )
+                        )
                     )
 
                     result.getOrNull()?.let { resp ->
                         val parsed = ClinicalVoiceExtractor.extract(resp.responseText, context)
                         if (!parsed.isEmpty) {
                             return@withContext parsed.copy(
-                                isAiExtracted = true,
-                                confidence = 0.98f
+                                isAiExtracted = true
                             )
                         }
                     }
@@ -143,13 +146,20 @@ class Gemma4AudioEngine(
             }
         }
 
-        // 4. On-device Deterministic Speech & Entity Extraction fallback
-        val textToParse = transcriptHint ?: extractAcousticTokens(preprocessedPcm, audioFrames)
-        val findings = ClinicalVoiceExtractor.extractDeterministic(textToParse)
-
+        // A deterministic parser is not speech recognition. Only parse text from an
+        // actual transcript supplied by the speech recognizer; never infer findings
+        // from waveform amplitude or claim that the AI model ran.
+        val transcript = transcriptHint?.takeIf { it.isNotBlank() }
+            ?: return@withContext ClinicalFindings(
+                rawTranscript = "",
+                confidence = 0f,
+                warnings = listOf("Audio inference is unavailable. No clinical findings were extracted.")
+            )
+        val findings = ClinicalVoiceExtractor.extractDeterministic(transcript)
         return@withContext findings.copy(
-            isAiExtracted = true,
-            confidence = if (audioRmsEnergy > 500f) 0.94f else 0.82f
+            isAiExtracted = false,
+            confidence = 0f,
+            warnings = findings.warnings + "Parsed from speech-recognition transcript; clinician review required."
         )
     }
 

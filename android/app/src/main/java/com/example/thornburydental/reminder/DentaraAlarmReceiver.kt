@@ -73,34 +73,14 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = if (appointments.isNotEmpty()) {
-            "Today's Schedule • ${appointments.size} Patient${if (appointments.size > 1) "s" else ""}"
-        } else {
-            "Today's Schedule • No Appointments"
-        }
-
-        val summaryText = if (appointments.isNotEmpty()) {
-            appointments.joinToString(separator = "\n") { appt ->
-                "• ${appt.time}: ${appt.patientName} (${appt.procedure})"
-            }
-        } else {
-            "You have no chairside appointments scheduled for today."
-        }
-
-        val shortText = if (appointments.isNotEmpty()) {
-            appointments.take(3).joinToString("; ") { "${it.time} ${it.patientName}" }
-        } else {
-            "No appointments scheduled for today."
-        }
-
         val notification = NotificationCompat.Builder(context, ReminderManager.CHANNEL_DAILY_BRIEFING)
             .setSmallIcon(android.R.drawable.ic_menu_my_calendar)
-            .setContentTitle(title)
-            .setContentText(shortText)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(summaryText))
+            .setContentTitle("Today's schedule")
+            .setContentText(if (appointments.isNotEmpty()) "You have ${appointments.size} scheduled appointments." else "No appointments scheduled for today.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Open Practix to view your schedule."))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -118,10 +98,8 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
 
     private fun handlePatientArrival(context: Context, intent: Intent) {
         val apptId = intent.getStringExtra(ReminderManager.EXTRA_APPT_ID) ?: return
-        val patientName = intent.getStringExtra(ReminderManager.EXTRA_PATIENT_NAME) ?: "Patient"
-        val procedure = intent.getStringExtra(ReminderManager.EXTRA_PROCEDURE) ?: "Dental Procedure"
+        // Patient details are intentionally omitted from lock-screen notifications.
         val time = intent.getStringExtra(ReminderManager.EXTRA_TIME) ?: ""
-        val leadMin = intent.getIntExtra(ReminderManager.EXTRA_LEAD_MIN, 15)
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
             ?: return
@@ -139,17 +117,8 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val formattedTime = if (time.isNotBlank()) ReminderManager.formatTime12Hour(time) else ""
-        val title = if (formattedTime.isNotBlank()) {
-            "Appointment at $formattedTime • $patientName"
-        } else {
-            "Upcoming Patient Appointment • $patientName"
-        }
-        val content = if (formattedTime.isNotBlank()) {
-            "$patientName is scheduled for $procedure at $formattedTime."
-        } else {
-            "$patientName is scheduled for $procedure."
-        }
+        val title = "Upcoming appointment"
+        val content = "Open Practix to view appointment details."
 
         val notification = NotificationCompat.Builder(context, ReminderManager.CHANNEL_PATIENT_ARRIVAL)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
@@ -158,13 +127,13 @@ class DentaraAlarmReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle().bigText(content))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(NotificationCompat.DEFAULT_ALL)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setCategory(NotificationCompat.CATEGORY_EVENT)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .build()
 
         notificationManager.notify(notificationId, notification)
-        Log.d(TAG, "Patient arrival notification posted for $patientName (Appt: $apptId)")
+        Log.d(TAG, "Patient arrival notification posted")
     }
 }
