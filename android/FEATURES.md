@@ -4,7 +4,7 @@
 **Package:** `com.dentara.dental` (`com.example.thornburydental`)  
 **Target SDK:** Android API 36 (Min SDK 24, Target SDK 36)  
 **Architecture:** Modern Android Architecture (Jetpack Compose M3, Clean Layered Architecture, Kotlin Coroutines/Flow, Native C++/NDK, SQLCipher Encrypted Persistence)  
-**Status:** Implemented & Verified in Codebase  
+**Status:** Historical feature inventory; implementation and verification status are tracked in [`STATUS.md`](STATUS.md). Source presence does not establish runtime correctness or production readiness.  
 
 ---
 
