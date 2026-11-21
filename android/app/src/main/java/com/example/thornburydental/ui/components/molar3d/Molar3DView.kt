@@ -54,6 +54,12 @@ fun LegacyMolar3DView(
     showCard: Boolean = true,
     isLocked: Boolean = false
 ) {
+    if (isLocked) {
+        // Prevent GLSurfaceView from creating hardware overlay that punches through BiometricLockOverlay
+        Box(modifier = modifier)
+        return
+    }
+
     val context = LocalContext.current
     var model by remember { mutableStateOf<MolarModel?>(null) }
     var isLoading by remember { mutableStateOf(true) }

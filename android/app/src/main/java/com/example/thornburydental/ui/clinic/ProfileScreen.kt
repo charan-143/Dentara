@@ -37,6 +37,7 @@ import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.ToothNumberingSystem
 import com.example.thornburydental.data.UserRole
 import com.example.thornburydental.reminder.ReminderManager
+import com.example.thornburydental.data.ClinicianAccentProfile
 import com.example.thornburydental.theme.*
 
 /**
@@ -78,6 +79,10 @@ fun ProfileScreen(
     val morningReminderEnabled by DentalRepository.morningReminderEnabled.collectAsState()
     val morningReminderTime by DentalRepository.morningReminderTime.collectAsState()
     val chairsideReminderDefaultMin by DentalRepository.chairsideReminderDefaultMin.collectAsState()
+    val isPerioAudioToneEnabled by DentalRepository.isPerioAudioToneEnabled.collectAsState()
+    val clinicianAccentProfile by DentalRepository.clinicianAccentProfile.collectAsState()
+    val ambientNoiseGateDb by DentalRepository.ambientNoiseGateDb.collectAsState()
+    val voiceCalibrationCompleted by DentalRepository.voiceCalibrationCompleted.collectAsState()
 
     val patients by DentalRepository.patients.collectAsState()
     val treatmentPlans by DentalRepository.treatmentPlans.collectAsState()
@@ -85,6 +90,7 @@ fun ProfileScreen(
     val appointments by DentalRepository.appointments.collectAsState()
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
+    var showVoiceCalibrationWizard by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -152,11 +158,17 @@ fun ProfileScreen(
                     isVoiceChartingEnabled = isVoiceChartingEnabled,
                     toothNumberingSystem = toothNumberingSystem,
                     isVoiceAutoApplyEnabled = isVoiceAutoApplyEnabled,
+                    isPerioAudioToneEnabled = isPerioAudioToneEnabled,
+                    clinicianAccentProfile = clinicianAccentProfile,
+                    ambientNoiseGateDb = ambientNoiseGateDb,
+                    voiceCalibrationCompleted = voiceCalibrationCompleted,
                     onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
                     onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
                     onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) },
                     onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) },
-                    onVoiceAutoApplyChange = { DentalRepository.setVoiceAutoApplyEnabled(it) }
+                    onVoiceAutoApplyChange = { DentalRepository.setVoiceAutoApplyEnabled(it) },
+                    onPerioAudioToneChange = { DentalRepository.setPerioAudioToneEnabled(it) },
+                    onLaunchVoiceCalibration = { showVoiceCalibrationWizard = true }
                 )
 
                 SecurityShieldTelemetryCard(
@@ -201,11 +213,17 @@ fun ProfileScreen(
                         isVoiceChartingEnabled = isVoiceChartingEnabled,
                         toothNumberingSystem = toothNumberingSystem,
                         isVoiceAutoApplyEnabled = isVoiceAutoApplyEnabled,
+                        isPerioAudioToneEnabled = isPerioAudioToneEnabled,
+                        clinicianAccentProfile = clinicianAccentProfile,
+                        ambientNoiseGateDb = ambientNoiseGateDb,
+                        voiceCalibrationCompleted = voiceCalibrationCompleted,
                         onDarkModeChange = { DentalRepository.setDarkModeEnabled(it) },
                         onNotificationsChange = { DentalRepository.setAppointmentRemindersEnabled(it) },
                         onVoiceChartingChange = { DentalRepository.setVoiceChartingEnabled(it) },
                         onToothNumberingChange = { DentalRepository.setToothNumberingSystem(it) },
-                        onVoiceAutoApplyChange = { DentalRepository.setVoiceAutoApplyEnabled(it) }
+                        onVoiceAutoApplyChange = { DentalRepository.setVoiceAutoApplyEnabled(it) },
+                        onPerioAudioToneChange = { DentalRepository.setPerioAudioToneEnabled(it) },
+                        onLaunchVoiceCalibration = { showVoiceCalibrationWizard = true }
                     )
 
                     AccountSecurityCard(
@@ -334,6 +352,12 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (showVoiceCalibrationWizard) {
+        ClinicianVoiceCalibrationWizardDialog(
+            onDismiss = { showVoiceCalibrationWizard = false }
+        )
     }
 }
 
@@ -720,11 +744,17 @@ private fun ClinicalErgonomicsCard(
     isVoiceChartingEnabled: Boolean,
     toothNumberingSystem: ToothNumberingSystem,
     isVoiceAutoApplyEnabled: Boolean,
+    isPerioAudioToneEnabled: Boolean,
+    clinicianAccentProfile: ClinicianAccentProfile,
+    ambientNoiseGateDb: Float,
+    voiceCalibrationCompleted: Boolean,
     onDarkModeChange: (Boolean) -> Unit,
     onNotificationsChange: (Boolean) -> Unit,
     onVoiceChartingChange: (Boolean) -> Unit,
     onToothNumberingChange: (ToothNumberingSystem) -> Unit,
-    onVoiceAutoApplyChange: (Boolean) -> Unit
+    onVoiceAutoApplyChange: (Boolean) -> Unit,
+    onPerioAudioToneChange: (Boolean) -> Unit,
+    onLaunchVoiceCalibration: () -> Unit
 ) {
     OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -778,6 +808,112 @@ private fun ClinicalErgonomicsCard(
                     checked = isVoiceChartingEnabled,
                     onCheckedChange = onVoiceChartingChange
                 )
+            }
+
+            if (isVoiceChartingEnabled) {
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Voice Calibration Banner
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = ThornburyCanvas,
+                    border = BorderStroke(1.dp, if (voiceCalibrationCompleted) ThornburyPrimary.copy(alpha = 0.4f) else Color(0xFFD97706).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.GraphicEq,
+                                    contentDescription = null,
+                                    tint = ThornburyPrimary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Operatory Noise & Accent Calibration",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = ThornburyInk
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (voiceCalibrationCompleted) Color(0xFF10B981).copy(alpha = 0.15f) else Color(0xFFF59E0B).copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = if (voiceCalibrationCompleted) "CALIBRATED" else "UNCALIBRATED",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = if (voiceCalibrationCompleted) Color(0xFF047857) else Color(0xFFB45309),
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Acoustic profile: ${clinicianAccentProfile.displayName} (${clinicianAccentProfile.speechLocaleCode}) • Noise floor gate: ${ambientNoiseGateDb.toInt()} dB",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ThornburyMuted
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = onLaunchVoiceCalibration,
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, ThornburyPrimary),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ThornburyPrimary),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(imageVector = Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = if (voiceCalibrationCompleted) "Recalibrate Operatory Acoustics (30s)" else "Launch 30-Second Voice Calibration",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Voice-Triggered Audio Playback Confirmation (Tone Beeps)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.VolumeUp,
+                                contentDescription = null,
+                                tint = ThornburyPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Perio Probing Tone Beeps",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = ThornburyInk
+                            )
+                        }
+                        Text(
+                            text = "Distinct auditory tones for pocket entries (low tone for 1–3 mm, alert double tone for 5+ mm / bleeding). Keeps eyes inside the patient's mouth.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ThornburyMuted
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = isPerioAudioToneEnabled,
+                        onCheckedChange = onPerioAudioToneChange
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))

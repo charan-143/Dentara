@@ -216,10 +216,10 @@ fun SharePatientPdfDialog(
             result.onSuccess { downloadedFile ->
                 Toast.makeText(
                     context,
-                    "Saved to Downloads: ${downloadedFile.name}",
+                    "Saved to Clinical Records: ${downloadedFile.name}",
                     Toast.LENGTH_LONG
                 ).show()
-                PatientPdfGenerator.viewPdfFile(context, file, patient)
+                PatientPdfGenerator.viewPdfFile(context, downloadedFile, patient)
             }.onFailure { err ->
                 Toast.makeText(context, "Download failed: ${err.message}", Toast.LENGTH_LONG).show()
             }

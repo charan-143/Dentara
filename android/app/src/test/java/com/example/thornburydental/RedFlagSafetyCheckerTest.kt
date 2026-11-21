@@ -52,7 +52,8 @@ class RedFlagSafetyCheckerTest {
         val result = RedFlagSafetyChecker.evaluate(query)
         assertTrue(result.hasRedFlag)
         assertTrue(result.redFlagReason!!.contains("Anaphylactic"))
-        assertTrue(result.recommendedActions.any { it.contains("Epinephrine") })
+        assertTrue(result.recommendedActions.any { it.contains("emergency medical services", ignoreCase = true) })
+        assertTrue(result.recommendedActions.any { it.contains("anaphylaxis protocol", ignoreCase = true) })
     }
 
     @Test
@@ -123,7 +124,10 @@ class RedFlagSafetyCheckerTest {
 
         val result = RedFlagSafetyChecker.evaluate(query)
         assertTrue(result.hasRedFlag)
-        assertTrue(result.redFlagReason!!.contains("PENICILLIN ALLERGY"))
-        assertTrue(result.recommendedActions.any { it.contains("Clindamycin") || it.contains("Azithromycin") })
+        assertTrue(result.redFlagReason!!.contains("allergy", ignoreCase = true))
+        assertTrue(result.recommendedActions.any { it.contains("allergy agent", ignoreCase = true) })
+        assertTrue(result.requiresClinicianConfirmation)
+        assertTrue(result.alerts.any { it.category == "MEDICATION_ALLERGY" })
+        assertFalse(result.recommendedActions.any { it.contains("Clindamycin") || it.contains("Azithromycin") })
     }
 }

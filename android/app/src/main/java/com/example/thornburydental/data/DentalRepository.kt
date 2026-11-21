@@ -2,6 +2,7 @@ package com.example.thornburydental.data
 
 import android.util.Log
 import com.example.thornburydental.data.db.LocalDatabaseManager
+import com.example.thornburydental.data.cds.ClinicalCorpusRepository
 import com.example.thornburydental.speech.ClinicalFindings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ import com.example.thornburydental.util.parseTimeToMinutes
 import com.example.thornburydental.util.todayIsoDate
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -43,6 +45,15 @@ data class VoiceUndoPoint(
     internal val teeth: Map<Int, ToothRecord>
 )
 
+enum class ClinicianAccentProfile(val displayName: String, val speechLocaleCode: String, val description: String) {
+    STANDARD_ENGLISH("Standard English (US/CA)", "en-US", "Standard North American dental terminology & phonetic models"),
+    BRITISH_COMMONWEALTH("British / Commonwealth", "en-GB", "UK, Australian, NZ accent models with Commonwealth terminology"),
+    SOUTH_ASIAN("Indian / South Asian English", "en-IN", "Phonetic adaptations for retroflex dental numbers & consonant cadences"),
+    LATIN_BILINGUAL("Hispanic / Bilingual English", "en-US", "Acoustic calibration for vowel lenition and Spanish dental nomenclature"),
+    EAST_ASIAN("East Asian Accent", "en-US", "Tuned for syllable-timed prosody and l/r phoneme clustering in operatory"),
+    EUROPEAN_SCANDINAVIAN("European / Scandinavian", "en-US", "Nordic and Germanic clinical pronunciation calibration")
+}
+
 object DentalRepository {
 
     private val repositoryScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -61,7 +72,7 @@ object DentalRepository {
             ?.apply()
     }
 
-    private val _isBiometricAuthEnabled = MutableStateFlow(true)
+    private val _isBiometricAuthEnabled = MutableStateFlow(false)
     val isBiometricAuthEnabled: StateFlow<Boolean> = _isBiometricAuthEnabled.asStateFlow()
     fun setBiometricAuthEnabled(enabled: Boolean) {
         _isBiometricAuthEnabled.value = enabled
@@ -112,10 +123,11 @@ object DentalRepository {
     private val _isVoiceAutoApplyEnabled = MutableStateFlow(false)
     val isVoiceAutoApplyEnabled: StateFlow<Boolean> = _isVoiceAutoApplyEnabled.asStateFlow()
     fun setVoiceAutoApplyEnabled(enabled: Boolean) {
-        _isVoiceAutoApplyEnabled.value = enabled
+        // Clinical findings always require clinician approval before entering a patient record.
+        _isVoiceAutoApplyEnabled.value = false
         LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
             ?.edit()
-            ?.putBoolean("voice_auto_apply_enabled", enabled)
+            ?.putBoolean("voice_auto_apply_enabled", false)
             ?.apply()
     }
 
@@ -129,12 +141,62 @@ object DentalRepository {
             ?.apply()
     }
 
+    private val _isPerioAudioToneEnabled = MutableStateFlow(true)
+    val isPerioAudioToneEnabled: StateFlow<Boolean> = _isPerioAudioToneEnabled.asStateFlow()
+    fun setPerioAudioToneEnabled(enabled: Boolean) {
+        _isPerioAudioToneEnabled.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("perio_audio_tone_enabled", enabled)
+            ?.apply()
+    }
+
+    private val _clinicianAccentProfile = MutableStateFlow(ClinicianAccentProfile.STANDARD_ENGLISH)
+    val clinicianAccentProfile: StateFlow<ClinicianAccentProfile> = _clinicianAccentProfile.asStateFlow()
+    fun setClinicianAccentProfile(profile: ClinicianAccentProfile) {
+        _clinicianAccentProfile.value = profile
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putString("clinician_accent_profile", profile.name)
+            ?.apply()
+    }
+
+    private val _ambientNoiseGateDb = MutableStateFlow(38.0f)
+    val ambientNoiseGateDb: StateFlow<Float> = _ambientNoiseGateDb.asStateFlow()
+    fun setAmbientNoiseGateDb(db: Float) {
+        _ambientNoiseGateDb.value = db
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putFloat("ambient_noise_gate_db", db)
+            ?.apply()
+    }
+
+    private val _maskSuctionAcousticBoost = MutableStateFlow(true)
+    val maskSuctionAcousticBoost: StateFlow<Boolean> = _maskSuctionAcousticBoost.asStateFlow()
+    fun setMaskSuctionAcousticBoost(enabled: Boolean) {
+        _maskSuctionAcousticBoost.value = enabled
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("mask_suction_boost", enabled)
+            ?.apply()
+    }
+
+    private val _voiceCalibrationCompleted = MutableStateFlow(false)
+    val voiceCalibrationCompleted: StateFlow<Boolean> = _voiceCalibrationCompleted.asStateFlow()
+    fun setVoiceCalibrationCompleted(completed: Boolean) {
+        _voiceCalibrationCompleted.value = completed
+        LocalDatabaseManager.appContext?.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
+            ?.edit()
+            ?.putBoolean("voice_calibration_completed", completed)
+            ?.apply()
+    }
+
     fun initializePreferencesSynchronously(context: android.content.Context) {
         val prefs = context.getSharedPreferences("dentara_app_prefs", android.content.Context.MODE_PRIVATE)
         val savedDarkMode = prefs.getBoolean("dark_mode_enabled", false)
         _isDarkModeEnabled.value = savedDarkMode
 
-        val savedBioAuth = prefs.getBoolean("biometric_auth_enabled", true)
+        val savedBioAuth = prefs.getBoolean("biometric_auth_enabled", false)
         _isBiometricAuthEnabled.value = savedBioAuth
 
         val savedTimeoutMin = prefs.getInt("biometric_lock_timeout_min", 0)
@@ -147,6 +209,17 @@ object DentalRepository {
             ToothNumberingSystem.fromNameOrDefault(prefs.getString("tooth_numbering_system", null))
 
         _isVoiceAutoApplyEnabled.value = prefs.getBoolean("voice_auto_apply_enabled", false)
+
+        _isPerioAudioToneEnabled.value = prefs.getBoolean("perio_audio_tone_enabled", true)
+        val savedAccentName = prefs.getString("clinician_accent_profile", ClinicianAccentProfile.STANDARD_ENGLISH.name)
+        _clinicianAccentProfile.value = try {
+            ClinicianAccentProfile.valueOf(savedAccentName ?: ClinicianAccentProfile.STANDARD_ENGLISH.name)
+        } catch (_: Exception) {
+            ClinicianAccentProfile.STANDARD_ENGLISH
+        }
+        _ambientNoiseGateDb.value = prefs.getFloat("ambient_noise_gate_db", 38.0f)
+        _maskSuctionAcousticBoost.value = prefs.getBoolean("mask_suction_boost", true)
+        _voiceCalibrationCompleted.value = prefs.getBoolean("voice_calibration_completed", false)
 
         com.example.thornburydental.data.security.AppSessionLifecycleObserver.initPreferences(context)
     }
@@ -234,12 +307,17 @@ object DentalRepository {
         startBackgroundSync()
     }
 
+    private val _isDatabaseReady = MutableStateFlow(false)
+    val isDatabaseReady: StateFlow<Boolean> = _isDatabaseReady.asStateFlow()
+
     fun initializeFromDatabase() {
-        repositoryScope.launch {
+        repositoryScope.launch(Dispatchers.IO) {
             if (LocalDatabaseManager.isInitialized) {
+                LocalDatabaseManager.warmupDatabase()
                 LocalDatabaseManager.purgeDevelopmentSeedData()
                 reloadFromDatabase()
             }
+            _isDatabaseReady.value = true
         }
     }
 
@@ -783,6 +861,10 @@ object DentalRepository {
             }
         }
 
+        if (_isPerioAudioToneEnabled.value) {
+            com.example.thornburydental.speech.PerioAudioFeedbackManager.playUndoTone()
+        }
+
         return point.description
     }
 
@@ -870,6 +952,11 @@ object DentalRepository {
                     patientId, toothKey, tooth.condition, tooth.notes
                 )
             }
+        }
+
+        // Auditory confirmation beeps: low beep for 1-3mm, alert tone for 5+mm or bleeding
+        if (_isPerioAudioToneEnabled.value) {
+            com.example.thornburydental.speech.PerioAudioFeedbackManager.playPocketConfirmed(depthMm, isBleeding)
         }
     }
 
@@ -968,6 +1055,7 @@ object DentalRepository {
         val undoDesc = buildString {
             append("Voice Dictation (")
             val parts = mutableListOf<String>()
+            if (findings.demographics != null && findings.demographics.hasAnyField) parts.add("demographics")
             if (findings.toothConditions.isNotEmpty()) parts.add("${findings.toothConditions.size} teeth")
             if (findings.perioMeasurements.isNotEmpty()) parts.add("${findings.perioMeasurements.size} perio sites")
             if (findings.treatmentPlanItems.isNotEmpty()) parts.add("${findings.treatmentPlanItems.size} plans")
@@ -1027,11 +1115,45 @@ object DentalRepository {
             )
         }
 
-        // 4. Update discrete Clinical Examination Fields and separate Patient Diagnosis
+        // 4. Update discrete Clinical Examination Fields, separate Patient Diagnosis, and Demographics
         val exam = findings.examFindings
+        val demo = findings.demographics
         _patients.updateAndGet { list ->
             list.map { patient ->
                 if (patient.id != patientId) return@map patient
+
+                val updatedName = if (demo != null && demo.name.isNotBlank()) demo.name else patient.name
+                val updatedDob = if (demo != null && demo.dob.isNotBlank()) {
+                    demo.dob
+                } else if (demo != null && demo.ageYears != null) {
+                    val cal = Calendar.getInstance()
+                    cal.add(Calendar.YEAR, -demo.ageYears)
+                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(cal.time)
+                } else patient.dob
+                val updatedPhone = if (demo != null && demo.phone.isNotBlank()) demo.phone else patient.phone
+                val updatedEmail = if (demo != null && demo.email.isNotBlank()) demo.email else patient.email
+                val updatedAddress = if (demo != null && demo.address.isNotBlank()) demo.address else patient.address
+                val updatedIsChild = demo?.isChild ?: patient.isChild
+                val teethChanged = patient.isChild != updatedIsChild
+                val newTeeth = if (teethChanged) generateDefaultTeeth(updatedIsChild) else patient.teeth
+                val updatedMedHistory = if (demo != null && demo.medicalHistory.isNotBlank()) {
+                    if (patient.medicalHistory.isBlank()) demo.medicalHistory else "${patient.medicalHistory}\n${demo.medicalHistory}"
+                } else patient.medicalHistory
+                val updatedFamHistory = if (demo != null && demo.familyHistory.isNotBlank()) {
+                    if (patient.familyHistory.isBlank()) demo.familyHistory else "${patient.familyHistory}\n${demo.familyHistory}"
+                } else patient.familyHistory
+                val updatedPastDental = if (demo != null && demo.pastDentalHistory.isNotBlank()) {
+                    if (patient.pastDentalHistory.isBlank()) demo.pastDentalHistory else "${patient.pastDentalHistory}\n${demo.pastDentalHistory}"
+                } else patient.pastDentalHistory
+                val newAllergies = demo?.allergies?.map {
+                    Allergy(
+                        allergen = it.allergen,
+                        severity = it.severity,
+                        reaction = it.reaction
+                    )
+                } ?: emptyList()
+                val updatedAllergies = (patient.allergies + newAllergies).distinctBy { it.allergen.lowercase() }
+                val updatedAlerts = (patient.medicalAlerts + (demo?.medicalAlerts ?: emptyList())).distinct()
 
                 val currentExam = patient.examAnswers ?: ExaminationAnswers()
 
@@ -1101,23 +1223,30 @@ object DentalRepository {
                 }
 
                 patient.copy(
+                    name = updatedName,
+                    dob = updatedDob,
+                    phone = updatedPhone,
+                    email = updatedEmail,
+                    address = updatedAddress,
+                    isChild = updatedIsChild,
+                    teeth = newTeeth,
+                    medicalHistory = updatedMedHistory,
+                    familyHistory = updatedFamHistory,
+                    pastDentalHistory = updatedPastDental,
+                    allergies = updatedAllergies,
+                    medicalAlerts = updatedAlerts,
                     examAnswers = newExamAnswers,
                     diagnosis = newDiagnosis
                 )
             }
         }
 
-        // Persist exam answers & diagnosis to SQLite
+        // Persist patient demographics, exam answers, teeth & diagnosis to SQLite
         val updatedPatient = _patients.value.firstOrNull { it.id == patientId }
         if (updatedPatient != null) {
             repositoryScope.launch {
                 if (LocalDatabaseManager.isInitialized) {
-                    updatedPatient.examAnswers?.let {
-                        LocalDatabaseManager.patientDao.updateExaminationAnswers(patientId, it)
-                    }
-                    updatedPatient.diagnosis?.let {
-                        LocalDatabaseManager.patientDao.updateDiagnosis(patientId, it)
-                    }
+                    LocalDatabaseManager.patientDao.insertPatient(updatedPatient)
                 }
             }
         }
@@ -1134,9 +1263,18 @@ object DentalRepository {
         duration: String,
         instructions: String,
         overrideReason: String? = null,
+        safetyReviewSummary: String? = null,
+        medicationReviewConfirmed: Boolean = false,
         saveAsPreset: Boolean = false,
         presetCategory: String = "Custom"
     ): Prescription {
+        require(medicationReviewConfirmed && !safetyReviewSummary.isNullOrBlank()) {
+            "Clinician medication review confirmation and context are required before prescribing."
+        }
+        val safetyReport = ClinicalCorpusRepository.evaluatePrescriptionContext(patient, drugName)
+        require(!safetyReport.isBlocked || !overrideReason.isNullOrBlank()) {
+            "A clinician must enter a justification before overriding a medication safety block."
+        }
         if (saveAsPreset && drugName.isNotBlank()) {
             val exists = _medicationPresets.value.any { it.name.equals(drugName.trim(), ignoreCase = true) }
             if (!exists) {
@@ -1150,11 +1288,6 @@ object DentalRepository {
                 )
             }
         }
-        val finalInstructions = if (overrideReason != null) {
-            "$instructions [CLINICAL OVERRIDE: $overrideReason]"
-        } else {
-            instructions
-        }
         var createdRx: Prescription? = null
         _prescriptions.update { current ->
             val newRx = Prescription(
@@ -1166,8 +1299,10 @@ object DentalRepository {
                 dosage = dosage,
                 frequency = frequency,
                 duration = duration,
-                instructions = finalInstructions,
-                issueDate = "Today, Just now"
+                instructions = instructions,
+                issueDate = "Today, Just now",
+                overrideReason = overrideReason?.trim()?.takeIf { it.isNotEmpty() },
+                safetyReviewSummary = safetyReviewSummary.trim().takeIf { it.isNotEmpty() }
             )
             createdRx = newRx
             listOf(newRx) + current
@@ -1185,7 +1320,9 @@ object DentalRepository {
                 frequency = frequency,
                 durationDays = durationDays,
                 indication = instructions,
-                overrideReason = overrideReason
+                overrideReason = overrideReason,
+                safetyReviewSummary = safetyReviewSummary,
+                clinicianConfirmation = medicationReviewConfirmed
             )
         }
         return rx
@@ -1523,13 +1660,34 @@ object DentalRepository {
                 return@withContext Result.failure(java.io.IOException("Could not read the selected file"))
             }
 
+            // Generate encrypted low-res WebP thumbnail for images / radiographs
+            val isImageOrDicom = mimeType.startsWith("image/") ||
+                    displayName.endsWith(".jpg", ignoreCase = true) ||
+                    displayName.endsWith(".jpeg", ignoreCase = true) ||
+                    displayName.endsWith(".png", ignoreCase = true) ||
+                    displayName.endsWith(".dcm", ignoreCase = true)
+
+            val thumbFile = if (isImageOrDicom) {
+                try {
+                    com.example.thornburydental.data.security.EncryptedThumbnailManager.generateAndEncryptThumbnail(
+                        context = context,
+                        sourceFile = destFile,
+                        attachmentId = id
+                    )
+                } catch (e: Exception) {
+                    Log.w("DentalRepository", "Failed to generate thumbnail for $id", e)
+                    null
+                }
+            } else null
+
             Result.success(
                 ReportAttachment(
                     id = id,
                     name = displayName,
                     sizeStr = sizeStr,
                     mimeType = mimeType,
-                    uri = destFile.absolutePath
+                    uri = destFile.absolutePath,
+                    thumbnailUri = thumbFile?.absolutePath
                 )
             )
         } catch (e: Exception) {

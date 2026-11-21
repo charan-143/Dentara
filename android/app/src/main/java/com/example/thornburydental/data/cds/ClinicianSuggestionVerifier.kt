@@ -42,14 +42,14 @@ object ClinicianSuggestionVerifier {
 
         if (isPenicillinAllergic && (textLower.contains("amoxicillin") || textLower.contains("augmentin") || textLower.contains("penicillin") || textLower.contains("ampicillin"))) {
             status = SuggestionVerificationStatus.CONTRAINDICATED
-            riskWarnings.add("CRITICAL CONTRAINDICATION: Patient has documented Penicillin / Beta-lactam allergy with high risk of severe anaphylaxis.")
-            rationaleBuilder.append("Suggested beta-lactam antibiotic is strictly contraindicated. Recommend safe non-beta-lactam alternative: Clindamycin 300mg QID or Azithromycin 500mg daily. ")
+            riskWarnings.add("ALLERGY REVIEW REQUIRED: A penicillin-family allergy is recorded; confirm the substance, reaction, severity, and timing.")
+            rationaleBuilder.append("Pause this candidate medication pending clinician verification. The allergy history alone does not determine an appropriate alternative; consult a current, approved medication source. ")
         }
 
         if (isAspirinNsaidAllergic && (textLower.contains("ibuprofen") || textLower.contains("nsaid") || textLower.contains("naproxen") || textLower.contains("aspirin") || textLower.contains("ketorolac"))) {
             status = SuggestionVerificationStatus.CONTRAINDICATED
-            riskWarnings.add("CRITICAL CONTRAINDICATION: Patient has documented NSAID/Aspirin hypersensitivity.")
-            rationaleBuilder.append("NSAIDs contraindicated. Recommend Paracetamol (Acetaminophen) 500-1000mg Q6H PRN. ")
+            riskWarnings.add("ALLERGY REVIEW REQUIRED: An NSAID/aspirin allergy is recorded; confirm the substance and reaction.")
+            rationaleBuilder.append("Pause this candidate medication pending clinician verification. Do not select an alternative from allergy history alone. ")
         }
 
         // 2. Check Systemic Medical Conditions

@@ -72,6 +72,8 @@ class PrescriptionDao(private val dbHelper: ThornburyDbHelper) {
             put(ThornburyDbHelper.COL_RX_INSTRUCTIONS, rx.instructions)
             put(ThornburyDbHelper.COL_RX_ISSUE_DATE, rx.issueDate)
             put(ThornburyDbHelper.COL_RX_IS_DISPENSED, if (rx.isDispensed) 1 else 0)
+            put(ThornburyDbHelper.COL_RX_OVERRIDE_REASON, rx.overrideReason)
+            put(ThornburyDbHelper.COL_RX_SAFETY_REVIEW_SUMMARY, rx.safetyReviewSummary)
         }
         db.insertWithOnConflict(
             ThornburyDbHelper.TABLE_PRESCRIPTIONS,
@@ -109,6 +111,8 @@ class PrescriptionDao(private val dbHelper: ThornburyDbHelper) {
         val instructions = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_RX_INSTRUCTIONS)) ?: ""
         val issueDate = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_RX_ISSUE_DATE)) ?: ""
         val isDispensed = cursor.getInt(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_RX_IS_DISPENSED)) == 1
+        val overrideReason = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_RX_OVERRIDE_REASON))
+        val safetyReviewSummary = cursor.getString(cursor.getColumnIndexOrThrow(ThornburyDbHelper.COL_RX_SAFETY_REVIEW_SUMMARY))
 
         return Prescription(
             id = id,
@@ -121,7 +125,9 @@ class PrescriptionDao(private val dbHelper: ThornburyDbHelper) {
             duration = duration,
             instructions = instructions,
             issueDate = issueDate,
-            isDispensed = isDispensed
+            isDispensed = isDispensed,
+            overrideReason = overrideReason,
+            safetyReviewSummary = safetyReviewSummary
         )
     }
 }

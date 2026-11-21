@@ -905,8 +905,8 @@ private fun InlineImageAttachmentCard(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val bitmapState by produceState<android.graphics.Bitmap?>(initialValue = null, attachment.uri) {
-        value = AttachmentViewerUtils.decodeBitmapSafely(context, attachment.uri, 400, 300)
+    val bitmapState by produceState<android.graphics.Bitmap?>(initialValue = null, attachment.uri, attachment.thumbnailUri) {
+        value = AttachmentViewerUtils.loadThumbnailSafely(context, attachment)
     }
 
     Surface(
@@ -1068,9 +1068,9 @@ private fun ImagingGalleryCard(
     val uriStr = attachment?.uri ?: report.image
     val isPdf = attachment?.name?.endsWith(".pdf", ignoreCase = true) == true
 
-    val bitmapState by produceState<android.graphics.Bitmap?>(initialValue = null, uriStr) {
+    val bitmapState by produceState<android.graphics.Bitmap?>(initialValue = null, uriStr, attachment?.thumbnailUri) {
         if (!isPdf) {
-            value = AttachmentViewerUtils.decodeBitmapSafely(context, uriStr, 400, 400)
+            value = AttachmentViewerUtils.loadReportThumbnail(context, report, attachment)
         }
     }
 

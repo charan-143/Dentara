@@ -75,6 +75,12 @@ class WhisperEngine(
             "Dental clinical examination notes. Caries, gingivitis, periodontitis, calculus, plaque, " +
                 "scaling, root planing, prophylaxis, restoration, extraction, endodontic, occlusion."
 
+        private const val UNIVERSAL_CLINICAL_PROMPT =
+            "Universal dental clinical dictation. Patient demographics, name, date of birth, age, phone, email, address, allergic to penicillin latex, medical alerts. " +
+                "Odontogram tooth conditions: tooth 14 occlusal decay, tooth 19 missing, tooth 30 MOD composite filling, tooth 3 root canal crownCap sound. " +
+                "Periodontal pocket depths: tooth 3 mesiobuccal 4mm bleeding bop, tooth 14 pocket 5mm. " +
+                "Clinical examination: chief complaint, severe throbbing pain, sensitivity to cold hot sweet, calculus, stains, TMJ clicking, bruxism clenching, brushing flossing frequency, caries risk, diagnosis periodontitis caries, prognosis good."
+
         /**
          * Clinical vocabulary normalisation applied after decoding. Maps spoken forms to
          * the canonical spelling used in the chart.
@@ -220,6 +226,7 @@ class WhisperEngine(
     private fun promptFor(mode: DictationTargetMode): String = when (mode) {
         DictationTargetMode.PERIODONTAL_CHARTING -> PERIODONTAL_PROMPT
         DictationTargetMode.CLINICAL_NOTES -> CLINICAL_NOTES_PROMPT
+        else -> UNIVERSAL_CLINICAL_PROMPT
     }
 
     /**

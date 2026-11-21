@@ -3,6 +3,7 @@ package com.example.thornburydental.data
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -157,7 +158,9 @@ data class PrescriptionDto(
     val duration: String = "",
     val instructions: String = "",
     val issueDate: String = "",
-    val isDispensed: Boolean = false
+    val isDispensed: Boolean = false,
+    val overrideReason: String? = null,
+    val safetyReviewSummary: String? = null
 ) {
     fun toDomain(): Prescription = Prescription(
         id = id.ifEmpty { "rx-${System.currentTimeMillis()}" },
@@ -170,7 +173,9 @@ data class PrescriptionDto(
         duration = duration,
         instructions = instructions,
         issueDate = issueDate,
-        isDispensed = isDispensed
+        isDispensed = isDispensed,
+        overrideReason = overrideReason,
+        safetyReviewSummary = safetyReviewSummary
     )
 
     companion object {
@@ -185,9 +190,52 @@ data class PrescriptionDto(
             duration = domain.duration,
             instructions = domain.instructions,
             issueDate = domain.issueDate,
-            isDispensed = domain.isDispensed
+            isDispensed = domain.isDispensed,
+            overrideReason = domain.overrideReason,
+            safetyReviewSummary = domain.safetyReviewSummary
         )
     }
+}
+
+@Serializable
+private data class PrescriptionApiResponse(
+    val data: PrescriptionApiDto
+)
+
+@Serializable
+private data class PrescriptionListApiResponse(
+    val data: List<PrescriptionApiDto>
+)
+
+@Serializable
+private data class PrescriptionApiDto(
+    val id: String = "",
+    @SerialName("patient_id") val patientId: String = "",
+    @SerialName("patient_name") val patientName: String = "",
+    @SerialName("clinician_name") val clinicianName: String = "",
+    val drug: String = "",
+    val dose: String = "",
+    val frequency: String = "",
+    @SerialName("duration_days") val durationDays: Int = 0,
+    val indication: String = "",
+    @SerialName("issued_at") val issuedAt: String = "",
+    @SerialName("override_reason") val overrideReason: String? = null,
+    @SerialName("safety_review_summary") val safetyReviewSummary: String? = null
+) {
+    fun toDomain() = Prescription(
+        id = id,
+        patientId = patientId,
+        patientName = patientName,
+        clinicianName = clinicianName,
+        drugName = drug,
+        dosage = dose,
+        frequency = frequency,
+        duration = if (durationDays > 0) "$durationDays days" else "",
+        instructions = indication,
+        issueDate = issuedAt,
+        overrideReason = overrideReason,
+        safetyReviewSummary = safetyReviewSummary
+    )
 }
 
 @Serializable
@@ -306,7 +354,9 @@ private data class IssuePrescriptionRequest(
     val frequency: String,
     val durationDays: Int,
     val indication: String,
-    val overrideReason: String? = null
+    val overrideReason: String? = null,
+    val safetyReviewSummary: String? = null,
+    val clinicianConfirmation: Boolean
 )
 
 @Serializable
@@ -332,8 +382,8 @@ private data class UploadReportRequest(
 
 object NetworkClient {
 
-    private const val PRIMARY_BASE_URL = "http://10.0.2.2:5178/api/v1"
-    private const val FALLBACK_BASE_URL = "http://localhost:5178/api/v1"
+    private const val PRIMARY_BASE_URL = "https://10.0.2.2:5178/api/v1"
+    private const val FALLBACK_BASE_URL = "https://localhost:5178/api/v1"
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -444,7 +494,7 @@ object NetworkClient {
 
     suspend fun fetchPrescriptions(): Result<List<Prescription>> {
         return executeRequest("/prescriptions", "GET") { text ->
-            json.decodeFromString<List<PrescriptionDto>>(text).map { it.toDomain() }
+            json.decodeFromString<PrescriptionListApiResponse>(text).data.map { it.toDomain() }
         }
     }
 
@@ -455,12 +505,14 @@ object NetworkClient {
         frequency: String,
         durationDays: Int,
         indication: String,
-        overrideReason: String?
+        overrideReason: String?,
+        safetyReviewSummary: String?,
+        clinicianConfirmation: Boolean
     ): Result<Prescription> {
-        val req = IssuePrescriptionRequest(patientId, drug, dose, frequency, durationDays, indication, overrideReason)
+        val req = IssuePrescriptionRequest(patientId, drug, dose, frequency, durationDays, indication, overrideReason, safetyReviewSummary, clinicianConfirmation)
         val body = json.encodeToString(IssuePrescriptionRequest.serializer(), req)
         return executeRequest("/prescriptions", "POST", body) { text ->
-            json.decodeFromString<PrescriptionDto>(text).toDomain()
+            json.decodeFromString<PrescriptionApiResponse>(text).data.toDomain()
         }
     }
 

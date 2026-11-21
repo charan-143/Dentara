@@ -1,8 +1,17 @@
 import { NextResponse } from "next/server";
 import { db, newId } from "@/lib/db";
+import { authenticateApiRequest } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const sql = db();
     const appointments = (await sql.query(
       `SELECT 
@@ -30,6 +39,14 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
       patient_id: patientSnake,
@@ -135,6 +152,14 @@ export async function POST(request: Request) {
 
 export async function PUT(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const { id, appointmentId, status } = body || {};
     const targetId = id || appointmentId;

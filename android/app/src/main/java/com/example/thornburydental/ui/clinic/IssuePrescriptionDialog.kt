@@ -25,6 +25,9 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.thornburydental.data.DentalRepository
 import com.example.thornburydental.data.MedicationPreset
 import com.example.thornburydental.data.Patient
+import com.example.thornburydental.data.cds.ClinicalCorpusRepository
+import com.example.thornburydental.data.cds.DrugAlertSeverity
+import com.example.thornburydental.data.cds.MedicationReviewContext
 import com.example.thornburydental.theme.*
 import com.example.thornburydental.util.formatAsDdMmYyyy
 
@@ -50,6 +53,8 @@ fun IssuePrescriptionDialog(
     var frequency by remember { mutableStateOf(initialPreset?.frequency ?: "") }
     var duration by remember { mutableStateOf(initialPreset?.duration ?: "") }
     var instructions by remember { mutableStateOf(initialPreset?.instructions ?: "") }
+    var renalFunction by remember { mutableStateOf("") }
+    var pregnancyStatus by remember { mutableStateOf("") }
 
     var saveAsPreset by remember { mutableStateOf(false) }
     var presetCategory by remember { mutableStateOf("Custom") }
@@ -68,16 +73,26 @@ fun IssuePrescriptionDialog(
         }
     }
 
-    // Real-time Allergy Cross-Check!
-    val allergyWarning = remember(drugName, patient) {
-        if (drugName.isNotBlank()) DentalRepository.checkAllergyConflict(patient, drugName) else null
+    // Real-time Contextual Drug-Drug & Allergy Cross-Check!
+    val interactionReport = remember(drugName, patient, renalFunction, pregnancyStatus) {
+        ClinicalCorpusRepository.evaluatePrescriptionContext(
+            patient,
+            drugName,
+            reviewContext = MedicationReviewContext(
+                renalFunction = renalFunction,
+                pregnancyStatus = pregnancyStatus,
+                currentMedications = patient.medicalHistory.split(',', ';').map { it.trim() }.filter { it.isNotBlank() }
+            )
+        )
     }
 
     var overrideConfirmed by remember { mutableStateOf(false) }
     var overrideReason by remember { mutableStateOf("") }
+    var medicationReviewConfirmed by remember { mutableStateOf(false) }
 
     val isFormValid = drugName.isNotBlank() && dosage.isNotBlank() && frequency.isNotBlank() &&
-            (allergyWarning == null || (overrideConfirmed && overrideReason.isNotBlank()))
+            medicationReviewConfirmed && renalFunction.isNotBlank() && pregnancyStatus.isNotBlank() &&
+            (!interactionReport.isBlocked || (overrideConfirmed && overrideReason.isNotBlank()))
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -132,66 +147,164 @@ fun IssuePrescriptionDialog(
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    // Allergy Alert Banner
-                if (allergyWarning != null) {
+                // Real-time Contextual CDS Interaction Alerts Banner
+                if (interactionReport.alerts.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(14.dp))
-                    Surface(
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        color = ThornburyErrorWash,
-                        border = BorderStroke(1.dp, ThornburyError)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = ThornburyError,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = allergyWarning,
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = ThornburyError
+                        interactionReport.alerts.forEach { alert ->
+                            val containerColor = when (alert.severity) {
+                                DrugAlertSeverity.CRITICAL_CONTRAINDICATION -> Color(0xFFFEF2F2)
+                                DrugAlertSeverity.HIGH_RISK_CROSS_REACTIVITY -> Color(0xFFFFFBEB)
+                                DrugAlertSeverity.CAUTIONARY_MONITORING -> Color(0xFFFFF7ED)
+                                DrugAlertSeverity.CLINICAL_ADVISORY -> Color(0xFFEFF6FF)
+                            }
+                            val borderColor = Color(alert.severity.colorHex)
+                            val iconVector = when (alert.severity) {
+                                DrugAlertSeverity.CRITICAL_CONTRAINDICATION -> Icons.Default.Dangerous
+                                DrugAlertSeverity.HIGH_RISK_CROSS_REACTIVITY -> Icons.Default.Warning
+                                DrugAlertSeverity.CAUTIONARY_MONITORING -> Icons.Default.ReportProblem
+                                DrugAlertSeverity.CLINICAL_ADVISORY -> Icons.Default.Info
+                            }
+
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                color = containerColor,
+                                border = BorderStroke(1.dp, borderColor)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = iconVector,
+                                                contentDescription = null,
+                                                tint = borderColor,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = alert.title,
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                                color = borderColor
+                                            )
+                                        }
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = borderColor.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = alert.severity.label,
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                                color = borderColor,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = alert.details,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = ThornburyInk,
+                                        lineHeight = 16.sp
+                                    )
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = ThornburyCanvas,
+                                        border = BorderStroke(0.5.dp, borderColor.copy(alpha = 0.4f))
+                                    ) {
+                                        Text(
+                                            text = "Reference (review pending): ${alert.clinicalGuidelineCitation}${alert.guidelineVersion?.let { " · $it" } ?: ""}${alert.reviewDate?.let { " · reviewed $it" } ?: ""}",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                            color = ThornburyMuted,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        )
+                                    }
+
+                                }
+                            }
+                        }
+
+                        if (interactionReport.isBlocked) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = overrideConfirmed,
+                                    onCheckedChange = { overrideConfirmed = it },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = ThornburyError,
+                                        checkmarkColor = Color.White
+                                    )
                                 )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                text = "I have reviewed this alert and authorize an override",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                    color = ThornburyInk,
+                                    modifier = Modifier.clickable { overrideConfirmed = !overrideConfirmed }
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            OutlinedTextField(
+                                value = overrideReason,
+                                onValueChange = { overrideReason = it },
+                                label = { Text("Clinical Justification & Consent Notes (required)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
                             )
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Checkbox(
-                            checked = overrideConfirmed,
-                            onCheckedChange = { overrideConfirmed = it },
-                            colors = CheckboxDefaults.colors(
-                                checkedColor = ThornburyError,
-                                checkmarkColor = Color.White
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Override allergy contraindication with senior clinician sign-off",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = ThornburyInk,
-                            modifier = Modifier.clickable { overrideConfirmed = !overrideConfirmed }
-                        )
-                    }
+                OutlinedTextField(
+                    value = renalFunction,
+                    onValueChange = { renalFunction = it },
+                    label = { Text("Renal function (eGFR / status / unknown) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = pregnancyStatus,
+                    onValueChange = { pregnancyStatus = it },
+                    label = { Text("Pregnancy status (or not applicable / unknown) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
+                )
 
-                    Spacer(modifier = Modifier.height(6.dp))
-                    OutlinedTextField(
-                        value = overrideReason,
-                        onValueChange = { overrideReason = it },
-                        label = { Text("Clinical Justification (required)") },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = thornburyTextFieldColors(containerColor = ThornburyCanvas)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = medicationReviewConfirmed,
+                        onCheckedChange = { medicationReviewConfirmed = it },
+                        colors = CheckboxDefaults.colors(checkedColor = ThornburyPrimary)
+                    )
+                    Text(
+                        text = "I confirm I reviewed the patient's allergy, medication, medical history, renal function, and pregnancy status before prescribing.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = ThornburyInk,
+                        modifier = Modifier.clickable { medicationReviewConfirmed = !medicationReviewConfirmed }
                     )
                 }
 
@@ -341,7 +454,7 @@ fun IssuePrescriptionDialog(
 
                     presets.forEach { item ->
                         val isSelected = item.id == selectedPresetId
-                        val hasConflict = DentalRepository.checkAllergyConflict(patient, item.name) != null
+                        val hasConflict = ClinicalCorpusRepository.evaluatePrescriptionContext(patient, item.name).isBlocked
 
                         Surface(
                             modifier = Modifier
@@ -564,7 +677,9 @@ fun IssuePrescriptionDialog(
                                 frequency = frequency.trim(),
                                 duration = duration.trim(),
                                 instructions = instructions.trim(),
-                                overrideReason = if (allergyWarning != null) overrideReason else null,
+                                overrideReason = if (interactionReport.isBlocked) overrideReason else null,
+                                safetyReviewSummary = "Renal function: ${renalFunction.trim()}; pregnancy status: ${pregnancyStatus.trim()}; allergy, current medication, and medical history review confirmed by $selectedClinician.",
+                                medicationReviewConfirmed = medicationReviewConfirmed,
                                 saveAsPreset = isCustomMode && saveAsPreset,
                                 presetCategory = presetCategory.trim().ifBlank { "Custom" }
                             )

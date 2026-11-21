@@ -27,7 +27,11 @@ data class PatientVitalsContext(
     val bloodPressureDiastolic: Int? = null,
     val heartRateBpm: Int? = null,
     val patientAllergies: List<String> = emptyList(), // e.g. ["Penicillin", "Latex", "NSAIDs"]
-    val medicalConditions: List<String> = emptyList() // e.g. ["Anticoagulated", "Bisphosphonate Therapy", "Type 2 Diabetes"]
+    val medicalConditions: List<String> = emptyList(), // e.g. ["Anticoagulated", "Bisphosphonate Therapy", "Type 2 Diabetes"]
+    val renalFunctionSummary: String? = null,
+    val pregnancyStatus: String? = null,
+    val currentMedications: List<String> = emptyList(),
+    val relevantMedicalHistory: List<String> = emptyList()
 )
 
 /**
@@ -66,7 +70,21 @@ data class RedFlagResult(
     val isAdvisory: Boolean = true,
     val guidelineCitations: List<String> = emptyList(),
     val requiresClinicianOverride: Boolean = false,
-    val overrideProtocol: String? = null
+    val overrideProtocol: String? = null,
+    val alerts: List<ClinicalAlert> = emptyList(),
+    val requiresClinicianConfirmation: Boolean = false,
+    val medicationKnowledgeBaseVersion: String? = null,
+    val evidenceReviewedDate: String? = null
+)
+
+@Serializable
+data class ClinicalAlert(
+    val category: String,
+    val severity: String,
+    val message: String,
+    val evidenceSource: String? = null,
+    val guidelineVersion: String? = null,
+    val reviewDate: String? = null
 )
 
 /**

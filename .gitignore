@@ -1,5 +1,7 @@
 node_modules/
 .next/
+__pycache__/
+*.py[cod]
 .env*.local
 .env
 *.log
@@ -23,7 +25,11 @@ node_modules/
 tsconfig.tsbuildinfo
 .impeccable/hook.cache.json
 .idea/
+.worktrees/
 agent/
 *.patch
 brag-output*
 broken_cds/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/

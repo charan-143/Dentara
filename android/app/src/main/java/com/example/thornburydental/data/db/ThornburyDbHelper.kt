@@ -34,10 +34,15 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             return getReadableDatabase(passphrase)
         }
 
+    @Volatile
+    private var isMigrationChecked = false
+
     @Synchronized
     private fun ensureMigratedIfNeeded() {
+        if (isMigrationChecked) return
         val dbFile = context.getDatabasePath(DATABASE_NAME)
         if (!dbFile.exists() || dbFile.length() == 0L) {
+            isMigrationChecked = true
             return
         }
 
@@ -56,6 +61,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
         }
 
         if (isAlreadyEncrypted) {
+            isMigrationChecked = true
             return
         }
 
@@ -69,9 +75,11 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             unencryptedDb.changePassword(passphrase)
             unencryptedDb.close()
             Log.i("ThornburyDbHelper", "Successfully migrated legacy unencrypted database to SQLCipher encryption.")
+            isMigrationChecked = true
         } catch (e: Exception) {
             Log.w("ThornburyDbHelper", "Direct rekey failed, trying temp file copy migration...", e)
             migrateViaTempCopy(dbFile)
+            isMigrationChecked = true
         }
     }
 
@@ -98,7 +106,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
 
     companion object {
         const val DATABASE_NAME = "thornbury_dental.db"
-        const val DATABASE_VERSION = 8
+        const val DATABASE_VERSION = 10
 
         // Table Names
         const val TABLE_PATIENTS = "patients"
@@ -254,6 +262,8 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
         const val COL_RX_INSTRUCTIONS = "instructions"
         const val COL_RX_ISSUE_DATE = "issue_date"
         const val COL_RX_IS_DISPENSED = "is_dispensed"
+        const val COL_RX_OVERRIDE_REASON = "override_reason"
+        const val COL_RX_SAFETY_REVIEW_SUMMARY = "safety_review_summary"
 
         // Diagnostic Reports columns
         const val COL_REPORTS_ID = "id"
@@ -328,6 +338,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_teeth_patient ON $TABLE_TEETH ($COL_TEETH_PATIENT_ID);")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_teeth_patient_number ON $TABLE_TEETH ($COL_TEETH_PATIENT_ID, $COL_TEETH_NUMBER);")
 
         // 3. Appointments Table
         db.execSQL(
@@ -354,6 +365,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_appts_patient ON $TABLE_APPOINTMENTS ($COL_APPTS_PATIENT_ID);")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_appts_date_patient ON $TABLE_APPOINTMENTS ($COL_APPTS_DATE, $COL_APPTS_PATIENT_ID);")
 
         // 4. Treatment Plans Table
         db.execSQL(
@@ -373,6 +385,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_plans_patient ON $TABLE_TREATMENT_PLANS ($COL_PLANS_PATIENT_ID);")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_plans_patient_locked ON $TABLE_TREATMENT_PLANS ($COL_PLANS_PATIENT_ID, $COL_PLANS_IS_LOCKED);")
 
         // 5. Prescriptions Table
         db.execSQL(
@@ -388,11 +401,14 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
                 $COL_RX_DURATION TEXT NOT NULL,
                 $COL_RX_INSTRUCTIONS TEXT NOT NULL,
                 $COL_RX_ISSUE_DATE TEXT NOT NULL,
-                $COL_RX_IS_DISPENSED INTEGER NOT NULL DEFAULT 0
+                $COL_RX_IS_DISPENSED INTEGER NOT NULL DEFAULT 0,
+                $COL_RX_OVERRIDE_REASON TEXT,
+                $COL_RX_SAFETY_REVIEW_SUMMARY TEXT
             );
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_rx_patient ON $TABLE_PRESCRIPTIONS ($COL_RX_PATIENT_ID);")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_dispensed ON $TABLE_PRESCRIPTIONS ($COL_RX_PATIENT_ID, $COL_RX_IS_DISPENSED);")
 
         // 6. Diagnostic Reports Table
         db.execSQL(
@@ -412,6 +428,7 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
             """.trimIndent()
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS idx_reports_patient ON $TABLE_DIAGNOSTIC_REPORTS ($COL_REPORTS_PATIENT_ID);")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_reports_patient_taken ON $TABLE_DIAGNOSTIC_REPORTS ($COL_REPORTS_PATIENT_ID, $COL_REPORTS_TAKEN_AT);")
 
         // 7. Users Table
         db.execSQL(
@@ -529,6 +546,22 @@ class ThornburyDbHelper(private val context: Context) : SQLiteOpenHelper(context
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 10) {
+            db.execSQL("ALTER TABLE $TABLE_PRESCRIPTIONS ADD COLUMN $COL_RX_OVERRIDE_REASON TEXT")
+            db.execSQL("ALTER TABLE $TABLE_PRESCRIPTIONS ADD COLUMN $COL_RX_SAFETY_REVIEW_SUMMARY TEXT")
+        }
+        if (oldVersion < 9) {
+            try {
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_teeth_patient_number ON $TABLE_TEETH ($COL_TEETH_PATIENT_ID, $COL_TEETH_NUMBER);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_appts_date_patient ON $TABLE_APPOINTMENTS ($COL_APPTS_DATE, $COL_APPTS_PATIENT_ID);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_reports_patient_taken ON $TABLE_DIAGNOSTIC_REPORTS ($COL_REPORTS_PATIENT_ID, $COL_REPORTS_TAKEN_AT);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_plans_patient_locked ON $TABLE_TREATMENT_PLANS ($COL_PLANS_PATIENT_ID, $COL_PLANS_IS_LOCKED);")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_prescriptions_patient_dispensed ON $TABLE_PRESCRIPTIONS ($COL_RX_PATIENT_ID, $COL_RX_IS_DISPENSED);")
+                Log.i("ThornburyDbHelper", "Upgraded database to version 9 with composite indexes on appointments, teeth, reports, and treatment plans.")
+            } catch (e: Exception) {
+                Log.e("ThornburyDbHelper", "Failed to create composite indexes during v9 upgrade", e)
+            }
+        }
         if (oldVersion < 8) {
             try {
                 db.execSQL(

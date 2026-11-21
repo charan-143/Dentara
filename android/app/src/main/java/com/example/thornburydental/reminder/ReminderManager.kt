@@ -15,6 +15,7 @@ import com.example.thornburydental.util.parseTimeToMinutes
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import kotlinx.coroutines.launch
 
 /**
  * Manages notification channels and exact/inexact AlarmManager alarms
@@ -257,6 +258,15 @@ object ReminderManager {
             Log.d(TAG, "Rescheduled ${activeAppointments.size} active chairside patient reminders.")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to reschedule active reminders", e)
+        }
+    }
+
+    /**
+     * Asynchronously reschedule reminders on Dispatchers.IO to prevent blocking the UI thread during app launch.
+     */
+    fun rescheduleAllActiveRemindersAsync(context: Context) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            rescheduleAllActiveReminders(context)
         }
     }
 

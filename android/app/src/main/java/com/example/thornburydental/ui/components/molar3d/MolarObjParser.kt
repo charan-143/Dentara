@@ -76,11 +76,24 @@ object MolarObjParser {
 
                 if (c0 == 'v' && c1 == ' ') {
                     // Vertex: v x y z
-                    val parts = line.split(" ").filter { it.isNotEmpty() }
-                    if (parts.size >= 4) {
-                        val x = parts[1].toFloat()
-                        val y = parts[2].toFloat()
-                        val z = parts[3].toFloat()
+                    try {
+                        var idxScan = 2
+                        while (idxScan < len && line[idxScan] == ' ') idxScan++
+                        var end = idxScan
+                        while (end < len && line[end] != ' ') end++
+                        val x = line.substring(idxScan, end).toFloat()
+
+                        idxScan = end
+                        while (idxScan < len && line[idxScan] == ' ') idxScan++
+                        end = idxScan
+                        while (end < len && line[end] != ' ') end++
+                        val y = line.substring(idxScan, end).toFloat()
+
+                        idxScan = end
+                        while (idxScan < len && line[idxScan] == ' ') idxScan++
+                        end = idxScan
+                        while (end < len && line[end] != ' ') end++
+                        val z = line.substring(idxScan, end).toFloat()
 
                         if (x < minX) minX = x
                         if (x > maxX) maxX = x
@@ -99,14 +112,27 @@ object MolarObjParser {
                         rawPositions[idx + 1] = y
                         rawPositions[idx + 2] = z
                         vertexCount++
-                    }
+                    } catch (_: Exception) {}
                 } else if (c0 == 'v' && c1 == 'n') {
                     // Normal: vn nx ny nz
-                    val parts = line.split(" ").filter { it.isNotEmpty() }
-                    if (parts.size >= 4) {
-                        val nx = parts[1].toFloat()
-                        val ny = parts[2].toFloat()
-                        val nz = parts[3].toFloat()
+                    try {
+                        var idxScan = 2
+                        while (idxScan < len && line[idxScan] == ' ') idxScan++
+                        var end = idxScan
+                        while (end < len && line[end] != ' ') end++
+                        val nx = line.substring(idxScan, end).toFloat()
+
+                        idxScan = end
+                        while (idxScan < len && line[idxScan] == ' ') idxScan++
+                        end = idxScan
+                        while (end < len && line[end] != ' ') end++
+                        val ny = line.substring(idxScan, end).toFloat()
+
+                        idxScan = end
+                        while (idxScan < len && line[idxScan] == ' ') idxScan++
+                        end = idxScan
+                        while (end < len && line[end] != ' ') end++
+                        val nz = line.substring(idxScan, end).toFloat()
 
                         val idx = normalCount * 3
                         if (idx + 2 >= rawNormals.size) {
@@ -118,7 +144,7 @@ object MolarObjParser {
                         rawNormals[idx + 1] = ny
                         rawNormals[idx + 2] = nz
                         normalCount++
-                    }
+                    } catch (_: Exception) {}
                 } else if (c0 == 'u' && line.startsWith("usemtl ")) {
                     val mtl = line.substring(7).trim()
                     currentMaterial = mtl

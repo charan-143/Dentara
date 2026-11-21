@@ -18,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -33,7 +35,6 @@ import com.example.thornburydental.data.PatientDiagnosis
 import com.example.thornburydental.data.PlanStep
 import com.example.thornburydental.data.cds.*
 import com.example.thornburydental.theme.*
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,8 +48,8 @@ fun CdsCopilotScreen(
 ) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    val orchestrator = remember { MultiAgentClinicalOrchestrator() }
-    val coroutineScope = rememberCoroutineScope()
+    val viewModel: CdsCopilotViewModel = viewModel()
+    val responseState by viewModel.executionState.collectAsStateWithLifecycle()
     val patients by DentalRepository.patients.collectAsState()
 
     var selectedPatient by remember { mutableStateOf<Patient?>(null) }
@@ -64,8 +65,6 @@ fun CdsCopilotScreen(
     var aiMode by remember { mutableStateOf(ClinicalAiExecutionMode.AGENT_REASONING) }
     var isWebSearchEnabled by remember { mutableStateOf(true) }
 
-    var responseState by remember { mutableStateOf<MultiAgentExecutionState>(MultiAgentExecutionState.Idle) }
-    
     // Clinician Feedback
     var clinicianSuggestionsList by remember { mutableStateOf<List<String>>(emptyList()) }
     var currentFeedbackInput by remember { mutableStateOf("") }
@@ -77,27 +76,16 @@ fun CdsCopilotScreen(
 
     fun executeAi() {
         keyboardController?.hide()
-        coroutineScope.launch {
-            orchestrator.executeClinicalPipeline(
-                context = context,
-                patient = selectedPatient,
-                freeTextNarrative = freeTextDescription,
-                selectedSymptoms = selectedSymptoms,
-                vitalsContext = vitalsContext,
-                mediaItems = emptyList(),
-                executionMode = aiMode,
-                enableWebSearch = isWebSearchEnabled,
-                clinicianSuggestions = clinicianSuggestionsList.map { 
-                    ClinicianSuggestionRecord(
-                        id = java.util.UUID.randomUUID().toString(),
-                        suggestionText = it,
-                        timestampIso = java.time.Instant.now().toString()
-                    )
-                }
-            ).collect { state ->
-                responseState = state
-            }
-        }
+        viewModel.execute(
+            context = context,
+            patient = selectedPatient,
+            freeTextNarrative = freeTextDescription,
+            selectedSymptoms = selectedSymptoms,
+            vitalsContext = vitalsContext,
+            executionMode = aiMode,
+            enableWebSearch = isWebSearchEnabled,
+            clinicianSuggestions = clinicianSuggestionsList
+        )
     }
 
     fun addCustomSymptom() {
@@ -464,7 +452,7 @@ fun CdsCopilotScreen(
                                             systemicConsiderations = p.medicalHistory,
                                             dateRecorded = today,
                                             lastUpdated = today,
-                                            clinicianName = "Clinical AI Copilot"
+                                            clinicianName = "Clinician-approved AI Copilot"
                                         )
                                         DentalRepository.updatePatientDiagnosis(p.id, diagRecord)
 
@@ -487,7 +475,7 @@ fun CdsCopilotScreen(
                                             DentalRepository.createTreatmentPlan(
                                                 patientId = p.id,
                                                 title = result.suggestedTreatmentPlan?.planTitle?.ifEmpty { "AI Generated Treatment Plan" } ?: "AI Generated Treatment Plan",
-                                                clinicianName = "Clinical AI Copilot",
+                                                clinicianName = "Clinician-approved AI Copilot",
                                                 diagnosis = primaryDiag,
                                                 steps = planSteps
                                             )
@@ -499,7 +487,7 @@ fun CdsCopilotScreen(
                                             kind = "AI Clinical Plan",
                                             title = "AI Copilot Analysis - $primaryDiag",
                                             summary = "Primary Diagnosis: $primaryDiag\n\n$findings",
-                                            clinicianName = "Clinical AI Copilot",
+                                            clinicianName = "Clinician-approved AI Copilot",
                                             attachments = emptyList()
                                         )
                                         
@@ -717,13 +705,87 @@ fun DiagnosisCard(differentials: List<DifferentialDiagnosisRecommendation>) {
                                 )
                             }
                         }
+
+                        // Guideline Reference Badges & Calibrated Confidence Thresholds
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp)
+                        ) {
+                            val confScore = (diff.confidenceScore * 100).toInt()
+                            val (confBg, confFg) = when {
+                                confScore >= 85 -> Color(0xFF10B981).copy(alpha = 0.15f) to Color(0xFF047857)
+                                confScore >= 70 -> Color(0xFFF59E0B).copy(alpha = 0.15f) to Color(0xFFB45309)
+                                else -> Color(0xFF3B82F6).copy(alpha = 0.15f) to Color(0xFF1D4ED8)
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = confBg
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = confFg,
+                                        modifier = Modifier.size(10.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(3.dp))
+                                    Text(
+                                        text = "$confScore% Calibrated Confidence",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                        color = confFg
+                                    )
+                                }
+                            }
+
+                            // Evidence Guideline Badge (ADA / NICE / AAOMS / SDCEP)
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
+                                border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                            ) {
+                                Text(
+                                    text = diff.primaryGuidelineBadge,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 9.sp),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+
+                            // Evidence Level
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = diff.evidenceLevel,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Medium),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
                         if (diff.clinicalRationale.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(6.dp))
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = diff.clinicalRationale, 
                                 style = MaterialTheme.typography.bodySmall, 
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 lineHeight = 17.sp
+                            )
+                        }
+
+                        if (diff.guidelineCitationText.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Citation: ${diff.guidelineCitationText}",
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                             )
                         }
                     }

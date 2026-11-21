@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
 import { db, newId } from "@/lib/db";
+import { authenticateApiRequest } from "@/lib/auth";
+import { record } from "@/lib/audit";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const sql = db();
     const prescriptions = (await sql.query(
       `SELECT 
@@ -32,12 +42,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const user = await authenticateApiRequest(request);
+    if (!user) {
+      return NextResponse.json(
+        { status: "error", message: "Unauthorized. Authentication required." },
+        { status: 401 }
+      );
+    }
+
     const body = await request.json();
     const {
       patient_id: patientSnake,
       patientId: patientCamel,
-      clinician_id: clinicianSnake,
-      clinicianId: clinicianCamel,
       drug,
       form,
       dose,
@@ -49,6 +65,10 @@ export async function POST(request: Request) {
       indication,
       override_reason: overrideSnake,
       overrideReason: overrideCamel,
+      safety_review_summary: safetyReviewSnake,
+      safetyReviewSummary: safetyReviewCamel,
+      clinician_confirmation: confirmationSnake,
+      clinicianConfirmation: confirmationCamel,
     } = body || {};
 
     const patientId = patientSnake || patientCamel;
@@ -76,13 +96,8 @@ export async function POST(request: Request) {
     const sql = db();
 
     // Determine clinician id
-    let clinicianId = clinicianSnake || clinicianCamel;
-    if (!clinicianId) {
-      const firstClinician = (await sql.query(
-        "SELECT id FROM clinicians WHERE active = true ORDER BY id LIMIT 1"
-      )) as Array<{ id: string }>;
-      clinicianId = firstClinician[0]?.id || "c1";
-    }
+    // Attribute prescribing to the authenticated account, never a client-supplied identity.
+    const clinicianId = user.clinicianId;
 
     const rxForm = form || "Tablet";
     const rxRoute = route || "Oral";
@@ -91,6 +106,15 @@ export async function POST(request: Request) {
     const rxRefills = Number(refillsInput || 0);
     const rxIndication = indication || "Clinical indication recorded";
     const overrideReason = overrideSnake || overrideCamel || null;
+    const safetyReviewSummary = safetyReviewSnake || safetyReviewCamel || null;
+    const clinicianConfirmation = confirmationSnake ?? confirmationCamel;
+
+    if (clinicianConfirmation !== true || typeof safetyReviewSummary !== "string" || !safetyReviewSummary.trim()) {
+      return NextResponse.json(
+        { status: "error", message: "Clinician confirmation and medication safety review are required before issuing this prescription." },
+        { status: 400 }
+      );
+    }
 
     // Check patient recorded allergies for safety
     const allergies = (await sql.query(
@@ -139,14 +163,26 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    if (overrideReason && typeof overrideReason !== "string") {
+      return NextResponse.json(
+        { status: "error", message: "A written clinical override justification is required." },
+        { status: 400 }
+      );
+    }
+    if (overrideReason && !overrideReason.trim()) {
+      return NextResponse.json(
+        { status: "error", message: "A written clinical override justification is required." },
+        { status: 400 }
+      );
+    }
 
     const id = newId("rx");
 
     await sql.query(
       `INSERT INTO prescriptions (
         id, patient_id, clinician_id, drug, form, dose, route, frequency,
-        duration_days, refills, indication, issued_at, override_reason
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12)`,
+        duration_days, refills, indication, issued_at, override_reason, safety_review_summary
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13)`,
       [
         id,
         patientId,
@@ -160,8 +196,18 @@ export async function POST(request: Request) {
         rxRefills,
         rxIndication,
         overrideReason,
+        safetyReviewSummary.trim(),
       ]
     );
+
+    await record({
+      actorId: user.clinicianId,
+      actorRole: user.role,
+      action: overrideReason ? "issued prescription with clinical override" : "issued prescription",
+      entity: "prescription",
+      entityId: id,
+      patientId,
+    });
 
     const inserted = (await sql.query(
       `SELECT 
@@ -189,6 +235,7 @@ export async function POST(request: Request) {
       refills: rxRefills,
       indication: rxIndication,
       override_reason: overrideReason,
+      safety_review_summary: safetyReviewSummary.trim(),
     };
 
     return NextResponse.json(

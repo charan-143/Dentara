@@ -469,10 +469,9 @@ class MultiAgentClinicalOrchestrator(
             safetyAlerts.add(
                 PharmacologicalAlert(
                     drugOrTreatment = "Amoxicillin / Beta-Lactam Antibiotics",
-                    severityLevel = SafetySeverityLevel.CRITICAL_CONTRAINDICATION,
-                    reason = "Patient has documented Penicillin / Beta-lactam allergy with risk of anaphylaxis.",
-                    clinicalAction = "STRICTLY CONTRAINDICATED. Use non-beta-lactam alternative.",
-                    safeAlternative = "Clindamycin 300mg QID or Azithromycin 500mg daily"
+                    severityLevel = SafetySeverityLevel.CAUTION,
+                    reason = "A penicillin-family allergy is reported. Verify the agent, reaction, severity, and timing before considering a beta-lactam.",
+                    clinicalAction = "Do not select an alternative from allergy history alone. Clinician review against a current medication source is required."
                 )
             )
         }
@@ -486,9 +485,8 @@ class MultiAgentClinicalOrchestrator(
                 PharmacologicalAlert(
                     drugOrTreatment = "Ibuprofen / NSAID Analgesics",
                     severityLevel = SafetySeverityLevel.CAUTION,
-                    reason = "Concurrent NSAID and systemic anticoagulation significantly escalates gastrointestinal and surgical bleeding hazard.",
-                    clinicalAction = "Avoid high-dose NSAIDs. Prefer Paracetamol (Acetaminophen) for first-line pain management.",
-                    safeAlternative = "Paracetamol 500mg-1000mg Q6H PRN (max 4g/24h)"
+                    reason = "Anticoagulant use is recorded. Review patient-specific bleeding risk and current interaction guidance.",
+                    clinicalAction = "Clinician confirmation is required before selecting an analgesic."
                 )
             )
         }
@@ -501,10 +499,9 @@ class MultiAgentClinicalOrchestrator(
             safetyAlerts.add(
                 PharmacologicalAlert(
                     drugOrTreatment = "Surgical Extractions & Osseous Surgery",
-                    severityLevel = SafetySeverityLevel.CRITICAL_CONTRAINDICATION,
-                    reason = "Patient has antiresorptive / bisphosphonate history with elevated risk of Medication-Related Osteonecrosis of the Jaw (MRONJ).",
-                    clinicalAction = "Avoid elective extractions. Prioritize endodontic retention or primary wound closure with chlorhexidine protocol.",
-                    safeAlternative = "Coronectomy, endodontic therapy, or specialist OMFS referral"
+                    severityLevel = SafetySeverityLevel.CAUTION,
+                    reason = "Antiresorptive therapy is recorded. Assess the individual risk before invasive dentoalveolar care.",
+                    clinicalAction = "Review current specialist guidance and consider appropriate specialist consultation."
                 )
             )
         }
@@ -642,9 +639,10 @@ class MultiAgentClinicalOrchestrator(
                 markdownBuilder.append("$icon **${alert.drugOrTreatment}** (${alert.severityLevel})\n")
                 markdownBuilder.append("   • *Reason*: ${alert.reason}\n")
                 markdownBuilder.append("   • *Clinical Action*: ${alert.clinicalAction}\n")
-                if (alert.safeAlternative != null) {
-                    markdownBuilder.append("   • *Safe Alternative*: ${alert.safeAlternative}\n")
-                }
+                markdownBuilder.append("   • *Evidence status*: review pending; ${alert.evidenceSource}")
+                alert.guidelineVersion?.let { markdownBuilder.append(" (version $it)") }
+                alert.reviewDate?.let { markdownBuilder.append(" (reviewed $it)") }
+                markdownBuilder.append("\n")
                 markdownBuilder.append("\n")
             }
         }

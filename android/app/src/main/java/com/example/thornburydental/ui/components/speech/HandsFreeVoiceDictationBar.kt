@@ -4,7 +4,9 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -19,10 +21,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import kotlin.math.PI
+import kotlin.math.sin
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,10 +80,10 @@ import com.example.thornburydental.theme.*
 @Composable
 fun HandsFreeVoiceDictationBar(
     state: VoiceDictationState,
-    targetMode: DictationTargetMode,
+    targetMode: DictationTargetMode = DictationTargetMode.PERIODONTAL_CHARTING,
     onStartListening: (DictationTargetMode) -> Unit,
     onStopListening: () -> Unit,
-    onSelectTargetMode: (DictationTargetMode) -> Unit,
+    onSelectTargetMode: (DictationTargetMode) -> Unit = {},
     modelState: SpeechModelState = SpeechModelState.Absent,
     onProvisionModel: () -> Unit = {},
     undoDescription: String? = null,
@@ -93,8 +98,21 @@ fun HandsFreeVoiceDictationBar(
     val downloading = modelState as? SpeechModelState.Downloading
     val verifying = modelState is SpeechModelState.Verifying
     val currentAmplitude = if (state is VoiceDictationState.Listening) state.amplitude else 0f
+    val currentDecibels = if (state is VoiceDictationState.Listening) state.decibels else 0f
 
     var isExpanded by remember { mutableStateOf(false) }
+
+    // Real-time animated waveform phase
+    val infiniteTransition = rememberInfiniteTransition(label = "waveform_anim")
+    val wavePhase by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(
+            animation = tween(1100, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "phase"
+    )
 
     // Auto-expand when active recording starts
     LaunchedEffect(isListening, isTranscribing) {
@@ -160,14 +178,36 @@ fun HandsFreeVoiceDictationBar(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = when {
-                            isListening -> "Listening (${targetMode.title})..."
-                            isUnavailable -> "Voice Charting Unavailable"
-                            else -> "Hands-Free Voice Charting"
+                            isListening -> "Listening (Universal AI Scribe)"
+                            isUnavailable -> "Voice Dictation Unavailable"
+                            else -> "Universal AI Voice Dictation"
                         },
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
                         color = if (isListening) ThornburyError else ThornburyInk
                     )
+                    if (isListening && currentDecibels > 0f) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = when {
+                                currentDecibels >= 52f -> ThornburySuccess.copy(alpha = 0.15f)
+                                currentDecibels >= 38f -> ThornburyWarning.copy(alpha = 0.15f)
+                                else -> ThornburyError.copy(alpha = 0.15f)
+                            }
+                        ) {
+                            Text(
+                                text = "${currentDecibels.toInt()} dB",
+                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                color = when {
+                                    currentDecibels >= 52f -> ThornburySuccess
+                                    currentDecibels >= 38f -> ThornburyWarning
+                                    else -> ThornburyError
+                                },
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
                 }
             }
         } else {
@@ -230,20 +270,28 @@ fun HandsFreeVoiceDictationBar(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Mode Selector Chips
-                    Row(
+                    // Universal Multi-Field AI Dictation Badge
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        color = ThornburyPrimaryWash,
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        DictationTargetMode.values().forEach { mode ->
-                            val isSelected = targetMode == mode
-                            AssistChip(
-                                onClick = { onSelectTargetMode(mode) },
-                                label = { Text(mode.title, fontSize = 12.sp) },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                                    labelColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-                                )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.GraphicEq,
+                                contentDescription = null,
+                                tint = ThornburyPrimary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Universal AI Scribe (Demographics • Odontogram • Examination)",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ThornburyPrimary
                             )
                         }
                     }
@@ -324,11 +372,11 @@ fun HandsFreeVoiceDictationBar(
                             Text(
                                 text = when {
                                     isListening && partialText.isNotBlank() -> "Heard: \"$partialText\""
-                                    isListening -> "Listening... Dictate 6-site probing or tooth depths hands-free"
+                                    isListening -> "Listening... Dictate demographics, tooth conditions, or clinical examination findings hands-free."
                                     isTranscribing -> "Transcribing dictation locally..."
                                     unavailableReason != null -> unavailableReason
                                     state is VoiceDictationState.Error -> state.message
-                                    else -> "Hands-free dictation ready. VAD endpointing and 6-site sequences active."
+                                    else -> "Universal AI dictation ready. Automatic multi-field clinical entity extraction active."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = when {
@@ -343,22 +391,93 @@ fun HandsFreeVoiceDictationBar(
                                 enter = fadeIn(),
                                 exit = fadeOut()
                             ) {
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.GraphicEq,
-                                        contentDescription = null,
-                                        tint = ThornburyPrimary,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Real-Time Multi-Bar Decibel Waveform Equalizer
+                                    Row(
                                         modifier = Modifier
-                                            .height(6.dp)
-                                            .fillMaxWidth(currentAmplitude.coerceIn(0.1f, 1f))
-                                            .clip(RoundedCornerShape(3.dp))
-                                            .background(ThornburyPrimary)
-                                    )
+                                            .fillMaxWidth()
+                                            .height(34.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(ThornburyCanvas.copy(alpha = 0.8f))
+                                            .border(BorderStroke(0.5.dp, ThornburyHairline))
+                                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val barCount = 20
+                                        for (i in 0 until barCount) {
+                                            val barFrac = i.toFloat() / barCount
+                                            val waveFactor = (sin(wavePhase + barFrac * 3.5f * PI.toFloat()) + 1.0f) * 0.5f
+                                            val dynamicHeight = if (isListening) {
+                                                val energy = (currentAmplitude * 0.7f + (currentDecibels / 90f) * 0.3f).coerceIn(0.12f, 1f)
+                                                (energy * (0.35f + 0.65f * waveFactor)).coerceIn(0.12f, 1f)
+                                            } else 0.12f
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(4.dp)
+                                                    .fillMaxHeight(dynamicHeight)
+                                                    .clip(RoundedCornerShape(2.dp))
+                                                    .background(
+                                                        when {
+                                                            currentDecibels >= 52f -> ThornburyPrimary
+                                                            currentDecibels >= 38f -> ThornburyWarning
+                                                            else -> ThornburyMuted.copy(alpha = 0.5f)
+                                                        }
+                                                    )
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Decibel & Operatory Suction / Mask Acoustic Clarity Readout
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(7.dp)
+                                                    .clip(CircleShape)
+                                                    .background(
+                                                        when {
+                                                            currentDecibels >= 52f -> ThornburySuccess
+                                                            currentDecibels >= 38f -> ThornburyWarning
+                                                            else -> ThornburyError
+                                                        }
+                                                    )
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = when {
+                                                    currentDecibels >= 52f -> "Voice Clear (Good SNR • Mask OK)"
+                                                    currentDecibels >= 38f -> "Suction / Ambient Background"
+                                                    else -> "Low Signal (Check Mask / Distance)"
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = when {
+                                                    currentDecibels >= 52f -> ThornburySuccess
+                                                    currentDecibels >= 38f -> ThornburyWarning
+                                                    else -> ThornburyMuted
+                                                }
+                                            )
+                                        }
+
+                                        Text(
+                                            text = "${currentDecibels.toInt()} dB SPL",
+                                            style = MaterialTheme.typography.labelSmall.copy(
+                                                fontWeight = FontWeight.Bold,
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                                            ),
+                                            color = ThornburyInk
+                                        )
+                                    }
                                 }
                             }
                         }

@@ -242,6 +242,106 @@ export const currentUser = cache(async (): Promise<SessionUser | null> => {
   };
 });
 
+/**
+ * Creates and stores a new API session in the sessions table, returning the raw token and expiration date.
+ */
+export async function createApiSession(account: Account, userAgent?: string): Promise<{ token: string; expiresAt: Date; sessionId: string }> {
+  const token = `sess_${randomBytes(32).toString("hex")}`;
+  const expiresAt = new Date(Date.now() + SESSION_ABSOLUTE_MS);
+  const sessionId = newId("se");
+
+  await db()`
+    INSERT INTO sessions (id, account_id, token_hash, expires_at, user_agent)
+    VALUES (${sessionId}, ${account.id}, ${sha256(token)}, ${expiresAt.toISOString()}, ${(userAgent ?? "").slice(0, 200)})
+  `;
+
+  return { token, expiresAt, sessionId };
+}
+
+/**
+ * Authenticates an incoming HTTP request via Bearer token, x-session-token, or td_session cookie.
+ */
+export async function authenticateApiRequest(request: Request): Promise<SessionUser | null> {
+  let token: string | null = null;
+
+  const authHeader = request.headers.get("authorization");
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.substring(7).trim();
+  }
+
+  if (!token) {
+    token = request.headers.get("x-session-token");
+  }
+
+  if (!token) {
+    const cookieHeader = request.headers.get("cookie");
+    if (cookieHeader) {
+      const match = cookieHeader.match(/(?:^|;\s*)td_session=([^;]+)/);
+      if (match) {
+        token = match[1];
+      }
+    }
+  }
+
+  if (!token) return null;
+
+  const sql = db();
+  const rows = (await sql`
+    SELECT s.id AS session_id, s.expires_at, s.last_seen_at, s.revoked_at,
+           a.id AS account_id, a.role, a.clinician_id, a.email, a.disabled_at,
+           c.name AS name, COALESCE(c.room, '') AS room, c.photo AS photo
+    FROM sessions s
+    JOIN accounts a ON a.id = s.account_id
+    JOIN clinicians c ON c.id = a.clinician_id
+    WHERE s.token_hash = ${sha256(token)}
+  `) as Array<{
+    session_id: string;
+    expires_at: Date;
+    last_seen_at: Date;
+    revoked_at: Date | null;
+    account_id: string;
+    role: Role;
+    clinician_id: string;
+    email: string;
+    disabled_at: Date | null;
+    name: string;
+    room: string;
+    photo: string | null;
+  }>;
+
+  const row = rows[0];
+  if (!row || row.revoked_at) return null;
+
+  if (row.disabled_at) {
+    await sql`UPDATE sessions SET revoked_at = now() WHERE id = ${row.session_id}`;
+    return null;
+  }
+
+  const now = Date.now();
+  const expired = now > new Date(row.expires_at).getTime();
+  const idle = now - new Date(row.last_seen_at).getTime() > SESSION_IDLE_MS;
+
+  if (expired || idle) {
+    await sql`UPDATE sessions SET revoked_at = now() WHERE id = ${row.session_id}`;
+    return null;
+  }
+
+  if (now - new Date(row.last_seen_at).getTime() > 60_000) {
+    await sql`UPDATE sessions SET last_seen_at = now() WHERE id = ${row.session_id}`;
+  }
+
+  return {
+    accountId: row.account_id,
+    sessionId: row.session_id,
+    role: row.role,
+    clinicianId: row.clinician_id,
+    email: row.email,
+    name: row.name,
+    room: row.room ?? "",
+    photo: row.photo ?? null,
+  };
+}
+
 export async function signOut(): Promise<void> {
   try {
     const user = await currentUser();

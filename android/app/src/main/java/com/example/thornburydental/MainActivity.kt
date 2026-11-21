@@ -28,7 +28,7 @@ class MainActivity : FragmentActivity() {
       ActivityResultContracts.RequestPermission()
   ) { isGranted ->
       if (isGranted) {
-          ReminderManager.rescheduleAllActiveReminders(this)
+          ReminderManager.rescheduleAllActiveRemindersAsync(this)
       }
   }
 
@@ -43,16 +43,16 @@ class MainActivity : FragmentActivity() {
       )
     }
 
-    // Initialize notification channels and schedule active reminders
+    // Initialize notification channels and schedule active reminders asynchronously
     ReminderManager.createNotificationChannels(this)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            ReminderManager.rescheduleAllActiveReminders(this)
+            ReminderManager.rescheduleAllActiveRemindersAsync(this)
         }
     } else {
-        ReminderManager.rescheduleAllActiveReminders(this)
+        ReminderManager.rescheduleAllActiveRemindersAsync(this)
     }
 
     DentalRepository.initializePreferencesSynchronously(this)
